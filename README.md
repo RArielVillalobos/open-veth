@@ -31,14 +31,25 @@ The project consists of two main components:
 
 ## 🏁 Getting Started
 
-To set up the development environment, build the base images, and run the API server, please refer to the detailed guide:
-
-👉 **[Development Guide (DEVELOPMENT.md)](./DEVELOPMENT.md)**
-
-### Core Requirements
+### Prerequisites
 - Docker & Docker Compose
 - Linux Environment (Native or WSL2)
-- Go 1.23+
+
+### Quick Start
+1. **Launch the development environment:**
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d --build
+   ```
+2. **Access the development container:**
+   ```bash
+   docker exec -it openveth-dev bash
+   ```
+3. **Run the API server (inside the container):**
+   ```bash
+   go mod tidy
+   go run cmd/openveth-api/main.go
+   ```
+   The API will be available at `http://localhost:8080`.
 
 ## 📄 License
 
