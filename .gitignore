@@ -1,0 +1,37 @@
+# Binarios de Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+openveth-server
+openveth-api
+
+# Dependencias y herramientas
+vendor/
+.gemini/
+tmp/
+
+# Docker
+.docker/
+*.log
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Frontend (Angular)
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/tmp/
+frontend/out-tsc/
+frontend/bazel-out/
+
+# OS locales
+Thumbs.db
+desktop.ini

@@ -1,0 +1,21 @@
+services:
+  openveth-dev:
+    build:
+      context: .
+      dockerfile: deployments/dev/Dockerfile
+    container_name: openveth-dev
+    # Privilegiado para poder manipular interfaces de red (netlink)
+    privileged: true
+    volumes:
+      # Montamos el código fuente actual
+      - .:/app
+      # Montamos el socket de Docker para poder crear contenedores desde dentro
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Configuración de red para facilitar la visibilidad
+    network_mode: bridge
+    ports:
+      - "8080:8080"
+    pid: host
+    working_dir: /app
+    environment:
+      - CGO_ENABLED=1
