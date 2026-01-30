@@ -1,0 +1,12 @@
+<div class="terminal-window">
+  <div class="terminal-window__header">
+    <div class="title">
+      <span class="icon">💻</span>
+      {{ nodeName() }}
+    </div>
+    <button class="close-btn" (click)="close.emit()">×</button>
+  </div>
+  <div class="terminal-window__body">
+    <div #terminal class="xterm-container"></div>
+  </div>
+</div>

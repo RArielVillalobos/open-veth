@@ -1,0 +1,20 @@
+<div class="toolbar">
+  <div class="toolbar__section">
+    <h1 class="text-xl font-bold text-slate-800 mr-6">OpenVeth</h1>
+    <button class="btn btn--secondary" (click)="addNode.emit('router')">
+      + Add Router
+    </button>
+    <button class="btn btn--secondary" (click)="addNode.emit('host')">
+      + Add PC
+    </button>
+  </div>
+
+  <div class="toolbar__section">
+    <button class="btn btn--success" [disabled]="isLoading()" (click)="deploy.emit()">
+      {{ isLoading() ? 'Deploying...' : '🚀 Deploy' }}
+    </button>
+    <button class="btn btn--danger" (click)="cleanup.emit()">
+      Cleanup
+    </button>
+  </div>
+</div>

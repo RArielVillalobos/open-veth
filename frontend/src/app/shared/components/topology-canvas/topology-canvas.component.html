@@ -1,0 +1,23 @@
+<div class="canvas-overlay">
+  <div *ngIf="sourceNodeId" class="linking-indicator">
+    🔗 Linking from: <strong>{{ getNodeName(sourceNodeId) }}</strong> (Click another node to connect)
+    <button (click)="cancelLinking()">Cancel</button>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div *ngIf="contextMenu.visible" 
+     class="context-menu"
+     [style.top.px]="contextMenu.y" 
+     [style.left.px]="contextMenu.x">
+  <div class="context-menu__header">{{ contextMenu.nodeName }}</div>
+  <button class="context-menu__item" (click)="onContextMenuAction('terminal')">
+    <span class="icon">💻</span> Open Terminal
+  </button>
+  <div class="context-menu__separator"></div>
+  <button class="context-menu__item text-red-600" (click)="onContextMenuAction('delete')">
+    <span class="icon">🗑️</span> Delete Node
+  </button>
+</div>
+
+<div #cyContainer class="cy-container"></div>

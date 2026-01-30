@@ -1,0 +1,35 @@
+<div class="dashboard">
+  <!-- Dumb Component: Toolbar -->
+  <app-topology-toolbar 
+    [isLoading]="store.isLoading()"
+    (addNode)="onAddNode($event)"
+    (deploy)="store.deploy()"
+    (cleanup)="store.cleanup()">
+  </app-topology-toolbar>
+
+  <main class="dashboard__content">
+    <!-- Dumb Component: Canvas (Cytoscape) -->
+    <div class="canvas-wrapper">
+        <app-topology-canvas
+            [nodes]="store.topology().nodes"
+            [links]="store.topology().links"
+            (edgeCreated)="store.addLink($event)"
+            (nodeMoved)="store.updateNodePosition($event.id, $event.x, $event.y)"
+            (openTerminalRequest)="openTerminal($event)">
+        </app-topology-canvas>
+    </div>
+  </main>
+
+  <!-- Terminal Panel (Bottom Sheet with Tabs) -->
+  <app-terminal-panel
+    [activeNodes]="activeTerminals()"
+    [activeTab]="activeTab()"
+    (closeTerminal)="closeTerminal($event)"
+    (selectTab)="setActiveTab($event)">
+  </app-terminal-panel>
+
+  <!-- Feedback Area -->
+  <div *ngIf="store.error()" class="alert alert--error">
+    {{ store.error() }}
+  </div>
+</div>
