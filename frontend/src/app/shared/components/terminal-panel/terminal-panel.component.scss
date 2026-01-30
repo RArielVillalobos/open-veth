@@ -1,0 +1,135 @@
+.terminal-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35vh; /* Altura fija importante */
+  min-height: 200px;
+  background-color: #1e293b; 
+  border-top: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.3);
+  font-family: 'Inter', sans-serif; /* Reset fuente UI */
+
+  &__header {
+    height: 40px;
+    background-color: #0f172a; 
+    display: flex;
+    align-items: flex-end; /* Alinear tabs abajo */
+    padding: 0 10px;
+    border-bottom: 1px solid #1e293b;
+    gap: 4px;
+
+    .tabs-container {
+      display: flex;
+      flex-direction: row; /* Forzar fila */
+      align-items: flex-end;
+      gap: 4px;
+      height: 100%;
+      overflow-x: auto; /* Scroll horizontal si hay muchas */
+      
+      &::-webkit-scrollbar { display: none; } /* Ocultar scrollbar para estética */
+    }
+
+    .controls {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      padding-bottom: 4px;
+
+      .clear-btn {
+        background: none;
+        border: 1px solid #334155;
+        color: #94a3b8;
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.2s;
+
+        &:hover {
+          background-color: #334155;
+          color: #f1f5f9;
+          border-color: #475569;
+        }
+      }
+    }
+
+    .tab {
+      background-color: #1e293b;
+      color: #94a3b8;
+      padding: 0 16px;
+      height: 32px; /* Altura tab */
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      border: 1px solid transparent;
+      user-select: none;
+      min-width: 140px;
+      justify-content: space-between;
+      transition: all 0.2s;
+
+      &:hover {
+        background-color: #334155;
+        color: #f1f5f9;
+      }
+
+      &--active {
+        background-color: #1e293b; 
+        color: #3b82f6; 
+        border-top: 3px solid #3b82f6;
+        font-weight: 600;
+        height: 34px; /* Un poco más alto */
+        margin-bottom: -1px; /* Solapar borde */
+        z-index: 10;
+      }
+
+      .icon { font-size: 14px; }
+      
+      .close-btn {
+        background: none;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        padding: 2px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        &:hover { background-color: #ef4444; color: white; }
+      }
+    }
+  }
+
+  &__body {
+    flex: 1;
+    position: relative;
+    background-color: #000000; 
+    padding: 0; /* Sin padding, terminal full width */
+    overflow: hidden;
+
+    .xterm-wrapper {
+      width: 100%;
+      height: 100%;
+      /* Importante: xterm necesita display block y tamaño */
+      display: block; 
+    }
+  }
+}
+
+/* Estilos globales para xterm (opcional si xterm.css está cargado, pero asegura visibilidad) */
+::ng-deep .xterm-viewport {
+    overflow-y: auto !important;
+}

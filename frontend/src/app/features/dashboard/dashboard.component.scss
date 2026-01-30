@@ -1,0 +1,18 @@
+.dashboard { 
+    @apply min-h-screen bg-slate-50 flex flex-col; 
+
+    &__content { 
+        @apply flex-1 p-0 relative; 
+    }
+}
+
+.canvas-wrapper { 
+    @apply w-full h-full absolute inset-0; 
+}
+
+.alert {
+  @apply fixed bottom-4 right-4 p-4 rounded-lg shadow-lg border z-50;
+  &--error { 
+    @apply bg-red-100 border-red-200 text-red-700; 
+  }
+}

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"io"
 	"log"
 	"net/http"
 

@@ -1,0 +1,55 @@
+.terminal-window {
+  position: fixed;
+  top: 100px;
+  right: 50px; /* Por defecto arriba a la derecha */
+  width: 600px;
+  height: 400px;
+  background-color: #1e293b; /* Slate-800 */
+  border-radius: 8px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1000;
+  border: 1px solid #334155;
+
+  &__header {
+    background-color: #0f172a; /* Slate-900 */
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move; /* Preparado para drag and drop futuro */
+    
+    .title {
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      &:hover { color: #fff; }
+    }
+  }
+
+  &__body {
+    flex: 1;
+    padding: 4px;
+    background-color: #1e293b;
+    position: relative;
+    
+    .xterm-container {
+      width: 100%;
+      height: 100%;
+    }
+  }
+}
