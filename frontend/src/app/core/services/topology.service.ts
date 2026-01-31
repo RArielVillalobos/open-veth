@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Topology, Node, Link } from '../../models/topology.model';
+import { Topology, Node, Link, InterfaceInfo } from '../../models/topology.model';
 
 @Injectable({
   providedIn: 'root'
@@ -11,8 +11,13 @@ export class TopologyService {
   private apiUrl = 'http://localhost:8080/api/v1';
 
   // --- Nodos ---
-  getNodes(): Observable<Node[]> {
-    return this.http.get<Node[]>(`${this.apiUrl}/nodes`);
+  getNodes(live: boolean = false): Observable<Node[]> {
+    const url = live ? `${this.apiUrl}/nodes?live=true` : `${this.apiUrl}/nodes`;
+    return this.http.get<Node[]>(url);
+  }
+
+  getNodeInterfaces(id: string): Observable<InterfaceInfo[]> {
+    return this.http.get<InterfaceInfo[]>(`${this.apiUrl}/nodes/${id}/interfaces`);
   }
 
   createNode(node: Node): Observable<Node> {

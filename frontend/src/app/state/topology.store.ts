@@ -90,6 +90,24 @@ export const TopologyStore = signalStore(
       }
     },
 
+    async fetchNodeInterfaces(id: string) {
+      // No activamos isLoading global para no bloquear la UI entera
+      try {
+        const interfaces = await firstValueFrom(service.getNodeInterfaces(id));
+        patchState(store, (state) => ({
+          topology: {
+            ...state.topology,
+            nodes: state.topology.nodes.map(n => 
+              n.id === id ? { ...n, interfaces } : n
+            )
+          }
+        }));
+      } catch (err: any) {
+        console.error('Failed to fetch interfaces for node', id, err);
+        // Opcional: toast.error('Could not fetch interfaces');
+      }
+    },
+
     updateNodePosition(id: string, x: number, y: number) {
       patchState(store, (state) => ({
         topology: {
@@ -141,6 +159,24 @@ export const TopologyStore = signalStore(
     },
 
     // --- System ---
+    async syncState() {
+      patchState(store, { isLoading: true });
+      try {
+        const nodes = await firstValueFrom(service.getNodes(true));
+        patchState(store, (state) => ({
+          isLoading: false,
+          topology: {
+            ...state.topology,
+            nodes: nodes
+          }
+        }));
+        toast.success('Network state synced');
+      } catch (err: any) {
+        patchState(store, { isLoading: false, error: err.message });
+        toast.error('Sync failed');
+      }
+    },
+
     async cleanup() {
       patchState(store, { isLoading: true });
       try {
