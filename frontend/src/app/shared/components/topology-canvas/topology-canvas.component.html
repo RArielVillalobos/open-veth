@@ -10,13 +10,24 @@
      class="context-menu"
      [style.top.px]="contextMenu.y" 
      [style.left.px]="contextMenu.x">
-  <div class="context-menu__header">{{ contextMenu.nodeName }}</div>
-  <button class="context-menu__item" (click)="onContextMenuAction('terminal')">
+  <div class="context-menu__header">{{ contextMenu.elementName }}</div>
+  
+  <!-- Solo para Nodos -->
+  <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'edge'" 
+          class="context-menu__item" (click)="onContextMenuAction('terminal')">
     <span class="icon">💻</span> Open Terminal
   </button>
-  <div class="context-menu__separator"></div>
+  
+  <button *ngIf="contextMenu.elementType !== 'edge'" 
+          class="context-menu__item" (click)="onContextMenuAction('properties')">
+    <span class="icon">ℹ️</span> Properties
+  </button>
+
+  <div *ngIf="contextMenu.elementType !== 'edge'" class="context-menu__separator"></div>
+
+  <!-- Común para todos -->
   <button class="context-menu__item text-red-600" (click)="onContextMenuAction('delete')">
-    <span class="icon">🗑️</span> Delete Node
+    <span class="icon">🗑️</span> Delete {{ contextMenu.elementType === 'edge' ? 'Link' : 'Node' }}
   </button>
 </div>
 

@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Server encapsula el router HTTP y las dependencias
+// Server encapsulates the HTTP router and dependencies
 type Server struct {
 	router  *gin.Engine
 	manager *orchestrator.Manager
@@ -61,7 +61,7 @@ func NewServer(mgr *orchestrator.Manager) *Server {
 	return s
 }
 
-// setupRoutes define los endpoints granulares (Fase 4)
+// setupRoutes defines granular endpoints (Phase 4)
 func (s *Server) setupRoutes() {
 	// Health Check
 	s.router.GET("/health", func(c *gin.Context) {
@@ -73,30 +73,43 @@ func (s *Server) setupRoutes() {
 		// Terminal (Websocket)
 		api.GET("/terminal", s.handleTerminal)
 
-		// Nodos
+		// Nodes
 		api.GET("/nodes", s.listNodes)
 		api.POST("/nodes", s.createNode)
 		api.DELETE("/nodes/:id", s.deleteNode)
+		api.GET("/nodes/:id/interfaces", s.getNodeInterfaces) // New Real-Time endpoint
 		
 		// Links
 		api.GET("/links", s.listLinks)
 		api.POST("/links", s.createLink)
 		api.DELETE("/links/:id", s.deleteLink)
 
-		// Limpieza Global
+		// Global Cleanup
 		api.DELETE("/system/cleanup", s.handleCleanup)
 	}
 }
 
-// Run arranca el servidor
+// Run starts the server
 func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
-// --- Handlers de Nodos ---
+// --- Node Handlers ---
 
 func (s *Server) listNodes(c *gin.Context) {
 	nodes, _ := s.repo.ListNodes()
+
+	// If real-time info is requested
+	if c.Query("live") == "true" {
+		for i := range nodes {
+			if nodes[i].ContainerID != "" {
+				if ifaces, err := s.manager.GetNodeInterfaces(c.Request.Context(), nodes[i].ContainerID); err == nil {
+					nodes[i].Interfaces = ifaces
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, nodes)
 }
 
@@ -139,6 +152,28 @@ func (s *Server) deleteNode(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (s *Server) getNodeInterfaces(c *gin.Context) {
+	id := c.Param("id")
+	node, found := s.repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+		return
+	}
+
+	interfaces, err := s.manager.GetNodeInterfaces(c.Request.Context(), node.ContainerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, interfaces)
+}
+
 // --- Handlers de Links ---
 
 func (s *Server) listLinks(c *gin.Context) {
@@ -159,6 +194,17 @@ func (s *Server) createLink(c *gin.Context) {
 	if !okS || !okT {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "source or target node not found"})
 		return
+	}
+
+	// Validation: Check for existing link between these nodes
+	existingLinks, _ := s.repo.ListLinks()
+	for _, l := range existingLinks {
+		// Check both directions
+		if (l.SourceID == link.SourceID && l.TargetID == link.TargetID) ||
+		   (l.SourceID == link.TargetID && l.TargetID == link.SourceID) {
+			c.JSON(http.StatusConflict, gin.H{"error": "link already exists between these nodes"})
+			return
+		}
 	}
 
 	nm := orchestrator.NewNetworkManager()

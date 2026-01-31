@@ -1,3 +1,13 @@
+export interface IPAddress {
+  local: string;
+  prefixlen: number;
+}
+
+export interface InterfaceInfo {
+  ifname: string;
+  addr_info: IPAddress[];
+}
+
 export interface Node {
   id: string;
   name: string;
@@ -5,7 +15,8 @@ export interface Node {
   image: string;
   x?: number;
   y?: number;
-  status?: 'pending' | 'running' | 'error'; // Nuevo campo
+  status?: 'pending' | 'running' | 'error';
+  interfaces?: InterfaceInfo[]; // Runtime info
 }
 
 export interface Link {

@@ -23,6 +23,20 @@ type Node struct {
 	// Internal state
 	ContainerID string `json:"container_id"`
 	PID         int    `json:"pid"`
+	
+	// Runtime Info (Not persisted in DB)
+	Interfaces []InterfaceInfo `json:"interfaces" gorm:"-"`
+}
+
+// InterfaceInfo maps the output of 'ip -j addr'
+type InterfaceInfo struct {
+	Name        string      `json:"ifname"`
+	IPAddresses []IPAddress `json:"addr_info"`
+}
+
+type IPAddress struct {
+	Address string `json:"local"`
+	Prefix  int    `json:"prefixlen"`
 }
 
 // Link representa un cable virtual (veth pair) entre dos nodos
