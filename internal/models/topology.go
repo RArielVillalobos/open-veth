@@ -11,25 +11,27 @@ const (
 
 // Node representa un dispositivo en la red
 type Node struct {
-	ID          string   `json:"id"`
+	ID          string   `json:"id" gorm:"primaryKey"`
 	Name        string   `json:"name"`
 	Type        NodeType `json:"type"`
-	Image       string   `json:"image"`       // Ej: "alpine:latest" o "frrouting/frr"
-	CPURequest  string   `json:"cpu_request"` // Ej: "0.1" (10% de un core)
-	RAMLimit    string   `json:"ram_limit"`   // Ej: "128MB"
+	Image       string   `json:"image"`
+	CPURequest  string   `json:"cpu_request"`
+	RAMLimit    string   `json:"ram_limit"`
+	X           float64  `json:"x"` // Canvas position
+	Y           float64  `json:"y"` // Canvas position
 	
-	// Estado en tiempo real (No se guarda en DB necesariamente)
-	ContainerID string   `json:"-"` // ID interno de Docker
-	PID         int      `json:"-"` // PID del proceso para Netns plumbing
+	// Internal state
+	ContainerID string `json:"container_id"`
+	PID         int    `json:"pid"`
 }
 
 // Link representa un cable virtual (veth pair) entre dos nodos
 type Link struct {
-	ID        string `json:"id"`
+	ID        string `json:"id" gorm:"primaryKey"`
 	SourceID  string `json:"source"`
 	TargetID  string `json:"target"`
-	SourceInt string `json:"source_int"` // Nombre interfaz (eth0)
-	TargetInt string `json:"target_int"` // Nombre interfaz (eth0)
+	SourceInt string `json:"source_int"`
+	TargetInt string `json:"target_int"`
 }
 
 // Topology es el objeto que engloba un laboratorio completo

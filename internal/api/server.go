@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"open-veth/internal/models"
 	"open-veth/internal/orchestrator"
 	"open-veth/internal/storage"
@@ -18,21 +20,41 @@ type Server struct {
 	repo    storage.Repository
 }
 
-// NewServer crea y configura una instancia del servidor API
+// NewServer creates and configures the API server instance
 func NewServer(mgr *orchestrator.Manager) *Server {
 	r := gin.Default()
 
-	// Configuración CORS
+	// CORS configuration
 	config := cors.DefaultConfig()
 	config.AllowAllOrigins = true
 	config.AllowCredentials = true
 	config.AddAllowHeaders("Authorization")
 	r.Use(cors.New(config))
 
+	// Database Configuration from Environment
+	dbDriver := os.Getenv("DB_DRIVER")
+	if dbDriver == "" {
+		dbDriver = "sqlite"
+	}
+	dbDSN := os.Getenv("DB_DSN")
+	if dbDSN == "" {
+		dbDSN = "openveth.db"
+	}
+
+	// Initialize Repository
+	var repo storage.Repository
+	dbRepo, err := storage.NewGormRepository(dbDriver, dbDSN)
+	if err != nil {
+		fmt.Printf("Warning: Failed to initialize DB (%s), falling back to Memory: %v\n", dbDriver, err)
+		repo = storage.NewMemoryRepository()
+	} else {
+		repo = dbRepo
+	}
+
 	s := &Server{
 		router:  r,
 		manager: mgr,
-		repo:    storage.NewMemoryRepository(),
+		repo:    repo,
 	}
 
 	s.setupRoutes()
