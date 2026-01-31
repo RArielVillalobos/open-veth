@@ -22,7 +22,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private cy!: cytoscape.Core;
   sourceNodeId: string | null = null;
   
-  // Estado del menú contextual
+  // Context menu state
   contextMenu = {
     visible: false,
     x: 0,
@@ -65,7 +65,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     if (action === 'terminal') {
       this.openTerminalRequest.emit(this.contextMenu.nodeName);
     }
-    // TODO: Implementar delete
+    // TODO: Implement delete
     this.closeContextMenu();
   }
 
@@ -78,12 +78,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
                           style: {
                             'label': 'data(label)',
                             'color': '#334155', // Slate-700
-                            'font-size': '9px',        // Reducido a 9px
+                            'font-size': '9px',        // Reduced to 9px
                             'font-weight': 'bold',
                             'text-valign': 'top',
                 
-              // Cambiado de bottom a top
-            'text-margin-y': -6,       // Margen negativo para subirlo
+              // Changed from bottom to top
+            'text-margin-y': -6,       // Negative margin to push it up
             'background-color': '#fff',
             'border-width': 2,
             'width': 40,
@@ -92,20 +92,18 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
             'text-outline-width': 2
           }
         },
-        // Estilo Router (Círculo Azul)
+        // Router Style (Blue Circle)
         {
           selector: 'node[type="router"]',
           style: {
             'shape': 'ellipse',
             'background-color': '#eff6ff', // Blue-50
             'border-color': '#3b82f6',     // Blue-500
-            'content': 'data(label)',      // Etiqueta abajo
-            // Icono central usando "content" o pseudo-elemento no soportado,
-            // pero podemos usar background-image si es SVG vectorial PURO (no base64 complejo).
-            // O mejor: simplemente la forma y el color distinguen.
+            'content': 'data(label)',      // Label below
+            // Icon handling (simplified)
           }
         },
-        // Estilo Host (Cuadrado Verde)
+        // Host Style (Green Square)
         {
           selector: 'node[type="host"]',
           style: {
@@ -154,12 +152,39 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         clickedNode.addClass('selected-source');
       } else {
         if (this.sourceNodeId !== clickedId) {
+          
+          // Calculate robust dynamic interface names
+          const getNextInterface = (nodeId: string) => {
+             // 1. Get all used interface names for this node
+             const usedNames = this.links()
+               .filter(l => l.source === nodeId || l.target === nodeId)
+               .map(l => l.source === nodeId ? l.source_int : l.target_int);
+             
+             // 2. Extract numbers (eth1 -> 1, eth2 -> 2)
+             const usedNumbers = usedNames
+               .map(name => parseInt(name.replace('eth', ''), 10))
+               .filter(n => !isNaN(n))
+               .sort((a, b) => a - b);
+
+             // 3. Find first gap starting from 1
+             let nextNum = 1;
+             for (const num of usedNumbers) {
+               if (num === nextNum) {
+                 nextNum++;
+               } else if (num > nextNum) {
+                 // Gap found
+                 break;
+               }
+             }
+             return `eth${nextNum}`;
+          };
+
           const newLink: Link = {
             id: 'link-' + Math.random().toString(36).substr(2, 5),
             source: this.sourceNodeId,
             target: clickedId,
-            source_int: 'eth1',
-            target_int: 'eth1'
+            source_int: getNextInterface(this.sourceNodeId),
+            target_int: getNextInterface(clickedId)
           };
           
           this.edgeCreated.emit(newLink);
@@ -190,7 +215,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     
     this.cy.on('zoom pan', () => this.closeContextMenu());
 
-    // Evento al terminar de arrastrar un nodo
+    // Event on drag end
     this.cy.on('dragfree', 'node', (evt) => {
       const node = evt.target;
       const pos = node.position();

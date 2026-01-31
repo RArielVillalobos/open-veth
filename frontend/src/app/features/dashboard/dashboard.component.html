@@ -3,7 +3,6 @@
   <app-topology-toolbar 
     [isLoading]="store.isLoading()"
     (addNode)="onAddNode($event)"
-    (deploy)="store.deploy()"
     (cleanup)="store.cleanup()">
   </app-topology-toolbar>
 
@@ -28,8 +27,6 @@
     (selectTab)="setActiveTab($event)">
   </app-terminal-panel>
 
-  <!-- Feedback Area -->
-  <div *ngIf="store.error()" class="alert alert--error">
-    {{ store.error() }}
-  </div>
+  <!-- Notificaciones Toast -->
+  <app-toast></app-toast>
 </div>

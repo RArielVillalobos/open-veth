@@ -3,8 +3,9 @@ export interface Node {
   name: string;
   type: 'router' | 'switch' | 'host';
   image: string;
-  x?: number; // Posición en el lienzo
+  x?: number;
   y?: number;
+  status?: 'pending' | 'running' | 'error'; // Nuevo campo
 }
 
 export interface Link {

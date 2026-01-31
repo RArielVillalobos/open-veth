@@ -28,29 +28,21 @@
 - Linux Environment (Native or WSL2)
 
 ### Quick Start
-1. **Launch the development environment:**
+1. **Initialize Environment:**
    ```bash
-   docker compose -f docker-compose.dev.yml up -d --build
+   make dev-env    # Starts Docker infrastructure
+   make images     # Builds node images (Host & Router)
    ```
-2. **Access the development container:**
+
+2. **Run Backend:**
    ```bash
-   docker exec -it openveth-dev bash
+   make run-api
    ```
-3. **Build Node Images (First time only):**
+
+3. **Run Frontend:**
    ```bash
-   docker build -t openveth/host:latest ./images/host-node
-   docker build -t openveth/router:latest ./images/router-node
-   ```
-4. **Run the API server:**
-   ```bash
-   go mod tidy
-   go run cmd/openveth-api/main.go
-   ```
-5. **Start Frontend:**
-   ```bash
-   cd frontend
-   npm install
-   npm start
+   # In a new terminal
+   make run-ui
    ```
    Open `http://localhost:4200` in your browser.
 

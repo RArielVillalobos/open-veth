@@ -113,12 +113,26 @@ import (
 			return "", fmt.Errorf("error al crear contenedor: %v", err)
 		}
 	
-		// 4. Arrancar el contenedor (Nuevo)
+		// 4. Start container
 		if err := m.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-			return "", fmt.Errorf("error al arrancar nuevo contenedor: %v", err)
+			return "", fmt.Errorf("error starting container: %v", err)
 		}
 	
-		fmt.Printf("Nodo %s creado y arrancado exitosamente (ID: %s).\n", node.Name, resp.ID[:12])
+		// 5. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
+		// We execute 'ip link set dev eth0 name mgmt0' inside the container immediately after start.
+		execConfig := container.ExecOptions{
+			Cmd:          []string{"ip", "link", "set", "dev", "eth0", "name", "mgmt0"},
+			AttachStdout: false,
+			AttachStderr: false,
+		}
+		
+		if execIDResp, err := m.cli.ContainerExecCreate(ctx, resp.ID, execConfig); err == nil {
+			_ = m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
+		} else {
+			fmt.Printf("Warning: Could not rename eth0 to mgmt0 in %s: %v\n", node.Name, err)
+		}
+
+		fmt.Printf("Node %s created and started successfully (ID: %s).\n", node.Name, resp.ID[:12])
 		return resp.ID, nil
 	}
 	

@@ -56,13 +56,22 @@ func (nm *NetworkManager) runInNs(pid int, action func() error) error {
 	return err
 }
 
-// CreateLink crea un cable virtual (veth pair) y conecta dos namespaces (PIDs)
+// CreateLink creates a veth pair and connects two namespaces (PIDs)
 func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int) error {
-	// Nombres temporales en el host
+	// Temporary names on host
 	hostVethNameSource := fmt.Sprintf("veth%s_s", link.ID[:5])
 	hostVethNameTarget := fmt.Sprintf("veth%s_t", link.ID[:5])
 
-	// 1. Crear el veth pair en el host (requiere estar en el ns original, asumimos que lo estamos)
+	// DEFENSIVE CLEANUP: Attempt to delete interfaces if they already exist
+	// This prevents 'file exists' errors if previous operations left residue on the host.
+	if l, _ := netlink.LinkByName(hostVethNameSource); l != nil {
+		_ = netlink.LinkDel(l)
+	}
+	if l, _ := netlink.LinkByName(hostVethNameTarget); l != nil {
+		_ = netlink.LinkDel(l)
+	}
+
+	// 1. Create veth pair on host
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:   hostVethNameSource,
@@ -72,7 +81,7 @@ func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int)
 	}
 
 	if err := netlink.LinkAdd(veth); err != nil {
-		return fmt.Errorf("error creando veth pair: %v", err)
+		return fmt.Errorf("error creating veth pair: %v", err)
 	}
 
 	// Función helper para mover y renombrar
