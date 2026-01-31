@@ -35,3 +35,7 @@ frontend/bazel-out/
 # OS locales
 Thumbs.db
 desktop.ini
+
+# Databases
+*.db
+*.db-journal
