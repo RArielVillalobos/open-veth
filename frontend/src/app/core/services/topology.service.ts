@@ -24,6 +24,10 @@ export class TopologyService {
     return this.http.post<Node>(`${this.apiUrl}/nodes`, node);
   }
 
+  updateNodePosition(id: string, x: number, y: number): Observable<void> {
+    return this.http.patch<void>(`${this.apiUrl}/nodes/${id}/position`, { x, y });
+  }
+
   deleteNode(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/nodes/${id}`);
   }
@@ -41,15 +45,30 @@ export class TopologyService {
     return this.http.delete<void>(`${this.apiUrl}/links/${id}`);
   }
 
+  // --- Laboratories ---
+  getLaboratories(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/laboratories`);
+  }
+
+  updateLaboratory(id: string, name: string): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/laboratories/${id}`, { name });
+  }
+
   // --- Sistema ---
 
   cleanup(): Observable<any> {
-
     return this.http.delete(`${this.apiUrl}/system/cleanup`);
-
   }
 
+  exportTopology(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/topology/export`, { responseType: 'blob' });
+  }
 
+  importTopology(yamlContent: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/topology/import`, yamlContent, {
+      headers: { 'Content-Type': 'application/x-yaml' }
+    });
+  }
 
   // --- Legacy (Batch Deploy) ---
 

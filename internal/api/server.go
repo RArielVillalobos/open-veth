@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 )
 
 // Server encapsulates the HTTP router and dependencies
@@ -76,6 +77,7 @@ func (s *Server) setupRoutes() {
 		// Nodes
 		api.GET("/nodes", s.listNodes)
 		api.POST("/nodes", s.createNode)
+		api.PATCH("/nodes/:id/position", s.updateNodePosition) // New for auto-save
 		api.DELETE("/nodes/:id", s.deleteNode)
 		api.GET("/nodes/:id/interfaces", s.getNodeInterfaces) // New Real-Time endpoint
 		
@@ -83,6 +85,16 @@ func (s *Server) setupRoutes() {
 		api.GET("/links", s.listLinks)
 		api.POST("/links", s.createLink)
 		api.DELETE("/links/:id", s.deleteLink)
+
+		// Laboratories
+		api.GET("/laboratories", s.listLaboratories)
+		api.POST("/laboratories", s.createLaboratory)
+		api.PATCH("/laboratories/:id", s.updateLaboratory) // New for renaming
+		api.DELETE("/laboratories/:id", s.deleteLaboratory)
+
+		// Topology Export/Import
+		api.GET("/topology/export", s.handleExport)
+		api.POST("/topology/import", s.handleImport)
 
 		// Global Cleanup
 		api.DELETE("/system/cleanup", s.handleCleanup)
@@ -94,10 +106,176 @@ func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
+// --- Topology Export/Import Handlers ---
+
+func (s *Server) handleImport(c *gin.Context) {
+	var imported models.LabExport
+	
+	// 1. Parse YAML from request body
+	if err := c.ShouldBindYAML(&imported); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid YAML format: " + err.Error()})
+		return
+	}
+
+	labID := "lab-1" // Current limitation: single lab
+
+	// 2. Cleanup current state (Containers and DB)
+	// We reuse the logic from handleCleanup but targeted to this lab
+	ctx := c.Request.Context()
+	nodes, _ := s.repo.ListNodesByLab(labID)
+	for _, n := range nodes {
+		_ = s.manager.DeleteNode(ctx, n.Name)
+	}
+	
+	// We don't use s.repo.ClearAll() because we might have other labs in the future.
+	// For now, we manually delete nodes/links of this lab.
+	// Optimization: Since it's lab-1, we can just clear if we assume single lab.
+	s.repo.DeleteLaboratory(labID) 
+	s.repo.SaveLaboratory(models.Laboratory{ID: labID, Name: imported.Name})
+
+	// 3. Recreate Nodes
+	nm := orchestrator.NewNetworkManager()
+	var errors []string
+
+	for _, n := range imported.Nodes {
+		nodeModel := models.Node{
+			ID:    n.ID,
+			LabID: labID,
+			Name:  n.Name,
+			Type:  n.Type,
+			Image: n.Image,
+			X:     n.X,
+			Y:     n.Y,
+		}
+
+		// Create container
+		containerID, err := s.manager.CreateNode(ctx, nodeModel)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to create node %s: %v", n.Name, err)
+			fmt.Printf("Warning: %s\n", msg)
+			errors = append(errors, msg)
+			continue
+		}
+
+		pid, _ := s.manager.GetNodePID(ctx, containerID)
+		nodeModel.ContainerID = containerID
+		nodeModel.PID = pid
+		s.repo.SaveNode(nodeModel)
+	}
+
+	// 4. Recreate Links
+	for _, l := range imported.Links {
+		linkModel := models.Link{
+			ID:        l.ID,
+			LabID:     labID,
+			SourceID:  l.Source,
+			TargetID:  l.Target,
+			SourceInt: l.SourceInt,
+			TargetInt: l.TargetInt,
+		}
+
+		source, okS := s.repo.GetNode(l.Source)
+		target, okT := s.repo.GetNode(l.Target)
+
+		if okS && okT {
+			if err := nm.CreateLink(linkModel, source.PID, target.PID); err != nil {
+				msg := fmt.Sprintf("Failed to create link %s: %v", l.ID, err)
+				fmt.Printf("Warning: %s\n", msg)
+				errors = append(errors, msg)
+			} else {
+				// Attach to Bridge if Switch
+				if source.Type == models.SWITCH {
+					_ = s.manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt)
+				}
+				if target.Type == models.SWITCH {
+					_ = s.manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt)
+				}
+				s.repo.SaveLink(linkModel)
+			}
+		} else {
+			errors = append(errors, fmt.Sprintf("Link %s skipped: source or target not found", l.ID))
+		}
+	}
+
+	status := http.StatusOK
+	if len(errors) > 0 {
+		status = http.StatusMultiStatus
+	}
+
+	c.JSON(status, gin.H{
+		"message": "import process completed",
+		"nodes":   len(imported.Nodes),
+		"links":   len(imported.Links),
+		"errors":  errors,
+	})
+}
+
+func (s *Server) handleExport(c *gin.Context) {
+	labID := c.DefaultQuery("lab_id", "lab-1")
+	
+	nodes, _ := s.repo.ListNodesByLab(labID)
+	links, _ := s.repo.ListLinksByLab(labID)
+	lab, _ := s.repo.GetLaboratory(labID)
+
+	export := models.LabExport{
+		Version: "0.4",
+		Name:    lab.Name,
+		Nodes:   make([]models.NodeExport, 0, len(nodes)),
+		Links:   make([]models.LinkExport, 0, len(links)),
+	}
+
+	if export.Name == "" {
+		export.Name = "Default Lab"
+	}
+
+	for _, n := range nodes {
+		export.Nodes = append(export.Nodes, models.NodeExport{
+			ID:    n.ID,
+			Name:  n.Name,
+			Type:  n.Type,
+			Image: n.Image,
+			X:     n.X,
+			Y:     n.Y,
+		})
+	}
+
+	for _, l := range links {
+		export.Links = append(export.Links, models.LinkExport{
+			ID:        l.ID,
+			Source:    l.SourceID,
+			Target:    l.TargetID,
+			SourceInt: l.SourceInt,
+			TargetInt: l.TargetInt,
+		})
+	}
+
+	yamlData, err := yaml.Marshal(&export)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate YAML"})
+		return
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.yaml", export.Name))
+	c.Data(http.StatusOK, "application/x-yaml", yamlData)
+}
+
 // --- Node Handlers ---
 
 func (s *Server) listNodes(c *gin.Context) {
-	nodes, _ := s.repo.ListNodes()
+	labID := c.Query("lab_id")
+	var nodes []models.Node
+	var err error
+
+	if labID != "" {
+		nodes, err = s.repo.ListNodesByLab(labID)
+	} else {
+		nodes, err = s.repo.ListNodes()
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	// If real-time info is requested
 	if c.Query("live") == "true" {
@@ -120,6 +298,11 @@ func (s *Server) createNode(c *gin.Context) {
 		return
 	}
 
+	// Default LabID if not provided
+	if node.LabID == "" {
+		node.LabID = "lab-1"
+	}
+
 	containerID, err := s.manager.CreateNode(c.Request.Context(), node)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -137,6 +320,31 @@ func (s *Server) createNode(c *gin.Context) {
 	s.repo.SaveNode(node)
 
 	c.JSON(http.StatusCreated, node)
+}
+
+func (s *Server) updateNodePosition(c *gin.Context) {
+	id := c.Param("id")
+	var pos struct {
+		X float64 `json:"x"`
+		Y float64 `json:"y"`
+	}
+
+	if err := c.ShouldBindJSON(&pos); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	node, found := s.repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	node.X = pos.X
+	node.Y = pos.Y
+	s.repo.SaveNode(node)
+
+	c.Status(http.StatusNoContent)
 }
 
 func (s *Server) deleteNode(c *gin.Context) {
@@ -174,10 +382,23 @@ func (s *Server) getNodeInterfaces(c *gin.Context) {
 	c.JSON(http.StatusOK, interfaces)
 }
 
-// --- Handlers de Links ---
+// --- Link Handlers ---
 
 func (s *Server) listLinks(c *gin.Context) {
-	links, _ := s.repo.ListLinks()
+	labID := c.Query("lab_id")
+	var links []models.Link
+	var err error
+
+	if labID != "" {
+		links, err = s.repo.ListLinksByLab(labID)
+	} else {
+		links, err = s.repo.ListLinks()
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, links)
 }
 
@@ -186,6 +407,11 @@ func (s *Server) createLink(c *gin.Context) {
 	if err := c.ShouldBindJSON(&link); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Default LabID if not provided
+	if link.LabID == "" {
+		link.LabID = "lab-1"
 	}
 
 	source, okS := s.repo.GetNode(link.SourceID)
@@ -197,7 +423,7 @@ func (s *Server) createLink(c *gin.Context) {
 	}
 
 	// Validation: Check for existing link between these nodes
-	existingLinks, _ := s.repo.ListLinks()
+	existingLinks, _ := s.repo.ListLinksByLab(link.LabID)
 	for _, l := range existingLinks {
 		// Check both directions
 		if (l.SourceID == link.SourceID && l.TargetID == link.TargetID) ||
@@ -213,6 +439,18 @@ func (s *Server) createLink(c *gin.Context) {
 		return
 	}
 
+	// Attach interfaces to bridge if nodes are Switches
+	if source.Type == models.SWITCH {
+		if err := s.manager.AttachInterfaceToBridge(c.Request.Context(), source.ContainerID, link.SourceInt); err != nil {
+			fmt.Printf("Error attaching interface %s to switch %s: %v\n", link.SourceInt, source.Name, err)
+		}
+	}
+	if target.Type == models.SWITCH {
+		if err := s.manager.AttachInterfaceToBridge(c.Request.Context(), target.ContainerID, link.TargetInt); err != nil {
+			fmt.Printf("Error attaching interface %s to switch %s: %v\n", link.TargetInt, target.Name, err)
+		}
+	}
+
 	s.repo.SaveLink(link)
 	c.JSON(http.StatusCreated, link)
 }
@@ -223,7 +461,70 @@ func (s *Server) deleteLink(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// handleCleanup elimina todos los contenedores con label openveth=true
+// --- Laboratory Handlers ---
+
+func (s *Server) listLaboratories(c *gin.Context) {
+	labs, err := s.repo.ListLaboratories()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, labs)
+}
+
+func (s *Server) createLaboratory(c *gin.Context) {
+	var lab models.Laboratory
+	if err := c.ShouldBindJSON(&lab); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if lab.ID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "lab id is required"})
+		return
+	}
+
+	if err := s.repo.SaveLaboratory(lab); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, lab)
+}
+
+func (s *Server) updateLaboratory(c *gin.Context) {
+	id := c.Param("id")
+	var data struct {
+		Name string `json:"name"`
+	}
+
+	if err := c.ShouldBindJSON(&data); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	lab, found := s.repo.GetLaboratory(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "laboratory not found"})
+		return
+	}
+
+	lab.Name = data.Name
+	s.repo.SaveLaboratory(lab)
+
+	c.JSON(http.StatusOK, lab)
+}
+
+func (s *Server) deleteLaboratory(c *gin.Context) {
+	id := c.Param("id")
+	if err := s.repo.DeleteLaboratory(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// handleCleanup eliminates all containers with label openveth=true
 func (s *Server) handleCleanup(c *gin.Context) {
 	ctx := c.Request.Context()
 	containers, _ := s.manager.GetDockerClient().ContainerList(ctx, container.ListOptions{All: true})

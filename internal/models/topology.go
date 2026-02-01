@@ -9,9 +9,10 @@ const (
 	HOST   NodeType = "host"   // Usa imagen Alpine/Ubuntu
 )
 
-// Node representa un dispositivo en la red
+// Node represents a device in the network
 type Node struct {
 	ID          string   `json:"id" gorm:"primaryKey"`
+	LabID       string   `json:"lab_id" gorm:"index"` // Associated laboratory
 	Name        string   `json:"name"`
 	Type        NodeType `json:"type"`
 	Image       string   `json:"image"`
@@ -39,19 +40,55 @@ type IPAddress struct {
 	Prefix  int    `json:"prefixlen"`
 }
 
-// Link representa un cable virtual (veth pair) entre dos nodos
+// Link represents a virtual cable (veth pair) between two nodes
 type Link struct {
 	ID        string `json:"id" gorm:"primaryKey"`
+	LabID     string `json:"lab_id" gorm:"index"` // Associated laboratory
 	SourceID  string `json:"source"`
 	TargetID  string `json:"target"`
 	SourceInt string `json:"source_int"`
 	TargetInt string `json:"target_int"`
 }
 
-// Topology es el objeto que engloba un laboratorio completo
+// Laboratory represents a saved network project
+type Laboratory struct {
+	ID        string `json:"id" gorm:"primaryKey"`
+	UserID    string `json:"user_id" gorm:"index"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt int64  `json:"updated_at" gorm:"autoUpdateTime"`
+}
+
+// Topology is the object that encompasses a full laboratory state for frontend
 type Topology struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Nodes []Node `json:"nodes"`
 	Links []Link `json:"links"`
+}
+
+// --- Export Models (Clean YAML) ---
+
+type LabExport struct {
+	Version string       `yaml:"version"`
+	Name    string       `yaml:"name"`
+	Nodes   []NodeExport `yaml:"nodes"`
+	Links   []LinkExport `yaml:"links"`
+}
+
+type NodeExport struct {
+	ID    string   `yaml:"id"`
+	Name  string   `yaml:"name"`
+	Type  NodeType `yaml:"type"`
+	Image string   `yaml:"image"`
+	X     float64  `yaml:"x"`
+	Y     float64  `yaml:"y"`
+}
+
+type LinkExport struct {
+	ID        string `yaml:"id"`
+	Source    string `yaml:"source"`
+	Target    string `yaml:"target"`
+	SourceInt string `yaml:"source_int"`
+	TargetInt string `yaml:"target_int"`
 }
