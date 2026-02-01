@@ -23,7 +23,7 @@ or replace this link with a valid URL.
 *   **⚡ Lightweight & Fast:** Uses Docker containers instead of heavy VMs. Boot a 50-node topology in seconds.
 *   **🎨 Visual Topology Builder:** Modern interactive canvas (Cytoscape.js) to design and manage your labs.
 *   **💾 Infrastructure as Code:** Export your labs to YAML. Share topologies easily.
-*   **🖥️ Integrated Terminals:** Access node consoles (sh, vtysh) directly in the browser via WebSockets.
+*   **🖥️ Integrated Terminals:** Professional shell access to nodes (sh, vtysh) powered by xterm.js directly in your browser.
 *   **🧠 "Smart" Networking:** Automatically handles `veth` pairs creation, interface naming, and bridge management.
 *   **🏢 Laboratory Management:** Create, save, and switch between different lab projects.
 
@@ -41,8 +41,8 @@ graph TD
         API -->|Netlink| Kernel[Linux Kernel]
         
         subgraph "Emulation Plane"
-            Docker --> NodeA[Node: Host (Alpine)]
-            Docker --> NodeB[Node: Router (FRR)]
+            Docker --> NodeA["Node: Host (Alpine)"]
+            Docker --> NodeB["Node: Router (FRR)"]
             
             NodeA -.->|eth1| VethA[Veth Endpoint]
             NodeB -.->|eth1| VethB[Veth Endpoint]
@@ -93,7 +93,7 @@ graph TD
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [DEVELOPMENT.md](DEVELOPMENT.md) for roadmap and technical details.
+We welcome contributions! Feel free to open issues or pull requests to improve the project.
 
 1.  Fork the project.
 2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
