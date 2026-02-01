@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-
 	"context"
 
 	"fmt"
@@ -14,11 +13,7 @@ import (
 
 	"time"
 
-
-
 	"open-veth/internal/models"
-
-
 
 	"github.com/docker/docker/api/types/container"
 
@@ -27,20 +22,13 @@ import (
 	"github.com/docker/docker/client"
 
 	"github.com/docker/docker/pkg/stdcopy"
-
 )
-
-
 
 // Manager handles communication with the Docker Daemon
 
 type Manager struct {
-
 	cli *client.Client
-
 }
-
-
 
 // GetNodeInterfaces executes 'ip -j addr' inside the container and returns parsed info
 
@@ -50,23 +38,18 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 
 	execConfig := container.ExecOptions{
 
-		Cmd:          []string{"ip", "-j", "addr"},
+		Cmd: []string{"ip", "-j", "addr"},
 
 		AttachStdout: true,
 
 		AttachStderr: true,
-
 	}
-
-
 
 	// Add timeout to prevent hanging if the container is unresponsive
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 
 	defer cancel()
-
-
 
 	// 2. Create the execution instance
 
@@ -77,8 +60,6 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 		return nil, fmt.Errorf("error creating exec: %v", err)
 
 	}
-
-
 
 	// 3. Attach and execute (Attach gives us the streams)
 
@@ -92,8 +73,6 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 
 	defer resp.Close()
 
-
-
 	// 4. Read Stdout (separate from Stderr using stdcopy, Docker mixes streams with headers)
 
 	var outBuf, errBuf bytes.Buffer
@@ -104,8 +83,6 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 
 	}
 
-
-
 	// Log stderr warning if not critical
 
 	if errBuf.Len() > 0 {
@@ -113,8 +90,6 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 		fmt.Printf("Warning: 'ip -j addr' stderr: %s\n", errBuf.String())
 
 	}
-
-
 
 	// 5. Parse JSON
 
@@ -126,13 +101,9 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 
 	}
 
-
-
 	return interfaces, nil
 
 }
-
-
 
 // NewManager creates a new orchestrator instance
 
@@ -146,13 +117,9 @@ func NewManager() (*Manager, error) {
 
 	}
 
-
-
 	return &Manager{cli: cli}, nil
 
 }
-
-
 
 // GetDockerClient returns the internal Docker client
 
@@ -162,15 +129,11 @@ func (m *Manager) GetDockerClient() *client.Client {
 
 }
 
-
-
 // CreateNode creates and starts a container for a topology node
 
 func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, error) {
 
 	fmt.Printf("Orchestrating node: %s (Image: %s)...\n", node.Name, node.Image)
-
-
 
 	// 1. Check if image exists locally
 
@@ -204,33 +167,26 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	}
 
-
-
 	// 2. Container configuration
 
 	config := &container.Config{
 
 		Image: node.Image,
 
-		Cmd:   []string{"sleep", "infinity"},
+		Cmd: []string{"sleep", "infinity"},
 
 		Labels: map[string]string{
 
-			"openveth":      "true",
+			"openveth": "true",
 
 			"openveth.name": node.Name,
-
 		},
-
 	}
 
 	hostConfig := &container.HostConfig{
 
 		CapAdd: []string{"NET_ADMIN", "SYS_ADMIN"},
-
 	}
-
-
 
 	// 3. Create container (Conflict handling)
 
@@ -252,8 +208,6 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 			fmt.Printf("Node %s already exists (ID: %s). Reusing...\n", node.Name, inspect.ID[:12])
 
-
-
 			// Ensure it's running
 
 			if !inspect.State.Running {
@@ -272,13 +226,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 		}
 
-
-
 		return "", fmt.Errorf("error creating container: %v", err)
 
 	}
-
-
 
 	// 4. Start container
 
@@ -288,21 +238,16 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	}
 
-
-
 	// 5. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
 
 	execConfig := container.ExecOptions{
 
-		Cmd:          []string{"ip", "link", "set", "dev", "eth0", "name", "mgmt0"},
+		Cmd: []string{"ip", "link", "set", "dev", "eth0", "name", "mgmt0"},
 
 		AttachStdout: false,
 
 		AttachStderr: false,
-
 	}
-
-
 
 	if execIDResp, err := m.cli.ContainerExecCreate(ctx, resp.ID, execConfig); err == nil {
 
@@ -314,7 +259,45 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	}
 
+	// 6. If node is SWITCH, initialize bridge 'br0'
 
+	if node.Type == models.SWITCH {
+
+		// Use specific shell command to ensure bridge creation
+
+		// We use ; instead of && to be safer with simple shells, though && is standard
+
+		setupCmd := []string{"sh", "-c", "ip link add name br0 type bridge; ip link set dev br0 up"}
+
+		execConfigSwitch := container.ExecOptions{
+
+			Cmd: setupCmd,
+
+			AttachStdout: true,
+
+			AttachStderr: true,
+
+			Privileged: true, // Ensure privileges for netlink ops
+
+		}
+
+		fmt.Printf("Initializing Bridge br0 for Switch %s...\n", node.Name)
+
+		if execID, err := m.cli.ContainerExecCreate(ctx, resp.ID, execConfigSwitch); err == nil {
+
+			if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
+
+				fmt.Printf("Error starting switch setup: %v\n", errStart)
+
+			}
+
+		} else {
+
+			fmt.Printf("Error creating switch setup exec: %v\n", err)
+
+		}
+
+	}
 
 	fmt.Printf("Node %s created and started successfully (ID: %s).\n", node.Name, resp.ID[:12])
 
@@ -322,7 +305,42 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 }
 
+// AttachInterfaceToBridge connects a network interface to the main bridge (br0) inside a container
 
+func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID string, ifaceName string) error {
+
+	cmd := fmt.Sprintf("ip link set dev %s master br0 && ip link set dev %s up", ifaceName, ifaceName)
+
+	execConfig := container.ExecOptions{
+
+		Cmd: []string{"sh", "-c", cmd},
+
+		AttachStdout: true,
+
+		AttachStderr: true,
+
+		Privileged: true,
+	}
+
+	execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+
+	if err != nil {
+
+		return fmt.Errorf("failed to create exec for bridge attach: %v", err)
+
+	}
+
+	err = m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{})
+
+	if err != nil {
+
+		return fmt.Errorf("failed to start exec for bridge attach: %v", err)
+
+	}
+
+	return nil
+
+}
 
 // DeleteNode stops and removes a container (Cleanup)
 
@@ -330,14 +348,11 @@ func (m *Manager) DeleteNode(ctx context.Context, nodeName string) error {
 
 	fmt.Printf("Deleting node %s...\n", nodeName)
 
-
-
 	// Force removal (kills process if running)
 
 	err := m.cli.ContainerRemove(ctx, nodeName, container.RemoveOptions{
 
 		Force: true,
-
 	})
 
 	if err != nil {
@@ -352,13 +367,9 @@ func (m *Manager) DeleteNode(ctx context.Context, nodeName string) error {
 
 	}
 
-
-
 	return nil
 
 }
-
-
 
 // TestConnection checks if Docker daemon is responsive
 
@@ -378,8 +389,6 @@ func (m *Manager) TestConnection(ctx context.Context) error {
 
 }
 
-
-
 // ListNodes displays containers managed by OpenVeth
 
 func (m *Manager) ListNodes(ctx context.Context) error {
@@ -391,8 +400,6 @@ func (m *Manager) ListNodes(ctx context.Context) error {
 		return err
 
 	}
-
-
 
 	fmt.Printf("Found %d containers on host.\n", len(containers))
 
@@ -406,8 +413,6 @@ func (m *Manager) ListNodes(ctx context.Context) error {
 
 }
 
-
-
 // GetNodePID gets the main process PID of a container
 
 func (m *Manager) GetNodePID(ctx context.Context, containerID string) (int, error) {
@@ -420,18 +425,12 @@ func (m *Manager) GetNodePID(ctx context.Context, containerID string) (int, erro
 
 	}
 
-
-
 	if !inspect.State.Running {
 
 		return 0, fmt.Errorf("container %s is not running", containerID)
 
 	}
 
-
-
 	return inspect.State.Pid, nil
 
 }
-		
-		

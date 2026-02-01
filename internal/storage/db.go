@@ -32,7 +32,7 @@ func NewGormRepository(driver string, dsn string) (*GormRepository, error) {
 	}
 
 	// Auto Migrate models
-	err = db.AutoMigrate(&models.Node{}, &models.Link{})
+	err = db.AutoMigrate(&models.Node{}, &models.Link{}, &models.Laboratory{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %v", err)
 	}
@@ -62,6 +62,12 @@ func (r *GormRepository) ListNodes() ([]models.Node, error) {
 	return nodes, err
 }
 
+func (r *GormRepository) ListNodesByLab(labID string) ([]models.Node, error) {
+	var nodes []models.Node
+	err := r.db.Where("lab_id = ?", labID).Find(&nodes).Error
+	return nodes, err
+}
+
 func (r *GormRepository) SaveLink(link models.Link) error {
 	return r.db.Save(&link).Error
 }
@@ -84,10 +90,45 @@ func (r *GormRepository) ListLinks() ([]models.Link, error) {
 	return links, err
 }
 
+func (r *GormRepository) ListLinksByLab(labID string) ([]models.Link, error) {
+	var links []models.Link
+	err := r.db.Where("lab_id = ?", labID).Find(&links).Error
+	return links, err
+}
+
+func (r *GormRepository) SaveLaboratory(lab models.Laboratory) error {
+	return r.db.Save(&lab).Error
+}
+
+func (r *GormRepository) GetLaboratory(id string) (models.Laboratory, bool) {
+	var lab models.Laboratory
+	if err := r.db.First(&lab, "id = ?", id).Error; err != nil {
+		return models.Laboratory{}, false
+	}
+	return lab, true
+}
+
+func (r *GormRepository) ListLaboratories() ([]models.Laboratory, error) {
+	var labs []models.Laboratory
+	err := r.db.Find(&labs).Error
+	return labs, err
+}
+
+func (r *GormRepository) DeleteLaboratory(id string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Cascading delete nodes and links associated with this lab
+		if err := tx.Delete(&models.Node{}, "lab_id = ?", id).Error; err != nil { return err }
+		if err := tx.Delete(&models.Link{}, "lab_id = ?", id).Error; err != nil { return err }
+		if err := tx.Delete(&models.Laboratory{}, "id = ?", id).Error; err != nil { return err }
+		return nil
+	})
+}
+
 func (r *GormRepository) ClearAll() error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("DELETE FROM nodes").Error; err != nil { return err }
 		if err := tx.Exec("DELETE FROM links").Error; err != nil { return err }
+		if err := tx.Exec("DELETE FROM laboratories").Error; err != nil { return err }
 		return nil
 	})
 }
