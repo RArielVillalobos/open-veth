@@ -8,12 +8,21 @@ import { PropertiesPanelComponent } from './components/properties-panel/properti
 import { TopologyCanvasComponent } from '../../shared/components/topology-canvas/topology-canvas.component';
 import { TerminalPanelComponent } from '../../shared/components/terminal-panel/terminal-panel.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
+import { LabManagerComponent } from './components/lab-manager/lab-manager.component';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, NodePaletteComponent, PropertiesPanelComponent, TopologyCanvasComponent, TerminalPanelComponent, ToastComponent],
+  imports: [
+    CommonModule, 
+    NodePaletteComponent, 
+    PropertiesPanelComponent, 
+    TopologyCanvasComponent, 
+    TerminalPanelComponent, 
+    ToastComponent,
+    LabManagerComponent
+  ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
@@ -25,6 +34,9 @@ export class DashboardComponent implements OnInit {
   // Estado para gestión de terminales (Tabs)
   activeTerminals = signal<string[]>([]);
   activeTab = signal<string | null>(null);
+  
+  // Estado para gestión de Labs
+  showLabManager = signal(false);
   
   // Selección de nodo y link
   selectedNodeId = signal<string | null>(null);
@@ -78,10 +90,8 @@ export class DashboardComponent implements OnInit {
   }
 
   onRename() {
-    const newName = window.prompt('Enter new laboratory name:', this.store.topology().name);
-    if (newName && newName.trim() !== '' && newName !== this.store.topology().name) {
-      this.store.renameLaboratory(newName.trim());
-    }
+    // Abrimos el Lab Manager en lugar de solo renombrar
+    this.showLabManager.set(true);
   }
 
   async onExport() {

@@ -15,8 +15,9 @@ import (
 
 	"open-veth/internal/models"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 
 	"github.com/docker/docker/client"
@@ -180,6 +181,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			"openveth": "true",
 
 			"openveth.name": node.Name,
+			
+			"openveth.lab":  node.LabID,
 		},
 	}
 
@@ -411,6 +414,21 @@ func (m *Manager) ListNodes(ctx context.Context) error {
 
 	return nil
 
+}
+
+// GetOpenVethContainers returns all containers managed by OpenVeth (label openveth=true)
+func (m *Manager) GetOpenVethContainers(ctx context.Context) ([]types.Container, error) {
+	filters := filters.NewArgs()
+	filters.Add("label", "openveth=true")
+
+	containers, err := m.cli.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filters,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
 }
 
 // GetNodePID gets the main process PID of a container

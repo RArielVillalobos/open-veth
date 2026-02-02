@@ -7,8 +7,8 @@
       <h1 class="text-sm font-semibold tracking-tight text-slate-200 flex items-center gap-2">
         OpenVeth 
         <span class="text-slate-500 font-normal ml-1">{{ store.topology().name }}</span>
-        <button (click)="onRename()" class="text-slate-600 hover:text-indigo-400 transition-colors" title="Rename Laboratory">
-          <span class="text-[10px]">✏️</span>
+        <button (click)="onRename()" class="text-slate-600 hover:text-indigo-400 transition-colors" title="Manage Laboratories">
+          <span class="text-[10px]">📂</span>
         </button>
       </h1>
     </div>
@@ -90,4 +90,7 @@
 
   <!-- Global Toasts -->
   <app-toast></app-toast>
+
+  <!-- Lab Manager Modal -->
+  <app-lab-manager *ngIf="showLabManager()" (close)="showLabManager.set(false)"></app-lab-manager>
 </div>

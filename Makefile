@@ -47,3 +47,9 @@ clean: dev-down ## Clean containers and artifacts
 	cd $(FRONTEND_DIR) && rm -rf node_modules .angular
 	$(GO_CMD) clean
 	@echo "Cleanup completed."
+
+nuke: ## ☢️  NUCLEAR CLEANUP: Stops & removes ALL OpenVeth containers and data
+	@echo "destroying openveth environment..."
+	-$(DOCKER_CMD) ps -a -q --filter label=openveth=true | xargs -r $(DOCKER_CMD) rm -f
+	-rm -f openveth.db
+	@echo "Environment reset complete."
