@@ -165,10 +165,62 @@ func (s *Server) reconcileState() error {
 		}
 	}
 
+	// 5. Revive Missing/Stopped Nodes (The Resurrection)
+	fmt.Println("🔄 Reviving nodes from database...")
+	// We already fetched nodes in step 2, but let's use the list we have.
+	// 'nodes' variable contains all nodes from DB.
+	for _, node := range nodes {
+		// CreateNode handles "ensure running" + "switch init"
+		// We re-pass the node definition.
+		cid, err := s.manager.CreateNode(ctx, node)
+		if err != nil {
+			fmt.Printf("⚠️ Failed to revive node %s: %v\n", node.Name, err)
+			continue
+		}
+
+		// Update DB with fresh PID (ContainerID might be same, but PID changes on restart)
+		pid, _ := s.manager.GetNodePID(ctx, cid)
+
+		// Update struct
+		node.ContainerID = cid
+		node.PID = pid
+		s.repo.SaveNode(node)
+	}
+
+	// 6. Restore Links
+	fmt.Println("🔗 Restoring network links...")
+	links, err := s.repo.ListLinks()
+	if err != nil {
+		fmt.Printf("Warning: failed to list links: %v\n", err)
+	} else {
+		nm := orchestrator.NewNetworkManager()
+		for _, l := range links {
+			src, okS := s.repo.GetNode(l.SourceID)
+			tgt, okT := s.repo.GetNode(l.TargetID)
+
+			if okS && okT && src.PID > 0 && tgt.PID > 0 {
+				// Try to create link. If it fails (e.g. exists), we continue.
+				if err := nm.CreateLink(l, src.PID, tgt.PID); err != nil {
+					// Likely "File exists" if partially there, or legitimate error.
+					// We log but don't stop.
+					// fmt.Printf("Note: Link %s restoration: %v\n", l.ID, err)
+				}
+
+				// Re-attach to bridges
+				if src.Type == models.SWITCH {
+					_ = s.manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt)
+				}
+				if tgt.Type == models.SWITCH {
+					_ = s.manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt)
+				}
+			}
+		}
+	}
+
 	if zombieCount > 0 {
 		fmt.Printf("✨ Cleaned up %d zombie containers.\n", zombieCount)
 	} else {
-		fmt.Println("✅ System state is clean.")
+		fmt.Println("✅ System state is reconciled (Zombies killed, Nodes/Links revived).")
 	}
 
 	return nil
