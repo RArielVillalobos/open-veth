@@ -7,9 +7,13 @@ import { ToastService } from '../core/services/toast.service';
 
 export interface TopologyState {
   topology: Topology;
+  laboratories: any[]; // List of available labs
+  currentLabId: string;
   isLoading: boolean;
   error: string | null;
 }
+
+const LAB_ID_KEY = 'openveth_current_lab_id';
 
 const initialState: TopologyState = {
   topology: {
@@ -18,6 +22,8 @@ const initialState: TopologyState = {
     nodes: [],
     links: []
   },
+  laboratories: [],
+  currentLabId: localStorage.getItem(LAB_ID_KEY) || 'lab-1',
   isLoading: false,
   error: null
 };
@@ -33,20 +39,44 @@ export const TopologyStore = signalStore(
       async loadTopology() {
         patchState(store, { isLoading: true, error: null });
         try {
-          const [nodes, links, labs] = await firstValueFrom(
-            forkJoin([service.getNodes(), service.getLinks(), service.getLaboratories()])
-          );
+          const labId = store.currentLabId();
           
-          // Find current lab name (lab-1)
-          const currentLab = labs.find(l => l.id === 'lab-1');
+          // Load labs list and current topology in parallel
+          const [nodes, links, labs] = await firstValueFrom(
+            forkJoin([
+              service.getNodes(false, labId), 
+              service.getLinks(labId), 
+              service.getLaboratories()
+            ])
+          );
+
+          // Find current lab metadata
+          let currentLab = labs.find(l => l.id === labId);
+
+          // Fallback: If lab from localStorage doesn't exist anymore, use the first available lab
+          if (!currentLab && labs.length > 0) {
+            const firstLab = labs[0];
+            patchState(store, { currentLabId: firstLab.id });
+            localStorage.setItem(LAB_ID_KEY, firstLab.id);
+            // Re-fetch nodes/links for the fallback lab
+            const [fNodes, fLinks] = await firstValueFrom(
+                forkJoin([service.getNodes(false, firstLab.id), service.getLinks(firstLab.id)])
+            );
+            currentLab = firstLab;
+            patchState(store, (state) => ({
+                topology: { ...state.topology, nodes: fNodes, links: fLinks }
+            }));
+          }
           
           patchState(store, (state) => ({
             isLoading: false,
+            laboratories: labs,
             topology: {
               ...state.topology,
-              name: currentLab?.name || state.topology.name,
-              nodes: nodes || [],
-              links: links || []
+              id: state.currentLabId,
+              name: currentLab?.name || 'Unknown Lab',
+              nodes: state.topology.nodes.length > 0 ? state.topology.nodes : (nodes || []),
+              links: state.topology.links.length > 0 ? state.topology.links : (links || [])
             }
           }));
         } catch (err: any) {
@@ -56,11 +86,69 @@ export const TopologyStore = signalStore(
         }
       },
 
+      // --- Lab Management ---
+      async switchLab(labId: string) {
+        localStorage.setItem(LAB_ID_KEY, labId);
+        patchState(store, { isLoading: true, currentLabId: labId });
+        toast.info(`Activating laboratory: ${labId}...`);
+        
+        try {
+            // 1. Tell backend to swap containers
+            await firstValueFrom(service.activateLaboratory(labId));
+            
+            // 2. Reload UI state
+            await this.loadTopology();
+            
+            toast.success(`Lab ${labId} is now active`);
+        } catch (err: any) {
+            patchState(store, { isLoading: false, error: err.message });
+            toast.error('Failed to activate lab: ' + err.message);
+        }
+      },
+
+      async createLaboratory(name: string) {
+        // Validation: Prevent duplicate names
+        const nameExists = store.laboratories().some(l => l.name.toLowerCase() === name.toLowerCase());
+        if (nameExists) {
+          toast.error(`A laboratory with the name "${name}" already exists.`);
+          return;
+        }
+
+        const id = 'lab-' + new Date().getTime(); // Simple ID generation
+        patchState(store, { isLoading: true });
+        try {
+          await firstValueFrom(service.createLaboratory({ id, name }));
+          await this.switchLab(id); // Auto-switch to new lab
+          toast.success('Laboratory created');
+        } catch (err: any) {
+          patchState(store, { isLoading: false, error: err.message });
+          toast.error('Failed to create lab');
+        }
+      },
+
+      async deleteLaboratory(id: string) {
+         if (id === store.currentLabId()) {
+             toast.error("Cannot delete active laboratory");
+             return;
+         }
+         try {
+             await firstValueFrom(service.deleteLaboratory(id));
+             patchState(store, (state) => ({
+                 laboratories: state.laboratories.filter(l => l.id !== id)
+             }));
+             toast.success('Laboratory deleted');
+         } catch(err: any) {
+             toast.error('Failed to delete lab');
+         }
+      },
+
       // --- Nodes ---
       async addNode(node: Node) {
         patchState(store, { isLoading: true, error: null });
         try {
-          const createdNode = await firstValueFrom(service.createNode(node));
+          // Inject current Lab ID
+          const nodeWithLab = { ...node, lab_id: store.currentLabId() };
+          const createdNode = await firstValueFrom(service.createNode(nodeWithLab));
           patchState(store, (state) => ({
             isLoading: false,
             topology: {
@@ -137,7 +225,9 @@ export const TopologyStore = signalStore(
       async addLink(link: Link) {
         patchState(store, { isLoading: true, error: null });
         try {
-          const createdLink = await firstValueFrom(service.createLink(link));
+          // Inject current Lab ID
+          const linkWithLab = { ...link, lab_id: store.currentLabId() };
+          const createdLink = await firstValueFrom(service.createLink(linkWithLab));
           patchState(store, (state) => ({
             isLoading: false,
             topology: {
@@ -176,7 +266,8 @@ export const TopologyStore = signalStore(
       async syncState() {
         patchState(store, { isLoading: true });
         try {
-          const nodes = await firstValueFrom(service.getNodes(true));
+          // Sync only current lab nodes
+          const nodes = await firstValueFrom(service.getNodes(true, store.currentLabId()));
           patchState(store, (state) => ({
             isLoading: false,
             topology: {
@@ -192,11 +283,13 @@ export const TopologyStore = signalStore(
       },
 
       async renameLaboratory(name: string) {
-        const labId = 'lab-1';
+        const labId = store.currentLabId();
         try {
           await firstValueFrom(service.updateLaboratory(labId, name));
           patchState(store, (state) => ({
-            topology: { ...state.topology, name }
+            topology: { ...state.topology, name },
+            // Also update the list
+            laboratories: state.laboratories.map(l => l.id === labId ? { ...l, name } : l)
           }));
           toast.success('Laboratory renamed');
         } catch (err: any) {

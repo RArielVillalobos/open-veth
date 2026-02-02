@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -89,7 +90,8 @@ func (s *Server) setupRoutes() {
 		// Laboratories
 		api.GET("/laboratories", s.listLaboratories)
 		api.POST("/laboratories", s.createLaboratory)
-		api.PATCH("/laboratories/:id", s.updateLaboratory) // New for renaming
+		api.POST("/laboratories/:id/activate", s.activateLaboratory) // New: Swap Labs
+		api.PATCH("/laboratories/:id", s.updateLaboratory)
 		api.DELETE("/laboratories/:id", s.deleteLaboratory)
 
 		// Topology Export/Import
@@ -101,9 +103,75 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-// Run starts the server
+// Run starts the HTTP server
 func (s *Server) Run(addr string) error {
+	// Perform startup reconciliation (The Janitor)
+	fmt.Println("🧹 Running startup reconciliation...")
+	if err := s.reconcileState(); err != nil {
+		fmt.Printf("Warning: reconciliation failed: %v\n", err)
+	}
+
 	return s.router.Run(addr)
+}
+
+// reconcileState ensures Docker matches the Database state
+func (s *Server) reconcileState() error {
+	ctx := context.Background()
+
+	// 1. Get all OpenVeth containers (The Reality)
+	containers, err := s.manager.GetOpenVethContainers(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list docker containers: %v", err)
+	}
+
+	// 2. Get all Nodes from DB (The Desired State)
+	// We need to list ALL nodes from ALL labs to know what is valid
+	nodes, err := s.repo.ListNodes()
+	if err != nil {
+		return fmt.Errorf("failed to list db nodes: %v", err)
+	}
+
+	// 3. Create a lookup map for valid container IDs
+	validContainers := make(map[string]bool)
+	for _, node := range nodes {
+		// We use Name as the key identifier since ContainerID might change if recreated manually,
+		// but openveth relies heavily on naming conventions.
+		// Ideally we should check both, but let's stick to Name for now as it maps to container name.
+		validContainers["/" + node.Name] = true // Docker names often start with /
+		validContainers[node.Name] = true
+	}
+
+	// 4. Hunt for Zombies
+	zombieCount := 0
+	for _, container := range containers {
+		isZombie := true
+		for _, name := range container.Names {
+			if validContainers[name] {
+				isZombie = false
+				break
+			}
+		}
+
+		if isZombie {
+			fmt.Printf("🧟 Zombie detected: %v (ID: %s). Terminating...\n", container.Names, container.ID[:12])
+			// Use the orchestrator to delete it properly
+			// We can pass the container ID or Name. Manager.DeleteNode expects Name usually but ContainerRemove works with ID.
+			// Let's use ID for precision here.
+		if err := s.manager.DeleteNode(ctx, container.ID); err != nil {
+				fmt.Printf("Failed to kill zombie %s: %v\n", container.ID[:12], err)
+			} else {
+				zombieCount++
+			}
+		}
+	}
+
+	if zombieCount > 0 {
+		fmt.Printf("✨ Cleaned up %d zombie containers.\n", zombieCount)
+	} else {
+		fmt.Println("✅ System state is clean.")
+	}
+
+	return nil
 }
 
 // --- Topology Export/Import Handlers ---
@@ -522,6 +590,87 @@ func (s *Server) deleteLaboratory(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (s *Server) activateLaboratory(c *gin.Context) {
+	labID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// 1. Verify Lab Exists
+	if _, ok := s.repo.GetLaboratory(labID); !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "laboratory not found"})
+		return
+	}
+
+	// 2. NUKE: Delete ALL running containers to free resources
+	// We reuse the logic of finding openveth containers
+	containers, err := s.manager.GetOpenVethContainers(ctx)
+	if err == nil {
+		for _, container := range containers {
+			// Don't error out, just try to kill everything
+			_ = s.manager.DeleteNode(ctx, container.ID) 
+		}
+	}
+
+	// 3. Rebuild Nodes
+	nodes, err := s.repo.ListNodesByLab(labID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch nodes: " + err.Error()})
+		return
+	}
+
+	for i, n := range nodes {
+		// Re-create container
+		containerID, err := s.manager.CreateNode(ctx, n)
+		if err != nil {
+			fmt.Printf("Error reviving node %s: %v\n", n.Name, err)
+			continue
+		}
+		
+		// Update Runtime Info in Struct (PID, ID)
+		pid, _ := s.manager.GetNodePID(ctx, containerID)
+		nodes[i].ContainerID = containerID
+		nodes[i].PID = pid
+		
+		// CRITICAL: Persist the new ContainerID and PID to DB
+		// Otherwise, subsequent API calls (like getInterfaces) will look for the old container
+		s.repo.SaveNode(nodes[i])
+	}
+
+	// 4. Rebuild Links
+	links, err := s.repo.ListLinksByLab(labID)
+	if err != nil {
+		fmt.Printf("Error fetching links: %v\n", err)
+	}
+	
+	nm := orchestrator.NewNetworkManager()
+	
+	for _, l := range links {
+		// Find source and target PIDs from our fresh `nodes` slice
+		var srcNode, tgtNode models.Node
+		foundS, foundT := false, false
+		
+		for _, n := range nodes {
+			if n.ID == l.SourceID { srcNode = n; foundS = true }
+			if n.ID == l.TargetID { tgtNode = n; foundT = true }
+		}
+
+		if foundS && foundT && srcNode.PID > 0 && tgtNode.PID > 0 {
+			if err := nm.CreateLink(l, srcNode.PID, tgtNode.PID); err != nil {
+				fmt.Printf("Error reviving link %s: %v\n", l.ID, err)
+			} else {
+				// Re-attach bridges if needed
+				if srcNode.Type == models.SWITCH {
+					_ = s.manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt)
+				}
+				if tgtNode.Type == models.SWITCH {
+					_ = s.manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt)
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "laboratory activated", "nodes_revived": len(nodes)})
 }
 
 // handleCleanup eliminates all containers with label openveth=true

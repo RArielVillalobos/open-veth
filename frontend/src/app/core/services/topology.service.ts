@@ -11,8 +11,11 @@ export class TopologyService {
   private apiUrl = 'http://localhost:8080/api/v1';
 
   // --- Nodos ---
-  getNodes(live: boolean = false): Observable<Node[]> {
-    const url = live ? `${this.apiUrl}/nodes?live=true` : `${this.apiUrl}/nodes`;
+  getNodes(live: boolean = false, labId?: string): Observable<Node[]> {
+    let url = `${this.apiUrl}/nodes?live=${live}`;
+    if (labId) {
+      url += `&lab_id=${labId}`;
+    }
     return this.http.get<Node[]>(url);
   }
 
@@ -33,8 +36,12 @@ export class TopologyService {
   }
 
   // --- Links ---
-  getLinks(): Observable<Link[]> {
-    return this.http.get<Link[]>(`${this.apiUrl}/links`);
+  getLinks(labId?: string): Observable<Link[]> {
+    let url = `${this.apiUrl}/links`;
+    if (labId) {
+      url += `?lab_id=${labId}`;
+    }
+    return this.http.get<Link[]>(url);
   }
 
   createLink(link: Link): Observable<Link> {
@@ -50,8 +57,20 @@ export class TopologyService {
     return this.http.get<any[]>(`${this.apiUrl}/laboratories`);
   }
 
+  createLaboratory(lab: { id: string, name: string }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/laboratories`, lab);
+  }
+
+  activateLaboratory(id: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/laboratories/${id}/activate`, {});
+  }
+
   updateLaboratory(id: string, name: string): Observable<any> {
     return this.http.patch(`${this.apiUrl}/laboratories/${id}`, { name });
+  }
+
+  deleteLaboratory(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/laboratories/${id}`);
   }
 
   // --- Sistema ---

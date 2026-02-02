@@ -1,0 +1,119 @@
+<div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in">
+  <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-up">
+    
+    <!-- Header -->
+    <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-100 tracking-tight">My Laboratories</h2>
+        <p class="text-slate-400 text-sm mt-1">Manage your network simulation projects</p>
+      </div>
+      <button (click)="close.emit()" class="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-800">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
+      
+      <!-- Sidebar / Create New -->
+      <div class="w-full md:w-80 bg-slate-800/30 border-r border-slate-700 p-6 flex flex-col gap-6">
+        <div>
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4">Create New Project</h3>
+          <div class="flex flex-col gap-3">
+            <div class="relative">
+              <input 
+                #labNameInput
+                type="text" 
+                placeholder="Project Name (e.g. BGP-Fabric)" 
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+                (keyup.enter)="createLab(labNameInput.value); labNameInput.value=''"
+              >
+            </div>
+            <button 
+              (click)="createLab(labNameInput.value); labNameInput.value=''"
+              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-3 rounded-lg text-sm font-semibold shadow-lg shadow-indigo-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <span>+</span> Create Laboratory
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-auto bg-indigo-900/20 border border-indigo-500/20 rounded-lg p-4">
+          <h4 class="text-indigo-300 font-medium text-sm mb-1">Did you know?</h4>
+          <p class="text-indigo-200/60 text-xs leading-relaxed">
+            Switching laboratories automatically saves your work and shuts down the previous environment to save resources.
+          </p>
+        </div>
+      </div>
+
+      <!-- Main Grid -->
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-950/30">
+        
+        <!-- Grid Layout -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4" *ngIf="store.laboratories().length > 0; else emptyState">
+          
+          <div *ngFor="let lab of store.laboratories()" 
+               class="group relative bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl p-5 transition-all hover:shadow-xl hover:shadow-black/20 hover:-translate-y-1 flex flex-col"
+               [class.ring-2]="lab.id === store.currentLabId()"
+               [class.ring-indigo-500]="lab.id === store.currentLabId()"
+               [class.bg-slate-800]="lab.id !== store.currentLabId()"
+               [class.bg-slate-800\/80]="lab.id === store.currentLabId()">
+            
+            <!-- Status Badge -->
+            <div class="absolute top-4 right-4">
+              <span *ngIf="lab.id === store.currentLabId()" class="flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+            </div>
+
+            <!-- Icon -->
+            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center mb-4 text-2xl group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-colors">
+              📂
+            </div>
+
+            <!-- Content -->
+            <h3 class="font-semibold text-slate-100 text-lg truncate mb-1" title="{{lab.name}}">{{ lab.name }}</h3>
+            <p class="text-xs text-slate-500 font-mono mb-6 truncate">{{ lab.id }}</p>
+
+            <!-- Actions -->
+            <div class="mt-auto flex gap-2">
+              <button *ngIf="lab.id !== store.currentLabId()"
+                      (click)="switchLab(lab.id)"
+                      class="flex-1 bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-2 rounded-lg text-xs font-medium transition-colors">
+                Open Project
+              </button>
+              
+              <button *ngIf="lab.id === store.currentLabId()"
+                      disabled
+                      class="flex-1 bg-green-900/20 text-green-400 border border-green-900/30 py-2 rounded-lg text-xs font-medium cursor-default">
+                Active
+              </button>
+
+              <button *ngIf="lab.id !== store.currentLabId()"
+                      (click)="deleteLab(lab.id)"
+                      class="px-3 py-2 bg-slate-700 hover:bg-red-900/50 hover:text-red-400 text-slate-400 rounded-lg transition-colors"
+                      title="Delete Project">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Empty State -->
+        <ng-template #emptyState>
+          <div class="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
+            <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 text-4xl grayscale">
+              🕸️
+            </div>
+            <h3 class="text-lg font-medium text-slate-300">No laboratories yet</h3>
+            <p class="text-slate-500 text-sm max-w-xs mt-2">Create your first network simulation project using the sidebar.</p>
+          </div>
+        </ng-template>
+
+      </div>
+    </div>
+  </div>
+</div>
