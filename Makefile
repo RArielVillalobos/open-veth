@@ -43,6 +43,10 @@ run-ui: ## Run Frontend in development mode
 	cd $(FRONTEND_DIR) && npm start
 
 # --- Utilities ---
+fmt: ## 🎨 Format Go source code
+	$(GO_CMD) fmt ./...
+	@echo "Go code formatted."
+
 clean: dev-down ## Clean containers and artifacts
 	cd $(FRONTEND_DIR) && rm -rf node_modules .angular
 	$(GO_CMD) clean

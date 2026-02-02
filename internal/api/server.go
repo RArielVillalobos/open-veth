@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"open-veth/internal/models"
 	"open-veth/internal/orchestrator"
 	"open-veth/internal/storage"
+	"os"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/gin-contrib/cors"
@@ -81,7 +81,7 @@ func (s *Server) setupRoutes() {
 		api.PATCH("/nodes/:id/position", s.updateNodePosition) // New for auto-save
 		api.DELETE("/nodes/:id", s.deleteNode)
 		api.GET("/nodes/:id/interfaces", s.getNodeInterfaces) // New Real-Time endpoint
-		
+
 		// Links
 		api.GET("/links", s.listLinks)
 		api.POST("/links", s.createLink)
@@ -137,7 +137,7 @@ func (s *Server) reconcileState() error {
 		// We use Name as the key identifier since ContainerID might change if recreated manually,
 		// but openveth relies heavily on naming conventions.
 		// Ideally we should check both, but let's stick to Name for now as it maps to container name.
-		validContainers["/" + node.Name] = true // Docker names often start with /
+		validContainers["/"+node.Name] = true // Docker names often start with /
 		validContainers[node.Name] = true
 	}
 
@@ -157,7 +157,7 @@ func (s *Server) reconcileState() error {
 			// Use the orchestrator to delete it properly
 			// We can pass the container ID or Name. Manager.DeleteNode expects Name usually but ContainerRemove works with ID.
 			// Let's use ID for precision here.
-		if err := s.manager.DeleteNode(ctx, container.ID); err != nil {
+			if err := s.manager.DeleteNode(ctx, container.ID); err != nil {
 				fmt.Printf("Failed to kill zombie %s: %v\n", container.ID[:12], err)
 			} else {
 				zombieCount++
@@ -178,7 +178,7 @@ func (s *Server) reconcileState() error {
 
 func (s *Server) handleImport(c *gin.Context) {
 	var imported models.LabExport
-	
+
 	// 1. Parse YAML from request body
 	if err := c.ShouldBindYAML(&imported); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid YAML format: " + err.Error()})
@@ -194,11 +194,11 @@ func (s *Server) handleImport(c *gin.Context) {
 	for _, n := range nodes {
 		_ = s.manager.DeleteNode(ctx, n.Name)
 	}
-	
+
 	// We don't use s.repo.ClearAll() because we might have other labs in the future.
 	// For now, we manually delete nodes/links of this lab.
 	// Optimization: Since it's lab-1, we can just clear if we assume single lab.
-	s.repo.DeleteLaboratory(labID) 
+	s.repo.DeleteLaboratory(labID)
 	s.repo.SaveLaboratory(models.Laboratory{ID: labID, Name: imported.Name})
 
 	// 3. Recreate Nodes
@@ -280,7 +280,7 @@ func (s *Server) handleImport(c *gin.Context) {
 
 func (s *Server) handleExport(c *gin.Context) {
 	labID := c.DefaultQuery("lab_id", "lab-1")
-	
+
 	nodes, _ := s.repo.ListNodesByLab(labID)
 	links, _ := s.repo.ListLinksByLab(labID)
 	lab, _ := s.repo.GetLaboratory(labID)
@@ -495,7 +495,7 @@ func (s *Server) createLink(c *gin.Context) {
 	for _, l := range existingLinks {
 		// Check both directions
 		if (l.SourceID == link.SourceID && l.TargetID == link.TargetID) ||
-		   (l.SourceID == link.TargetID && l.TargetID == link.SourceID) {
+			(l.SourceID == link.TargetID && l.TargetID == link.SourceID) {
 			c.JSON(http.StatusConflict, gin.H{"error": "link already exists between these nodes"})
 			return
 		}
@@ -608,7 +608,7 @@ func (s *Server) activateLaboratory(c *gin.Context) {
 	if err == nil {
 		for _, container := range containers {
 			// Don't error out, just try to kill everything
-			_ = s.manager.DeleteNode(ctx, container.ID) 
+			_ = s.manager.DeleteNode(ctx, container.ID)
 		}
 	}
 
@@ -626,12 +626,12 @@ func (s *Server) activateLaboratory(c *gin.Context) {
 			fmt.Printf("Error reviving node %s: %v\n", n.Name, err)
 			continue
 		}
-		
+
 		// Update Runtime Info in Struct (PID, ID)
 		pid, _ := s.manager.GetNodePID(ctx, containerID)
 		nodes[i].ContainerID = containerID
 		nodes[i].PID = pid
-		
+
 		// CRITICAL: Persist the new ContainerID and PID to DB
 		// Otherwise, subsequent API calls (like getInterfaces) will look for the old container
 		s.repo.SaveNode(nodes[i])
@@ -642,17 +642,23 @@ func (s *Server) activateLaboratory(c *gin.Context) {
 	if err != nil {
 		fmt.Printf("Error fetching links: %v\n", err)
 	}
-	
+
 	nm := orchestrator.NewNetworkManager()
-	
+
 	for _, l := range links {
 		// Find source and target PIDs from our fresh `nodes` slice
 		var srcNode, tgtNode models.Node
 		foundS, foundT := false, false
-		
+
 		for _, n := range nodes {
-			if n.ID == l.SourceID { srcNode = n; foundS = true }
-			if n.ID == l.TargetID { tgtNode = n; foundT = true }
+			if n.ID == l.SourceID {
+				srcNode = n
+				foundS = true
+			}
+			if n.ID == l.TargetID {
+				tgtNode = n
+				foundT = true
+			}
 		}
 
 		if foundS && foundT && srcNode.PID > 0 && tgtNode.PID > 0 {
