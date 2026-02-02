@@ -117,18 +117,30 @@ func (r *GormRepository) ListLaboratories() ([]models.Laboratory, error) {
 func (r *GormRepository) DeleteLaboratory(id string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Cascading delete nodes and links associated with this lab
-		if err := tx.Delete(&models.Node{}, "lab_id = ?", id).Error; err != nil { return err }
-		if err := tx.Delete(&models.Link{}, "lab_id = ?", id).Error; err != nil { return err }
-		if err := tx.Delete(&models.Laboratory{}, "id = ?", id).Error; err != nil { return err }
+		if err := tx.Delete(&models.Node{}, "lab_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.Link{}, "lab_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.Laboratory{}, "id = ?", id).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 }
 
 func (r *GormRepository) ClearAll() error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("DELETE FROM nodes").Error; err != nil { return err }
-		if err := tx.Exec("DELETE FROM links").Error; err != nil { return err }
-		if err := tx.Exec("DELETE FROM laboratories").Error; err != nil { return err }
+		if err := tx.Exec("DELETE FROM nodes").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DELETE FROM links").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DELETE FROM laboratories").Error; err != nil {
+			return err
+		}
 		return nil
 	})
 }

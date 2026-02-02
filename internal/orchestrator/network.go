@@ -3,7 +3,7 @@ package orchestrator
 import (
 	"fmt"
 	"runtime"
-	
+
 	"open-veth/internal/models"
 
 	"github.com/vishvananda/netlink"
@@ -110,17 +110,17 @@ func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int)
 			if err != nil {
 				return fmt.Errorf("interfaz movida no encontrada: %v", err)
 			}
-			
+
 			if err := netlink.LinkSetName(l, ifaceContainerName); err != nil {
 				return fmt.Errorf("error renombrando: %v", err)
 			}
-			
+
 			// Re-buscamos por nuevo nombre
 			l, err = netlink.LinkByName(ifaceContainerName)
 			if err != nil {
 				return err
 			}
-			
+
 			return netlink.LinkSetUp(l)
 		})
 	}
@@ -133,7 +133,7 @@ func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int)
 		return fmt.Errorf("fallo configurando target: %v", err)
 	}
 
-	fmt.Printf("Link creado: %s (%s) <--> %s (%s)\n", 
+	fmt.Printf("Link creado: %s (%s) <--> %s (%s)\n",
 		link.SourceID, link.SourceInt, link.TargetID, link.TargetInt)
 
 	return nil
@@ -174,7 +174,7 @@ func (nm *NetworkManager) ConnectNodeToBridge(pid int, containerIface, bridgeNam
 	if len(suffix) > 3 {
 		suffix = suffix[:3]
 	}
-	
+
 	hostVethName := fmt.Sprintf("v%d-%s", pid, suffix)
 	containerVethTemp := hostVethName + "c" // temp name for container side
 
@@ -212,7 +212,7 @@ func (nm *NetworkManager) ConnectNodeToBridge(pid int, containerIface, bridgeNam
 	// 3. Mover lado Container al Namespace
 	// Reutilizamos lógica similar a CreateLink, pero simplificada inline o extraemos funcion Move
 	// Por ahora copiamos la logica de movimiento:
-	
+
 	targetNs, err := netns.GetFromPid(pid)
 	if err != nil {
 		return err
@@ -234,15 +234,17 @@ func (nm *NetworkManager) ConnectNodeToBridge(pid int, containerIface, bridgeNam
 		if err != nil {
 			return fmt.Errorf("interfaz movida no encontrada: %v", err)
 		}
-		
+
 		if err := netlink.LinkSetName(l, containerIface); err != nil {
 			return fmt.Errorf("error renombrando a %s: %v", containerIface, err)
 		}
-		
+
 		// Re-buscar
 		l, err = netlink.LinkByName(containerIface)
-		if err != nil { return err }
-		
+		if err != nil {
+			return err
+		}
+
 		return netlink.LinkSetUp(l)
 	})
 }

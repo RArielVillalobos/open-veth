@@ -181,8 +181,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			"openveth": "true",
 
 			"openveth.name": node.Name,
-			
-			"openveth.lab":  node.LabID,
+
+			"openveth.lab": node.LabID,
 		},
 	}
 

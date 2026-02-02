@@ -146,7 +146,7 @@ func (m *MemoryRepository) ListLaboratories() ([]models.Laboratory, error) {
 func (m *MemoryRepository) DeleteLaboratory(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Delete associated nodes and links
 	for nodeID, node := range m.nodes {
 		if node.LabID == id {
@@ -158,7 +158,7 @@ func (m *MemoryRepository) DeleteLaboratory(id string) error {
 			delete(m.links, linkID)
 		}
 	}
-	
+
 	delete(m.labs, id)
 	return nil
 }

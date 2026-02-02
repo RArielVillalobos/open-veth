@@ -23,7 +23,7 @@ type Repository interface {
 	GetLaboratory(id string) (models.Laboratory, bool)
 	ListLaboratories() ([]models.Laboratory, error)
 	DeleteLaboratory(id string) error
-	
+
 	// Cleanup
 	ClearAll() error
 }

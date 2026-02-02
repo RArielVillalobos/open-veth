@@ -11,20 +11,20 @@ const (
 
 // Node represents a device in the network
 type Node struct {
-	ID          string   `json:"id" gorm:"primaryKey"`
-	LabID       string   `json:"lab_id" gorm:"index"` // Associated laboratory
-	Name        string   `json:"name"`
-	Type        NodeType `json:"type"`
-	Image       string   `json:"image"`
-	CPURequest  string   `json:"cpu_request"`
-	RAMLimit    string   `json:"ram_limit"`
-	X           float64  `json:"x"` // Canvas position
-	Y           float64  `json:"y"` // Canvas position
-	
+	ID         string   `json:"id" gorm:"primaryKey"`
+	LabID      string   `json:"lab_id" gorm:"index"` // Associated laboratory
+	Name       string   `json:"name"`
+	Type       NodeType `json:"type"`
+	Image      string   `json:"image"`
+	CPURequest string   `json:"cpu_request"`
+	RAMLimit   string   `json:"ram_limit"`
+	X          float64  `json:"x"` // Canvas position
+	Y          float64  `json:"y"` // Canvas position
+
 	// Internal state
 	ContainerID string `json:"container_id"`
 	PID         int    `json:"pid"`
-	
+
 	// Runtime Info (Not persisted in DB)
 	Interfaces []InterfaceInfo `json:"interfaces" gorm:"-"`
 }
