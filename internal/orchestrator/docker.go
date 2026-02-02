@@ -225,6 +225,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 			}
 
+			// Ensure Switch Bridge exists (it might be lost on restart)
+			if node.Type == models.SWITCH {
+				m.setupSwitchBridge(ctx, inspect.ID, node.Name)
+			}
+
 			return inspect.ID, nil
 
 		}
@@ -265,47 +270,37 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	// 6. If node is SWITCH, initialize bridge 'br0'
 
 	if node.Type == models.SWITCH {
-
-		// Use specific shell command to ensure bridge creation
-
-		// We use ; instead of && to be safer with simple shells, though && is standard
-
-		setupCmd := []string{"sh", "-c", "ip link add name br0 type bridge; ip link set dev br0 up"}
-
-		execConfigSwitch := container.ExecOptions{
-
-			Cmd: setupCmd,
-
-			AttachStdout: true,
-
-			AttachStderr: true,
-
-			Privileged: true, // Ensure privileges for netlink ops
-
-		}
-
-		fmt.Printf("Initializing Bridge br0 for Switch %s...\n", node.Name)
-
-		if execID, err := m.cli.ContainerExecCreate(ctx, resp.ID, execConfigSwitch); err == nil {
-
-			if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
-
-				fmt.Printf("Error starting switch setup: %v\n", errStart)
-
-			}
-
-		} else {
-
-			fmt.Printf("Error creating switch setup exec: %v\n", err)
-
-		}
-
+		m.setupSwitchBridge(ctx, resp.ID, node.Name)
 	}
 
 	fmt.Printf("Node %s created and started successfully (ID: %s).\n", node.Name, resp.ID[:12])
 
 	return resp.ID, nil
 
+}
+
+// setupSwitchBridge initializes the bridge interface inside a switch container
+func (m *Manager) setupSwitchBridge(ctx context.Context, containerID, nodeName string) {
+	// Use specific shell command to ensure bridge creation
+	// We use ; instead of && to be safer with simple shells, though && is standard
+	setupCmd := []string{"sh", "-c", "ip link add name br0 type bridge; ip link set dev br0 up"}
+
+	execConfigSwitch := container.ExecOptions{
+		Cmd:          setupCmd,
+		AttachStdout: true,
+		AttachStderr: true,
+		Privileged:   true, // Ensure privileges for netlink ops
+	}
+
+	fmt.Printf("Initializing Bridge br0 for Switch %s...\n", nodeName)
+
+	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfigSwitch); err == nil {
+		if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
+			fmt.Printf("Error starting switch setup: %v\n", errStart)
+		}
+	} else {
+		fmt.Printf("Error creating switch setup exec: %v\n", err)
+	}
 }
 
 // AttachInterfaceToBridge connects a network interface to the main bridge (br0) inside a container
