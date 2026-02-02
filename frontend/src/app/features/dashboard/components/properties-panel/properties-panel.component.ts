@@ -55,11 +55,6 @@ import { Node, Link } from '../../../../models/topology.model';
 
           <!-- Detalles Técnicos -->
           <div class="space-y-4">
-            <div>
-              <label class="text-xs text-slate-500 block mb-1">Image</label>
-              <input type="text" [value]="selectedNode()?.image" disabled
-                     class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-400 font-mono">
-            </div>
             
             <div>
               <label class="text-xs text-slate-500 block mb-1">Status</label>

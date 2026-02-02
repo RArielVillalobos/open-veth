@@ -12,7 +12,7 @@ export interface Node {
   id: string;
   name: string;
   type: 'router' | 'switch' | 'host';
-  image: string;
+  // Image removed: Backend managed
   x?: number;
   y?: number;
   status?: 'pending' | 'running' | 'error';

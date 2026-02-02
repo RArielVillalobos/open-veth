@@ -211,7 +211,7 @@ func (s *Server) handleImport(c *gin.Context) {
 			LabID: labID,
 			Name:  n.Name,
 			Type:  n.Type,
-			Image: n.Image,
+			Image: models.GetImageForType(n.Type), // SECURITY: Force official image
 			X:     n.X,
 			Y:     n.Y,
 		}
@@ -298,12 +298,11 @@ func (s *Server) handleExport(c *gin.Context) {
 
 	for _, n := range nodes {
 		export.Nodes = append(export.Nodes, models.NodeExport{
-			ID:    n.ID,
-			Name:  n.Name,
-			Type:  n.Type,
-			Image: n.Image,
-			X:     n.X,
-			Y:     n.Y,
+			ID:   n.ID,
+			Name: n.Name,
+			Type: n.Type,
+			X:    n.X,
+			Y:    n.Y,
 		})
 	}
 
@@ -370,6 +369,9 @@ func (s *Server) createNode(c *gin.Context) {
 	if node.LabID == "" {
 		node.LabID = "lab-1"
 	}
+
+	// SECURITY: Override user-provided image with official image
+	node.Image = models.GetImageForType(node.Type)
 
 	containerID, err := s.manager.CreateNode(c.Request.Context(), node)
 	if err != nil {
