@@ -73,7 +73,6 @@ export class DashboardComponent implements OnInit {
       id: 'node-' + Math.random().toString(36).substr(2, 5),
       name: type.toUpperCase() + '-' + (this.store.topology().nodes.length + 1),
       type: type,
-      image: type === 'router' ? 'openveth/router:latest' : 'openveth/host:latest',
       x: 100, // Posición inicial por defecto
       y: 100
     });

@@ -9,6 +9,26 @@ const (
 	HOST   NodeType = "host"   // Usa imagen Alpine/Ubuntu
 )
 
+// Official Images
+const (
+	ImgRouter = "openveth/router:latest"
+	ImgHost   = "openveth/host:latest"
+)
+
+// GetImageForType returns the official docker image for a given node type
+func GetImageForType(t NodeType) string {
+	switch t {
+	case ROUTER:
+		return ImgRouter
+	case HOST:
+		return ImgHost
+	case SWITCH:
+		return ImgHost // Switch uses the host image to run the bridge
+	default:
+		return ImgHost
+	}
+}
+
 // Node represents a device in the network
 type Node struct {
 	ID         string   `json:"id" gorm:"primaryKey"`
@@ -77,12 +97,12 @@ type LabExport struct {
 }
 
 type NodeExport struct {
-	ID    string   `yaml:"id"`
-	Name  string   `yaml:"name"`
-	Type  NodeType `yaml:"type"`
-	Image string   `yaml:"image"`
-	X     float64  `yaml:"x"`
-	Y     float64  `yaml:"y"`
+	ID   string   `yaml:"id"`
+	Name string   `yaml:"name"`
+	Type NodeType `yaml:"type"`
+	// Image removed for security abstraction
+	X float64 `yaml:"x"`
+	Y float64 `yaml:"y"`
 }
 
 type LinkExport struct {
