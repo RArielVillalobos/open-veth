@@ -14,6 +14,7 @@ export class PropertiesPanelComponent {
   selectedLink = input<Link | null>(null);
 
   openTerminal = output<string>();
+  openCapture = output<string>();
   deleteNode = output<string>();
   deleteLink = output<string>();
   close = output<void>();
@@ -23,6 +24,7 @@ export class PropertiesPanelComponent {
   // Internal state
   routes = signal<RouteInfo[]>([]);
   loadingRoutes = signal(false);
+  showHelp = signal(false);
 
   // Safe check for interfaces to use in template
   hasInterfaces = computed(() => {

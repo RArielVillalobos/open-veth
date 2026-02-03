@@ -104,6 +104,61 @@
         </div>
       }
 
+      <!-- LAB GUIDE (Cheat Sheet) -->
+      <div class="mt-auto border-t border-slate-800 p-4 bg-slate-900/50">
+        <button (click)="showHelp.set(!showHelp())" 
+                class="flex items-center justify-between w-full text-xs font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors">
+          <span>📖 Lab Guide</span>
+          <span>{{ showHelp() ? '▼' : '▶' }}</span>
+        </button>
+
+        @if (showHelp()) {
+          <div class="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            
+            @if (selectedNode()?.type === 'router') {
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Set up DHCP Server:</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-blue-300 overflow-x-auto border border-slate-800">
+echo "interface=eth1" > /etc/dnsmasq.conf
+echo "dhcp-range=192.168.1.50,192.168.1.100,12h" >> /etc/dnsmasq.conf
+dnsmasq --no-daemon</pre>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Enable NAT (Internet):</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-green-300 overflow-x-auto border border-slate-800">
+iptables -t nat -A POSTROUTING -o mgmt0 -j MASQUERADE</pre>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Remote Access (SSH):</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-purple-300 overflow-x-auto border border-slate-800">
+# From a Host, connect to this Router:
+ssh root@&lt;ROUTER_IP&gt;
+# Password: openveth</pre>
+              </div>
+            }
+
+            @if (selectedNode()?.type === 'host') {
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Request IP via DHCP:</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-blue-300 overflow-x-auto border border-slate-800">
+udhcpc -i eth1</pre>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Generate SSH Keys:</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-purple-300 overflow-x-auto border border-slate-800">
+ssh-keygen -t rsa
+ssh-copy-id root@&lt;TARGET_IP&gt;</pre>
+              </div>
+            }
+
+            <p class="text-[9px] text-slate-500 italic">Copy these commands into the node terminal to configure services manually.</p>
+          </div>
+        }
+      </div>
+
     </div>
   } 
   

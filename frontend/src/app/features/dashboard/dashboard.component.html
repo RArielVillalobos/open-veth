@@ -83,7 +83,7 @@
           [selectedNode]="selectedNode()"
           [selectedLink]="selectedLink()"
           (openTerminal)="openTerminal($event)"
-          (openCapture)="onOpenCapture($event)"
+          (openCapture)="onOpenCapture($any($event))"
           (deleteNode)="onDeleteNode($event)"
           (deleteLink)="onDeleteLink($event)"
           (close)="onNodeSelected(null)">

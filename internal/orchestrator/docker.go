@@ -214,6 +214,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 		Image: node.Image,
 
+		Hostname: node.Name, // Set hostname to node name (e.g. ROUTER-1)
+
 		Cmd: []string{"sleep", "infinity"},
 
 		Labels: map[string]string{
@@ -223,6 +225,10 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			"openveth.name": node.Name,
 
 			"openveth.lab": node.LabID,
+		},
+
+		Env: []string{
+			"PS1=" + node.Name + ":\\w\\$ ", // Forces the prompt to show node name
 		},
 	}
 
