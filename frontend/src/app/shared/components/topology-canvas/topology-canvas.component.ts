@@ -17,6 +17,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   links = input.required<Link[]>();
   edgeCreated = output<Link>();
   openTerminalRequest = output<string>();
+  openSniffRequest = output<{nodeId: string, nodeName: string, iface: string}>();
   nodeMoved = output<{id: string, x: number, y: number}>();
   nodeSelected = output<string | null>();
   linkSelected = output<string | null>();
@@ -33,14 +34,18 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     y: 0,
     elementId: '',
     elementName: '',
-    elementType: ''
+    elementType: '',
+    // Optional data for links
+    sourceNode: { nodeId: '', nodeName: '', iface: '' },
+    targetNode: { nodeId: '', nodeName: '', iface: '' }
   };
 
   constructor() {
     effect(() => {
+      // Use this.nodes() to access the signal value
       const currentNodes = this.nodes();
       if (this.cy) {
-        this.updateGraph(currentNodes);
+        this.updateCanvas();
       }
     });
   }
@@ -82,6 +87,11 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         this.nodeDelete.emit(this.contextMenu.elementId);
       }
     }
+    this.closeContextMenu();
+  }
+
+  triggerOpenSniff(data: {nodeId: string, nodeName: string, iface: string}) {
+    this.openSniffRequest.emit(data);
     this.closeContextMenu();
   }
 
@@ -169,7 +179,6 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         // Mode: Start Link
         this.sourceNodeId = clickedId;
         clickedNode.addClass('selected-source');
-        // Do NOT emit selection here (as requested)
       } else {
         // Mode: End Link
         if (this.sourceNodeId !== clickedId) {
@@ -214,7 +223,6 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     this.cy.on('tap', 'edge', (evt) => {
       const edge = evt.target;
       this.linkSelected.emit(edge.id());
-      // No necesitamos cancelar linking porque no se puede linkear desde un edge
     });
 
     // Right Click (Context Menu) - Node
@@ -228,22 +236,40 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         y: pos.y + 20,
         elementId: node.id(),
         elementName: node.data('label').split('\n')[0],
-        elementType: node.data('type')
+        elementType: node.data('type'),
+        sourceNode: { nodeId: '', nodeName: '', iface: '' },
+        targetNode: { nodeId: '', nodeName: '', iface: '' }
       };
     });
 
     // Right Click (Context Menu) - Edge
     this.cy.on('cxttap', 'edge', (evt) => {
       const edge = evt.target;
+      const data = edge.data();
       const pos = evt.renderedPosition; 
       
+      // Look up full node objects to get names
+      const sNode = this.nodes().find(n => n.id === data.source);
+      const tNode = this.nodes().find(n => n.id === data.target);
+
       this.contextMenu = {
         visible: true,
         x: pos.x + 20,
         y: pos.y + 20,
         elementId: edge.id(),
         elementName: 'Link',
-        elementType: 'edge'
+        elementType: 'edge',
+        // Populate with correct structure for the event
+        sourceNode: { 
+            nodeId: data.source, 
+            nodeName: sNode?.name || 'A', 
+            iface: data.source_int 
+        },
+        targetNode: { 
+            nodeId: data.target, 
+            nodeName: tNode?.name || 'B', 
+            iface: data.target_int 
+        }
       };
     });
 
@@ -271,23 +297,32 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private updateGraph(nodes: TopologyNode[]) {
+  private updateCanvas(): void {
+    // Access signal value once
+    const nodes = this.nodes();
+    
     this.cy.batch(() => {
       // 1. Add/Update Nodes
-      nodes.forEach(node => {
-        // Build rich label with IPs
+      nodes.forEach((node: any) => {
+        // Build rich label with IPs (Limited to 2 for clarity)
         let label = node.name;
         if (node.interfaces && node.interfaces.length > 0) {
-          const ips = node.interfaces
-            .filter(i => i.ifname !== 'lo' && i.ifname !== 'mgmt0')
-            .map(i => {
-              const ipv4 = i.addr_info?.find(addr => !addr.local.includes(':'));
+          const relevantIfaces = node.interfaces
+            .filter((i: any) => i.ifname !== 'lo' && i.ifname !== 'mgmt0');
+          
+          const ips = relevantIfaces
+            .slice(0, 2) // Limit to 2 IPs
+            .map((i: any) => {
+              const ipv4 = i.addr_info?.find((addr: any) => !addr.local.includes(':'));
               return ipv4 ? `${ipv4.local}/${ipv4.prefixlen} (${i.ifname})` : null;
             })
             .filter(Boolean);
           
           if (ips.length > 0) {
             label += '\n' + ips.join('\n');
+            if (relevantIfaces.length > 2) {
+                label += '\n...';
+            }
           }
         }
 
@@ -324,7 +359,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       });
 
       // 3. Remove deleted Nodes
-      const currentIds = new Set(nodes.map(n => n.id));
+      const currentIds = new Set(nodes.map((n: any) => n.id));
       this.cy.nodes().forEach(ele => {
         if (!currentIds.has(ele.id())) {
           this.cy.remove(ele);

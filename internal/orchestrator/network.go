@@ -106,6 +106,14 @@ func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int)
 
 		// Ahora entramos al NS para renombrarla y levantarla
 		return nm.runInNs(pid, func() error {
+			// Pre-check: If target name exists (zombie interface), delete it
+			if oldLink, _ := netlink.LinkByName(ifaceContainerName); oldLink != nil {
+				fmt.Printf("Warning: Interface %s already exists in PID %d. Deleting zombie...\n", ifaceContainerName, pid)
+				if err := netlink.LinkDel(oldLink); err != nil {
+					return fmt.Errorf("failed to delete zombie interface %s: %v", ifaceContainerName, err)
+				}
+			}
+
 			l, err := netlink.LinkByName(ifaceHostName)
 			if err != nil {
 				return fmt.Errorf("interfaz movida no encontrada: %v", err)
@@ -270,6 +278,22 @@ func (nm *NetworkManager) SetInterfaceIP(pid int, ifaceName string, ipCidr strin
 		}
 
 		fmt.Printf("IP asignada en PID %d: %s -> %s\n", pid, ifaceName, ipCidr)
+		return nil
+	})
+}
+
+// RemoveInterface deletes a network interface from a container namespace (PID)
+func (nm *NetworkManager) RemoveInterface(pid int, ifaceName string) error {
+	return nm.runInNs(pid, func() error {
+		link, err := netlink.LinkByName(ifaceName)
+		if err != nil {
+			// If interface not found, it's already gone, so we consider it a success
+			return nil
+		}
+		if err := netlink.LinkDel(link); err != nil {
+			return fmt.Errorf("error deleting interface %s: %v", ifaceName, err)
+		}
+		fmt.Printf("Deleted interface %s from PID %d\n", ifaceName, pid)
 		return nil
 	})
 }
