@@ -84,6 +84,7 @@ func (s *Server) setupRoutes() {
 		api.PATCH("/nodes/:id/position", s.updateNodePosition) // New for auto-save
 		api.DELETE("/nodes/:id", s.deleteNode)
 		api.GET("/nodes/:id/interfaces", s.getNodeInterfaces) // New Real-Time endpoint
+		api.GET("/nodes/:id/routes", s.getNodeRoutes)         // New Route Table endpoint
 
 		// Links
 		api.GET("/links", s.listLinks)
@@ -505,6 +506,28 @@ func (s *Server) getNodeInterfaces(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, interfaces)
+}
+
+func (s *Server) getNodeRoutes(c *gin.Context) {
+	id := c.Param("id")
+	node, found := s.repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+		return
+	}
+
+	routes, err := s.manager.GetNodeRoutes(c.Request.Context(), node.ContainerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, routes)
 }
 
 // --- Link Handlers ---

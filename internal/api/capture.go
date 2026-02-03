@@ -85,15 +85,9 @@ func (s *Server) handleSniff(c *gin.Context) {
 
 	// CLEANUP: Ensure tcpdump is killed when we exit (e.g. client disconnect)
 	defer func() {
-		// We use pkill to target the specific tcpdump on this interface
-		// This prevents orphaned processes consuming CPU/Disk
-		killCmd := []string{"pkill", "-f", fmt.Sprintf("tcpdump -i %s", iface)}
-		killExec, _ := s.manager.GetDockerClient().ContainerExecCreate(context.Background(), node.ContainerID, container.ExecOptions{
-			Cmd: killCmd,
-		})
-		if killExec.ID != "" {
-			_ = s.manager.GetDockerClient().ContainerExecStart(context.Background(), killExec.ID, container.ExecStartOptions{})
-		}
+		// We use the helper to kill the specific tcpdump process on this interface
+		pattern := fmt.Sprintf("tcpdump -i %s", iface)
+		_ = s.manager.KillProcessByName(context.Background(), node.ContainerID, pattern)
 		fmt.Printf("Sniffer cleanup: killed tcpdump on %s (%s)\n", node.Name, iface)
 	}()
 

@@ -8,6 +8,16 @@ export interface InterfaceInfo {
   addr_info: IPAddress[];
 }
 
+export interface RouteInfo {
+  dst: string;
+  gateway?: string;
+  dev: string;
+  protocol: string;
+  scope: string;
+  prefsrc?: string;
+  metric?: number;
+}
+
 export interface Node {
   id: string;
   name: string;
