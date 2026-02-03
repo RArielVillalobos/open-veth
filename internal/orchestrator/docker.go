@@ -493,7 +493,7 @@ func (m *Manager) GetNodePID(ctx context.Context, containerID string) (int, erro
 func (m *Manager) KillProcessByName(ctx context.Context, containerID, pattern string) error {
 	// We use pkill -f to match the full command line
 	cmd := []string{"pkill", "-f", pattern}
-	
+
 	execConfig := container.ExecOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
