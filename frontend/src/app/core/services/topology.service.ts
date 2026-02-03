@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Topology, Node, Link, InterfaceInfo } from '../../models/topology.model';
+import { Topology, Node, Link, InterfaceInfo, RouteInfo } from '../../models/topology.model';
 
 @Injectable({
   providedIn: 'root'
@@ -21,6 +21,10 @@ export class TopologyService {
 
   getNodeInterfaces(id: string): Observable<InterfaceInfo[]> {
     return this.http.get<InterfaceInfo[]>(`${this.apiUrl}/nodes/${id}/interfaces`);
+  }
+
+  getNodeRoutes(id: string): Observable<RouteInfo[]> {
+    return this.http.get<RouteInfo[]>(`${this.apiUrl}/nodes/${id}/routes`);
   }
 
   createNode(node: Node): Observable<Node> {

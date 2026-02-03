@@ -1,0 +1,139 @@
+<div class="h-full bg-slate-900 border-l border-slate-700 flex flex-col w-80 overflow-y-auto">
+  <!-- HEADER -->
+  <div class="p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
+    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+      {{ selectedNode() ? 'Node Properties' : (selectedLink() ? 'Link Properties' : 'Properties') }}
+    </h2>
+    <button (click)="close.emit()" class="text-slate-500 hover:text-white transition-colors text-lg">✕</button>
+  </div>
+
+  <!-- NODE DETAILS -->
+  @if (selectedNode()) {
+    <div class="p-4 flex flex-col gap-6">
+      
+      <!-- Icon & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded flex items-center justify-center text-xl font-bold"
+             [ngClass]="{
+               'bg-blue-500/20 text-blue-400': selectedNode()?.type === 'router',
+               'bg-green-500/20 text-green-400': selectedNode()?.type === 'host',
+               'bg-amber-500/20 text-amber-400': selectedNode()?.type === 'switch'
+             }">
+          {{ selectedNode()?.type?.[0]?.toUpperCase() }}
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-100">{{ selectedNode()?.name }}</h3>
+          <p class="text-xs text-slate-500 font-mono">{{ selectedNode()?.id }}</p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="grid grid-cols-2 gap-2">
+        <button (click)="openTerminal.emit(selectedNode()?.name!)"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 px-3 rounded border border-slate-700 transition-colors">
+          Terminal
+        </button>
+        <button (click)="deleteNode.emit(selectedNode()?.id!)"
+                class="bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs py-2 px-3 rounded border border-red-900/30 transition-colors">
+          Delete
+        </button>
+      </div>
+
+      <!-- Network Interfaces -->
+      <div class="space-y-2">
+        <label class="text-xs text-slate-500 font-bold uppercase tracking-tighter">Network Interfaces</label>
+        
+        @if (hasInterfaces()) {
+          <div class="bg-slate-950 rounded border border-slate-700 overflow-hidden">
+            <table class="w-full text-xs text-left">
+              <tbody class="divide-y divide-slate-800">
+                @for (iface of selectedNode()?.interfaces; track iface.ifname) {
+                  @if (iface.ifname !== 'lo' && iface.ifname !== 'mgmt0') {
+                    <tr class="hover:bg-slate-900">
+                      <td class="p-2 font-mono text-slate-400 border-r border-slate-800 w-16">{{ iface.ifname }}</td>
+                      <td class="p-2 text-slate-200">
+                        {{ getIPv4(iface.addr_info) }}
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="text-xs text-slate-600 italic">Interfaces hidden or not active</div>
+        }
+      </div>
+
+      <!-- Routing Table (Only for L3 nodes) -->
+      @if (selectedNode()?.type !== 'switch') {
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <label class="text-xs text-slate-500 font-bold uppercase tracking-tighter">Routing Table</label>
+            <button (click)="loadRoutes()" class="text-[10px] text-blue-400 hover:underline" [disabled]="loadingRoutes()">
+              {{ loadingRoutes() ? 'Loading...' : 'Refresh' }}
+            </button>
+          </div>
+
+          @if (routes().length > 0) {
+            <div class="bg-slate-950 rounded border border-slate-700 overflow-hidden">
+              <table class="w-full text-[10px] text-left">
+                <thead class="bg-slate-900 text-slate-500">
+                  <tr>
+                    <th class="p-1 px-2 font-normal">Dest</th>
+                    <th class="p-1 px-2 font-normal">Via</th>
+                    <th class="p-1 px-2 font-normal">Dev</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                  @for (r of routes(); track r.dst) {
+                    <tr class="hover:bg-slate-900">
+                      <td class="p-1 px-2 text-slate-300 font-mono">{{ r.dst === 'default' ? '0.0.0.0/0' : r.dst }}</td>
+                      <td class="p-1 px-2 text-slate-400 truncate max-w-[80px]" [title]="r.gateway || 'Direct'">
+                        {{ r.gateway || 'Direct' }}
+                      </td>
+                      <td class="p-1 px-2 text-blue-400 font-mono">{{ r.dev }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else if (!loadingRoutes()) {
+            <div class="text-xs text-slate-600 italic">No routes found</div>
+          }
+        </div>
+      }
+
+    </div>
+  } 
+  
+  <!-- LINK DETAILS -->
+  @else if (selectedLink()) {
+    <div class="p-4 flex flex-col gap-6">
+        <h3 class="font-bold text-slate-100">Virtual Link</h3>
+        <p class="text-xs text-slate-500 font-mono">{{ selectedLink()?.id }}</p>
+        <div class="space-y-4 text-xs text-slate-400">
+            <div class="p-2 bg-slate-950 rounded border border-slate-800">
+                <div class="text-blue-400 font-mono mb-1">{{ selectedLink()?.source_int }}</div>
+                <div class="text-slate-200">{{ selectedLink()?.source }}</div>
+            </div>
+            <div class="p-2 bg-slate-950 rounded border border-slate-800">
+                <div class="text-blue-400 font-mono mb-1">{{ selectedLink()?.target_int }}</div>
+                <div class="text-slate-200">{{ selectedLink()?.target }}</div>
+            </div>
+        </div>
+        <button (click)="deleteLink.emit(selectedLink()?.id!)" 
+                class="bg-red-900/20 text-red-400 py-2 rounded border border-red-900/30 transition-colors">
+          Delete Link
+        </button>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!selectedNode() && !selectedLink()) {
+    <div class="flex-1 flex flex-col items-center justify-center text-slate-600 p-8 text-center">
+      <div class="text-4xl mb-2 opacity-20">🖱️</div>
+      <p class="text-sm">Select a node or link to view properties</p>
+    </div>
+  }
+</div>

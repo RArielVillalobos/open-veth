@@ -106,6 +106,46 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 
 }
 
+// GetNodeRoutes executes 'ip -j route' inside the container
+func (m *Manager) GetNodeRoutes(ctx context.Context, containerID string) ([]models.RouteInfo, error) {
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"ip", "-j", "route"},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error creating route exec: %v", err)
+	}
+
+	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error attaching to route exec: %v", err)
+	}
+	defer resp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
+		return nil, err
+	}
+
+	var routes []models.RouteInfo
+	if err := json.Unmarshal(outBuf.Bytes(), &routes); err != nil {
+		return nil, fmt.Errorf("error parsing routes: %v", err)
+	}
+
+	// Filter out mgmt0 routes (internal docker network)
+	var cleanRoutes []models.RouteInfo
+	for _, r := range routes {
+		if r.Dev != "mgmt0" {
+			cleanRoutes = append(cleanRoutes, r)
+		}
+	}
+
+	return cleanRoutes, nil
+}
+
 // NewManager creates a new orchestrator instance
 
 func NewManager() (*Manager, error) {
@@ -447,4 +487,23 @@ func (m *Manager) GetNodePID(ctx context.Context, containerID string) (int, erro
 
 	return inspect.State.Pid, nil
 
+}
+
+// KillProcessByName finds processes matching a name pattern inside a container and kills them
+func (m *Manager) KillProcessByName(ctx context.Context, containerID, pattern string) error {
+	// We use pkill -f to match the full command line
+	cmd := []string{"pkill", "-f", pattern}
+	
+	execConfig := container.ExecOptions{
+		Cmd:          cmd,
+		AttachStdout: false,
+		AttachStderr: false,
+	}
+
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create pkill exec: %v", err)
+	}
+
+	return m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
 }

@@ -62,6 +62,17 @@ type IPAddress struct {
 	Prefix  int    `json:"prefixlen"`
 }
 
+// RouteInfo maps the output of 'ip -j route'
+type RouteInfo struct {
+	Dst      string `json:"dst"`
+	Gateway  string `json:"gateway,omitempty"`
+	Dev      string `json:"dev"`
+	Protocol string `json:"protocol"`
+	Scope    string `json:"scope"`
+	PrefSrc  string `json:"prefsrc,omitempty"`
+	Metric   int    `json:"metric,omitempty"`
+}
+
 // Link represents a virtual cable (veth pair) between two nodes
 type Link struct {
 	ID        string `json:"id" gorm:"primaryKey"`
