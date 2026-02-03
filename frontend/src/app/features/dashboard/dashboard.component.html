@@ -58,6 +58,7 @@
                 (edgeCreated)="store.addLink($event)"
                 (nodeMoved)="store.updateNodePosition($event.id, $event.x, $event.y)"
                 (openTerminalRequest)="openTerminal($event)"
+                (openSniffRequest)="store.openCapture($event.nodeId, $event.nodeName, $event.iface)"
                 (nodeSelected)="onNodeSelected($event)"
                 (linkSelected)="onLinkSelected($event)"
                 (nodeDelete)="onDeleteNode($event)"
@@ -82,10 +83,25 @@
           [selectedNode]="selectedNode()"
           [selectedLink]="selectedLink()"
           (openTerminal)="openTerminal($event)"
+          (openCapture)="onOpenCapture($event)"
           (deleteNode)="onDeleteNode($event)"
           (deleteLink)="onDeleteLink($event)"
           (close)="onNodeSelected(null)">
       </app-properties-panel>
+  </div>
+
+  <!-- Floating Windows Layer (Captures) -->
+  <div class="fixed inset-0 pointer-events-none z-50 p-8">
+    @for (cap of store.activeCaptures(); track cap.nodeId + cap.interfaceName) {
+      <div class="absolute bottom-8 right-8 pointer-events-auto">
+        <app-packet-capture-window 
+          [nodeId]="cap.nodeId"
+          [nodeName]="cap.nodeName"
+          [interfaceName]="cap.interfaceName"
+          (onClose)="store.closeCapture(cap.nodeId, cap.interfaceName)">
+        </app-packet-capture-window>
+      </div>
+    }
   </div>
 
   <!-- Global Toasts -->

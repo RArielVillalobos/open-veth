@@ -1,0 +1,20 @@
+.capture-container {
+  height: 400px;
+  width: 850px;
+  pointer-events: auto;
+}
+
+table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+tbody tr:nth-child(even) {
+  background-color: rgba(30, 41, 59, 0.3);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

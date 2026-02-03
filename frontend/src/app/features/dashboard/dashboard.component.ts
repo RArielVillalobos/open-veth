@@ -7,6 +7,7 @@ import { NodePaletteComponent } from './components/node-palette/node-palette.com
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel.component';
 import { TopologyCanvasComponent } from '../../shared/components/topology-canvas/topology-canvas.component';
 import { TerminalPanelComponent } from '../../shared/components/terminal-panel/terminal-panel.component';
+import { PacketCaptureWindowComponent } from '../../shared/components/packet-capture-window/packet-capture-window.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { LabManagerComponent } from './components/lab-manager/lab-manager.component';
 import { firstValueFrom } from 'rxjs';
@@ -20,6 +21,7 @@ import { firstValueFrom } from 'rxjs';
     PropertiesPanelComponent, 
     TopologyCanvasComponent, 
     TerminalPanelComponent, 
+    PacketCaptureWindowComponent,
     ToastComponent,
     LabManagerComponent
   ],
@@ -148,7 +150,26 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  setActiveTab(nodeName: string) {
-    this.activeTab.set(nodeName);
+    setActiveTab(nodeName: string) {
+
+      this.activeTab.set(nodeName);
+
+    }
+
+  
+
+    onOpenCapture(iface: string) {
+
+      const node = this.selectedNode();
+
+      if (node) {
+
+        this.store.openCapture(node.id, node.name, iface);
+
+      }
+
+    }
+
   }
-}
+
+  

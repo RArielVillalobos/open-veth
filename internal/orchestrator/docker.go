@@ -230,6 +230,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.setupSwitchBridge(ctx, inspect.ID, node.Name)
 			}
 
+			// Ensure Management Interface is renamed (idempotent check)
+			m.renameMgmtInterface(ctx, inspect.ID, node.Name)
+
 			return inspect.ID, nil
 
 		}
@@ -247,25 +250,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	// 5. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
-
-	execConfig := container.ExecOptions{
-
-		Cmd: []string{"ip", "link", "set", "dev", "eth0", "name", "mgmt0"},
-
-		AttachStdout: false,
-
-		AttachStderr: false,
-	}
-
-	if execIDResp, err := m.cli.ContainerExecCreate(ctx, resp.ID, execConfig); err == nil {
-
-		_ = m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
-
-	} else {
-
-		fmt.Printf("Warning: Could not rename eth0 to mgmt0 in %s: %v\n", node.Name, err)
-
-	}
+	m.renameMgmtInterface(ctx, resp.ID, node.Name)
 
 	// 6. If node is SWITCH, initialize bridge 'br0'
 
@@ -277,6 +262,22 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	return resp.ID, nil
 
+}
+
+// renameMgmtInterface attempts to rename eth0 to mgmt0. It's safe to call multiple times.
+func (m *Manager) renameMgmtInterface(ctx context.Context, containerID, nodeName string) {
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"ip", "link", "set", "dev", "eth0", "name", "mgmt0"},
+		AttachStdout: false,
+		AttachStderr: false,
+	}
+
+	if execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
+		_ = m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
+	} else {
+		// This might fail if eth0 doesn't exist (already renamed), which is fine.
+		// fmt.Printf("Debug: Renaming eth0->mgmt0 attempt on %s: %v\n", nodeName, err)
+	}
 }
 
 // setupSwitchBridge initializes the bridge interface inside a switch container

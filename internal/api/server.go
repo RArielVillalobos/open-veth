@@ -75,6 +75,9 @@ func (s *Server) setupRoutes() {
 		// Terminal (Websocket)
 		api.GET("/terminal", s.handleTerminal)
 
+		// Sniffer (Websocket)
+		api.GET("/sniff", s.handleSniff)
+
 		// Nodes
 		api.GET("/nodes", s.listNodes)
 		api.POST("/nodes", s.createNode)
@@ -555,8 +558,18 @@ func (s *Server) createLink(c *gin.Context) {
 		}
 	}
 
+	// Fetch FRESH PIDs
+	ctx := c.Request.Context()
+	srcPID, errS := s.manager.GetNodePID(ctx, source.ContainerID)
+	tgtPID, errT := s.manager.GetNodePID(ctx, target.ContainerID)
+
+	if errS != nil || errT != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "nodes must be running to create a link"})
+		return
+	}
+
 	nm := orchestrator.NewNetworkManager()
-	if err := nm.CreateLink(link, source.PID, target.PID); err != nil {
+	if err := nm.CreateLink(link, srcPID, tgtPID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -579,6 +592,47 @@ func (s *Server) createLink(c *gin.Context) {
 
 func (s *Server) deleteLink(c *gin.Context) {
 	id := c.Param("id")
+
+	// 1. Get Link details before deleting
+	link, found := s.repo.GetLink(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "link not found"})
+		return
+	}
+
+	// 2. Physically remove interfaces from containers
+	// We need the PIDs of the source and target nodes
+	source, okS := s.repo.GetNode(link.SourceID)
+	target, okT := s.repo.GetNode(link.TargetID)
+
+	nm := orchestrator.NewNetworkManager()
+	ctx := c.Request.Context()
+
+	// Helper to safely get PID and remove interface
+	cleanupInterface := func(node models.Node, ifaceName string) {
+		if node.ContainerID == "" {
+			return
+		}
+		// Get FRESH PID from Docker, don't trust DB cache
+		pid, err := s.manager.GetNodePID(ctx, node.ContainerID)
+		if err != nil {
+			fmt.Printf("Warning: Could not get PID for node %s (might be stopped): %v\n", node.Name, err)
+			return
+		}
+
+		if err := nm.RemoveInterface(pid, ifaceName); err != nil {
+			fmt.Printf("Warning: Failed to cleanup interface %s on %s: %v\n", ifaceName, node.Name, err)
+		}
+	}
+
+	if okS {
+		cleanupInterface(source, link.SourceInt)
+	}
+	if okT {
+		cleanupInterface(target, link.TargetInt)
+	}
+
+	// 3. Delete from DB
 	s.repo.DeleteLink(id)
 	c.Status(http.StatusNoContent)
 }

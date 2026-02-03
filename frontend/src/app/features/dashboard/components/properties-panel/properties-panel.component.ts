@@ -76,12 +76,19 @@ import { Node, Link } from '../../../../models/topology.model';
                           <tr>
                             <td class="p-2 font-mono text-slate-400 border-r border-slate-800 w-16">{{ iface.ifname }}</td>
                             <td class="p-2 text-slate-300">
-                              @let ipv4 = getIPv4(iface.addr_info);
-                              @if (ipv4) {
-                                {{ ipv4.local }}/{{ ipv4.prefixlen }}
-                              } @else {
-                                <span class="text-slate-600 italic">No IP</span>
-                              }
+                              <div class="flex justify-between items-center group">
+                                @let ipv4 = getIPv4(iface.addr_info);
+                                @if (ipv4) {
+                                  <span>{{ ipv4.local }}/{{ ipv4.prefixlen }}</span>
+                                } @else {
+                                  <span class="text-slate-600 italic">No IP</span>
+                                }
+                                <button (click)="openCapture.emit(iface.ifname)" 
+                                        class="opacity-0 group-hover:opacity-100 bg-blue-900/40 hover:bg-blue-800 text-blue-300 px-1.5 py-0.5 rounded text-[10px] uppercase transition-all"
+                                        title="Sniff Traffic">
+                                  Sniff
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         }
@@ -151,6 +158,7 @@ export class PropertiesPanelComponent {
   selectedNode = input<Node | null>(null);
   selectedLink = input<Link | null>(null);
   openTerminal = output<string>();
+  openCapture = output<string>();
   deleteNode = output<string>();
   deleteLink = output<string>();
   close = output<void>();
