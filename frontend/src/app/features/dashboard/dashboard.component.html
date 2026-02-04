@@ -109,4 +109,13 @@
 
   <!-- Lab Manager Modal -->
   <app-lab-manager *ngIf="showLabManager()" (close)="showLabManager.set(false)"></app-lab-manager>
+
+  <!-- Welcome / Start Screen -->
+  <app-welcome-modal
+    *ngIf="showWelcomeModal()"
+    (createLab)="userHasInteracted.set(true)"
+    (importLab)="fileInput.click()"
+    (openLabManager)="showLabManager.set(true)"
+    (close)="userHasInteracted.set(true)">
+  </app-welcome-modal>
 </div>

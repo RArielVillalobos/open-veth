@@ -1,0 +1,41 @@
+<div class="h-full bg-slate-900 border-r border-slate-700 flex flex-col w-56">
+  <!-- Header -->
+  <div class="px-4 py-3 border-b border-slate-800">
+    <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nodes</h2>
+  </div>
+
+  <!-- Node List -->
+  <div class="flex-1 overflow-y-auto p-2 flex flex-col gap-1 custom-scrollbar">
+    @for (node of nodeTypes; track node.id) {
+      <button
+        (click)="addNode.emit(node.id)"
+        [class]="'flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all group text-left ' +
+                 'bg-slate-800/30 border-slate-700/50 ' +
+                 'hover:bg-slate-800 hover:border-slate-600'"
+      >
+        <!-- Icon -->
+        <div [class]="'w-8 h-8 border-2 flex items-center justify-center transition-transform group-hover:scale-110 ' + node.iconClass + ' ' + node.accentClass">
+          <span class="text-xs font-bold">{{ node.name.charAt(0) }}</span>
+        </div>
+
+        <!-- Info -->
+        <div class="flex-1 min-w-0">
+          <span class="block text-sm font-medium text-slate-200 group-hover:text-white">{{ node.name }}</span>
+          <span class="text-[10px] text-slate-500">{{ node.subtitle }}</span>
+        </div>
+
+        <!-- Hotkey -->
+        <kbd class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-500 group-hover:text-slate-300 group-hover:border-slate-600">
+          {{ node.hotkey }}
+        </kbd>
+      </button>
+    }
+  </div>
+
+  <!-- Drag hint -->
+  <div class="px-4 py-3 border-t border-slate-800">
+    <p class="text-[10px] text-slate-600 text-center">
+      Click or press hotkey to add
+    </p>
+  </div>
+</div>

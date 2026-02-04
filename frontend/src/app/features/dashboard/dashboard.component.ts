@@ -10,20 +10,22 @@ import { TerminalPanelComponent } from '../../shared/components/terminal-panel/t
 import { PacketCaptureWindowComponent } from '../../shared/components/packet-capture-window/packet-capture-window.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { LabManagerComponent } from './components/lab-manager/lab-manager.component';
+import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [
-    CommonModule, 
-    NodePaletteComponent, 
-    PropertiesPanelComponent, 
-    TopologyCanvasComponent, 
-    TerminalPanelComponent, 
+    CommonModule,
+    NodePaletteComponent,
+    PropertiesPanelComponent,
+    TopologyCanvasComponent,
+    TerminalPanelComponent,
     PacketCaptureWindowComponent,
     ToastComponent,
-    LabManagerComponent
+    LabManagerComponent,
+    WelcomeModalComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
@@ -32,23 +34,31 @@ export class DashboardComponent implements OnInit {
   readonly store = inject(TopologyStore);
   private service = inject(TopologyService);
   private toast = inject(ToastService);
-  
+
   // Estado para gestión de terminales (Tabs)
   activeTerminals = signal<string[]>([]);
   activeTab = signal<string | null>(null);
-  
+
   // Estado para gestión de Labs
   showLabManager = signal(false);
-  
+
+  // Control para ocultar el modal de bienvenida tras la primera acción
+  userHasInteracted = signal(false);
+
   // Selección de nodo y link
   selectedNodeId = signal<string | null>(null);
   selectedLinkId = signal<string | null>(null);
-  
-  selectedNode = computed(() => 
+
+  // Mostrar modal si la topología está vacía Y el usuario no ha interactuado aún
+  showWelcomeModal = computed(() =>
+    this.store.topology().nodes.length === 0 && !this.userHasInteracted()
+  );
+
+  selectedNode = computed(() =>
     this.store.topology().nodes.find(n => n.id === this.selectedNodeId()) || null
   );
 
-  selectedLink = computed(() => 
+  selectedLink = computed(() =>
     this.store.topology().links.find(l => l.id === this.selectedLinkId()) || null
   );
 
@@ -58,8 +68,8 @@ export class DashboardComponent implements OnInit {
 
   onNodeSelected(id: string | null) {
     this.selectedNodeId.set(id);
-    this.selectedLinkId.set(null); // Mutuamente exclusivo
-    
+    this.selectedLinkId.set(null);
+
     if (id) {
       this.store.fetchNodeInterfaces(id);
     }
@@ -67,22 +77,23 @@ export class DashboardComponent implements OnInit {
 
   onLinkSelected(id: string | null) {
     this.selectedLinkId.set(id);
-    this.selectedNodeId.set(null); // Mutuamente exclusivo
+    this.selectedNodeId.set(null);
   }
 
   onAddNode(type: 'router' | 'host' | 'switch') {
+    this.userHasInteracted.set(true);
     this.store.addNode({
       id: 'node-' + Math.random().toString(36).substr(2, 5),
       name: type.toUpperCase() + '-' + (this.store.topology().nodes.length + 1),
       type: type,
-      x: 100, // Posición inicial por defecto
+      x: 100,
       y: 100
     });
   }
 
   onDeleteNode(id: string) {
     this.store.removeNode(id);
-    this.selectedNodeId.set(null); // Deseleccionar
+    this.selectedNodeId.set(null);
   }
 
   onDeleteLink(id: string) {
@@ -91,7 +102,7 @@ export class DashboardComponent implements OnInit {
   }
 
   onRename() {
-    // Abrimos el Lab Manager en lugar de solo renombrar
+    this.userHasInteracted.set(true);
     this.showLabManager.set(true);
   }
 
@@ -110,6 +121,7 @@ export class DashboardComponent implements OnInit {
   }
 
   async onImport(event: any) {
+    this.userHasInteracted.set(true);
     const file = event.target.files[0];
     if (!file) return;
 
@@ -119,57 +131,41 @@ export class DashboardComponent implements OnInit {
       try {
         await firstValueFrom(this.service.importTopology(content));
         this.toast.success('Topology imported successfully');
-        this.store.loadTopology(); // Reload canvas
+        this.store.loadTopology();
       } catch (err: any) {
         console.error('Failed to import topology', err);
         this.toast.error('Import failed: ' + (err.error?.error || err.message));
       }
     };
     reader.readAsText(file);
-    
-    // Reset input
+
     event.target.value = '';
   }
 
   openTerminal(nodeName: string) {
-    // Si no está abierta, añadirla
     if (!this.activeTerminals().includes(nodeName)) {
       this.activeTerminals.update(list => [...list, nodeName]);
     }
-    // Enfocarla
     this.activeTab.set(nodeName);
   }
 
   closeTerminal(nodeName: string) {
     this.activeTerminals.update(list => list.filter(n => n !== nodeName));
-    
-    // Si cerramos la activa, cambiar foco
+
     if (this.activeTab() === nodeName) {
       const remaining = this.activeTerminals();
       this.activeTab.set(remaining.length > 0 ? remaining[remaining.length - 1] : null);
     }
   }
 
-    setActiveTab(nodeName: string) {
-
-      this.activeTab.set(nodeName);
-
-    }
-
-  
-
-    onOpenCapture(iface: string) {
-
-      const node = this.selectedNode();
-
-      if (node) {
-
-        this.store.openCapture(node.id, node.name, iface);
-
-      }
-
-    }
-
+  setActiveTab(nodeName: string) {
+    this.activeTab.set(nodeName);
   }
 
-  
+  onOpenCapture(iface: string) {
+    const node = this.selectedNode();
+    if (node) {
+      this.store.openCapture(node.id, node.name, iface);
+    }
+  }
+}
