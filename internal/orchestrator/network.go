@@ -10,148 +10,173 @@ import (
 	"github.com/vishvananda/netns"
 )
 
-// NetworkManager maneja la configuración de red a nivel de kernel
+// NetworkManager handles kernel-level network configuration
 type NetworkManager struct{}
 
-// NewNetworkManager crea una nueva instancia
+// NewNetworkManager creates a new instance
 func NewNetworkManager() *NetworkManager {
 	return &NetworkManager{}
 }
 
-// runInNs ejecuta una función dentro del namespace de red de un proceso (PID)
-// Se encarga de bloquear el hilo y restaurar el namespace original al finalizar.
+// =============================================================================
+// Low-level helpers
+// =============================================================================
+
+// runInNs executes a function inside the network namespace of a process (PID).
+// It handles thread locking and restores the original namespace on exit.
 func (nm *NetworkManager) runInNs(pid int, action func() error) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// Guardar el namespace original
-	origns, err := netns.Get()
+	// Save original namespace
+	origNs, err := netns.Get()
 	if err != nil {
-		return fmt.Errorf("error obteniendo netns original: %v", err)
+		return fmt.Errorf("failed to get original netns: %v", err)
 	}
-	defer origns.Close()
+	defer origNs.Close()
 
-	// Obtener handle del namespace destino
+	// Get target namespace handle
 	targetNs, err := netns.GetFromPid(pid)
 	if err != nil {
-		return fmt.Errorf("error obteniendo ns del pid %d: %v", pid, err)
+		return fmt.Errorf("failed to get netns for pid %d: %v", pid, err)
 	}
 	defer targetNs.Close()
 
-	// Cambiar al namespace destino
+	// Switch to target namespace
 	if err := netns.Set(targetNs); err != nil {
-		return fmt.Errorf("error cambiando al ns %d: %v", pid, err)
+		return fmt.Errorf("failed to switch to netns for pid %d: %v", pid, err)
 	}
 
-	// Ejecutar la acción
-	err = action()
+	// Execute action
+	actionErr := action()
 
-	// Volver al namespace original
-	// Es crítico hacer esto antes de retornar, incluso si action() falló
-	if errSwitchBack := netns.Set(origns); errSwitchBack != nil {
-		// Si fallamos en volver, estamos en un estado inconsistente (panic worthy en algunos casos)
-		return fmt.Errorf("CRÍTICO: error volviendo al ns original (error acción: %v): %v", err, errSwitchBack)
+	// CRITICAL: Restore original namespace before returning
+	if err := netns.Set(origNs); err != nil {
+		return fmt.Errorf("CRITICAL: failed to restore original netns (action error: %v): %v", actionErr, err)
 	}
 
-	return err
+	return actionErr
 }
+
+// deleteIfExists removes a network interface if it exists (defensive cleanup)
+func deleteIfExists(name string) {
+	if link, _ := netlink.LinkByName(name); link != nil {
+		_ = netlink.LinkDel(link)
+	}
+}
+
+// createVethPair creates a veth pair on the host with the given names
+func createVethPair(name1, name2 string, txQLen int) error {
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{
+			Name:   name1,
+			TxQLen: txQLen,
+		},
+		PeerName: name2,
+	}
+	if err := netlink.LinkAdd(veth); err != nil {
+		return fmt.Errorf("failed to create veth pair (%s, %s): %v", name1, name2, err)
+	}
+	return nil
+}
+
+// moveToNamespace moves an interface from host to a container's network namespace
+func moveToNamespace(ifaceName string, pid int) error {
+	link, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return fmt.Errorf("interface %s not found on host: %v", ifaceName, err)
+	}
+
+	targetNs, err := netns.GetFromPid(pid)
+	if err != nil {
+		return fmt.Errorf("failed to get netns for pid %d: %v", pid, err)
+	}
+	defer targetNs.Close()
+
+	if err := netlink.LinkSetNsFd(link, int(targetNs)); err != nil {
+		return fmt.Errorf("failed to move interface %s to pid %d: %v", ifaceName, pid, err)
+	}
+	return nil
+}
+
+// renameAndBringUp renames an interface and brings it up.
+// Must be called from within the target namespace (via runInNs).
+func renameAndBringUp(currentName, newName string) error {
+	link, err := netlink.LinkByName(currentName)
+	if err != nil {
+		return fmt.Errorf("interface %s not found after move: %v", currentName, err)
+	}
+
+	if err := netlink.LinkSetName(link, newName); err != nil {
+		return fmt.Errorf("failed to rename %s to %s: %v", currentName, newName, err)
+	}
+
+	// Re-fetch by new name
+	link, err = netlink.LinkByName(newName)
+	if err != nil {
+		return fmt.Errorf("interface %s not found after rename: %v", newName, err)
+	}
+
+	if err := netlink.LinkSetUp(link); err != nil {
+		return fmt.Errorf("failed to bring up %s: %v", newName, err)
+	}
+	return nil
+}
+
+// =============================================================================
+// Public API
+// =============================================================================
 
 // CreateLink creates a veth pair and connects two namespaces (PIDs)
 func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int) error {
-	// Temporary names on host
-	hostVethNameSource := fmt.Sprintf("veth%s_s", link.ID[:5])
-	hostVethNameTarget := fmt.Sprintf("veth%s_t", link.ID[:5])
+	// Generate temporary names for host
+	vethSource := fmt.Sprintf("veth%s_s", link.ID[:5])
+	vethTarget := fmt.Sprintf("veth%s_t", link.ID[:5])
 
-	// DEFENSIVE CLEANUP: Attempt to delete interfaces if they already exist
-	// This prevents 'file exists' errors if previous operations left residue on the host.
-	if l, _ := netlink.LinkByName(hostVethNameSource); l != nil {
-		_ = netlink.LinkDel(l)
-	}
-	if l, _ := netlink.LinkByName(hostVethNameTarget); l != nil {
-		_ = netlink.LinkDel(l)
-	}
+	// Defensive cleanup: remove stale interfaces if they exist
+	deleteIfExists(vethSource)
+	deleteIfExists(vethTarget)
 
 	// 1. Create veth pair on host
-	veth := &netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{
-			Name:   hostVethNameSource,
-			TxQLen: 1000,
-		},
-		PeerName: hostVethNameTarget,
+	if err := createVethPair(vethSource, vethTarget, 1000); err != nil {
+		return err
 	}
 
-	if err := netlink.LinkAdd(veth); err != nil {
-		return fmt.Errorf("error creating veth pair: %v", err)
+	// 2. Move and configure source endpoint
+	if err := nm.moveAndConfigure(vethSource, link.SourceInt, pidSource); err != nil {
+		return fmt.Errorf("failed to configure source endpoint: %v", err)
 	}
 
-	// Función helper para mover y renombrar
-	moveAndConfigure := func(ifaceHostName, ifaceContainerName string, pid int) error {
-		// Buscamos la interfaz en el host
-		linkRef, err := netlink.LinkByName(ifaceHostName)
-		if err != nil {
-			return err
-		}
-
-		// Obtenemos el NS del destino solo para moverla (netlink.LinkSetNsFd necesita el FD)
-		targetNs, err := netns.GetFromPid(pid)
-		if err != nil {
-			return err
-		}
-		defer targetNs.Close()
-
-		// Movemos la interfaz
-		if err := netlink.LinkSetNsFd(linkRef, int(targetNs)); err != nil {
-			return fmt.Errorf("error moviendo interfaz: %v", err)
-		}
-
-		// Ahora entramos al NS para renombrarla y levantarla
-		return nm.runInNs(pid, func() error {
-			// Pre-check: If target name exists (zombie interface), delete it
-			if oldLink, _ := netlink.LinkByName(ifaceContainerName); oldLink != nil {
-				fmt.Printf("Warning: Interface %s already exists in PID %d. Deleting zombie...\n", ifaceContainerName, pid)
-				if err := netlink.LinkDel(oldLink); err != nil {
-					return fmt.Errorf("failed to delete zombie interface %s: %v", ifaceContainerName, err)
-				}
-			}
-
-			l, err := netlink.LinkByName(ifaceHostName)
-			if err != nil {
-				return fmt.Errorf("interfaz movida no encontrada: %v", err)
-			}
-
-			if err := netlink.LinkSetName(l, ifaceContainerName); err != nil {
-				return fmt.Errorf("error renombrando: %v", err)
-			}
-
-			// Re-buscamos por nuevo nombre
-			l, err = netlink.LinkByName(ifaceContainerName)
-			if err != nil {
-				return err
-			}
-
-			return netlink.LinkSetUp(l)
-		})
+	// 3. Move and configure target endpoint
+	if err := nm.moveAndConfigure(vethTarget, link.TargetInt, pidTarget); err != nil {
+		return fmt.Errorf("failed to configure target endpoint: %v", err)
 	}
-
-	// 2. Mover extremos
-	if err := moveAndConfigure(hostVethNameSource, link.SourceInt, pidSource); err != nil {
-		return fmt.Errorf("fallo configurando source: %v", err)
-	}
-	if err := moveAndConfigure(hostVethNameTarget, link.TargetInt, pidTarget); err != nil {
-		return fmt.Errorf("fallo configurando target: %v", err)
-	}
-
-	fmt.Printf("Link creado: %s (%s) <--> %s (%s)\n",
-		link.SourceID, link.SourceInt, link.TargetID, link.TargetInt)
 
 	return nil
 }
 
-// CreateBridge crea un Linux Bridge en el host (actúa como Switch)
+// moveAndConfigure moves an interface to a namespace and renames it
+func (nm *NetworkManager) moveAndConfigure(hostIface, containerIface string, pid int) error {
+	// Move interface from host to container namespace
+	if err := moveToNamespace(hostIface, pid); err != nil {
+		return err
+	}
+
+	// Configure inside namespace
+	return nm.runInNs(pid, func() error {
+		// Cleanup: delete zombie interface if it exists with target name
+		deleteIfExists(containerIface)
+
+		// Rename and bring up
+		return renameAndBringUp(hostIface, containerIface)
+	})
+}
+
+// CreateBridge creates a Linux Bridge on the host (acts as a Switch)
 func (nm *NetworkManager) CreateBridge(bridgeName string) error {
-	// Verificar si ya existe
+	// Check if already exists (idempotent)
 	if _, err := netlink.LinkByName(bridgeName); err == nil {
-		return nil // Ya existe, idempotente
+		return nil
 	}
 
 	br := &netlink.Bridge{
@@ -161,123 +186,76 @@ func (nm *NetworkManager) CreateBridge(bridgeName string) error {
 	}
 
 	if err := netlink.LinkAdd(br); err != nil {
-		return fmt.Errorf("error creando bridge %s: %v", bridgeName, err)
+		return fmt.Errorf("failed to create bridge %s: %v", bridgeName, err)
 	}
 
-	// Levantar el bridge
 	if err := netlink.LinkSetUp(br); err != nil {
-		return fmt.Errorf("error levantando bridge %s: %v", bridgeName, err)
+		return fmt.Errorf("failed to bring up bridge %s: %v", bridgeName, err)
 	}
 
-	fmt.Printf("Bridge (Switch) creado: %s\n", bridgeName)
 	return nil
 }
 
-// ConnectNodeToBridge conecta un contenedor (PID) a un Bridge en el host
+// ConnectNodeToBridge connects a container (PID) to a Bridge on the host
 func (nm *NetworkManager) ConnectNodeToBridge(pid int, containerIface, bridgeName string) error {
-	// Generar nombres cortos y seguros para evitar limite de 15 chars de Linux
-	// Formato: v<PID>-<Primeras3LetrasIface>
-	// Ej: PID=1234, Iface=eth1 -> v1234-eth
+	// Generate short names to avoid Linux's 15-char limit
+	// Format: v<PID>-<first3chars>
 	suffix := containerIface
 	if len(suffix) > 3 {
 		suffix = suffix[:3]
 	}
+	hostVeth := fmt.Sprintf("v%d-%s", pid, suffix)
+	tempVeth := hostVeth + "c"
 
-	hostVethName := fmt.Sprintf("v%d-%s", pid, suffix)
-	containerVethTemp := hostVethName + "c" // temp name for container side
-
-	// 1. Crear veth pair
-	veth := &netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{
-			Name: hostVethName,
-		},
-		PeerName: containerVethTemp,
+	// 1. Create veth pair
+	if err := createVethPair(hostVeth, tempVeth, 0); err != nil {
+		return err
 	}
 
-	if err := netlink.LinkAdd(veth); err != nil {
-		return fmt.Errorf("error creando veth para bridge: %v", err)
-	}
-
-	// 2. Conectar lado Host al Bridge
+	// 2. Connect host side to bridge
 	bridgeLink, err := netlink.LinkByName(bridgeName)
 	if err != nil {
-		return fmt.Errorf("bridge %s no encontrado: %v", bridgeName, err)
+		return fmt.Errorf("bridge %s not found: %v", bridgeName, err)
 	}
 
-	hostLink, err := netlink.LinkByName(hostVethName)
+	hostLink, err := netlink.LinkByName(hostVeth)
 	if err != nil {
-		return err
+		return fmt.Errorf("host veth %s not found: %v", hostVeth, err)
 	}
 
 	if err := netlink.LinkSetMaster(hostLink, bridgeLink); err != nil {
-		return fmt.Errorf("error conectando veth %s al bridge: %v", hostVethName, err)
+		return fmt.Errorf("failed to attach %s to bridge %s: %v", hostVeth, bridgeName, err)
 	}
 
 	if err := netlink.LinkSetUp(hostLink); err != nil {
-		return fmt.Errorf("error levantando veth host: %v", err)
+		return fmt.Errorf("failed to bring up %s: %v", hostVeth, err)
 	}
 
-	// 3. Mover lado Container al Namespace
-	// Reutilizamos lógica similar a CreateLink, pero simplificada inline o extraemos funcion Move
-	// Por ahora copiamos la logica de movimiento:
-
-	targetNs, err := netns.GetFromPid(pid)
-	if err != nil {
-		return err
-	}
-	defer targetNs.Close()
-
-	peerLink, err := netlink.LinkByName(containerVethTemp)
-	if err != nil {
-		return err
+	// 3. Move container side to namespace and configure
+	if err := nm.moveAndConfigure(tempVeth, containerIface, pid); err != nil {
+		return fmt.Errorf("failed to configure container interface: %v", err)
 	}
 
-	if err := netlink.LinkSetNsFd(peerLink, int(targetNs)); err != nil {
-		return fmt.Errorf("error moviendo interfaz al container: %v", err)
-	}
-
-	// 4. Configurar dentro del Container
-	return nm.runInNs(pid, func() error {
-		l, err := netlink.LinkByName(containerVethTemp)
-		if err != nil {
-			return fmt.Errorf("interfaz movida no encontrada: %v", err)
-		}
-
-		if err := netlink.LinkSetName(l, containerIface); err != nil {
-			return fmt.Errorf("error renombrando a %s: %v", containerIface, err)
-		}
-
-		// Re-buscar
-		l, err = netlink.LinkByName(containerIface)
-		if err != nil {
-			return err
-		}
-
-		return netlink.LinkSetUp(l)
-	})
+	return nil
 }
 
-// SetInterfaceIP asigna una IP/CIDR a una interfaz dentro de un namespace (PID)
+// SetInterfaceIP assigns an IP/CIDR to an interface inside a namespace (PID)
 func (nm *NetworkManager) SetInterfaceIP(pid int, ifaceName string, ipCidr string) error {
 	return nm.runInNs(pid, func() error {
-		// 1. Buscar la interfaz
 		link, err := netlink.LinkByName(ifaceName)
 		if err != nil {
-			return fmt.Errorf("interfaz %s no encontrada: %v", ifaceName, err)
+			return fmt.Errorf("interface %s not found: %v", ifaceName, err)
 		}
 
-		// 2. Parsear la IP
 		addr, err := netlink.ParseAddr(ipCidr)
 		if err != nil {
-			return fmt.Errorf("formato IP incorrecto %s: %v", ipCidr, err)
+			return fmt.Errorf("invalid IP format %s: %v", ipCidr, err)
 		}
 
-		// 3. Asignar la IP
 		if err := netlink.AddrAdd(link, addr); err != nil {
-			return fmt.Errorf("error asignando IP: %v", err)
+			return fmt.Errorf("failed to assign IP %s to %s: %v", ipCidr, ifaceName, err)
 		}
 
-		fmt.Printf("IP asignada en PID %d: %s -> %s\n", pid, ifaceName, ipCidr)
 		return nil
 	})
 }
@@ -287,13 +265,12 @@ func (nm *NetworkManager) RemoveInterface(pid int, ifaceName string) error {
 	return nm.runInNs(pid, func() error {
 		link, err := netlink.LinkByName(ifaceName)
 		if err != nil {
-			// If interface not found, it's already gone, so we consider it a success
+			// Interface not found = already gone = success
 			return nil
 		}
 		if err := netlink.LinkDel(link); err != nil {
-			return fmt.Errorf("error deleting interface %s: %v", ifaceName, err)
+			return fmt.Errorf("failed to delete interface %s: %v", ifaceName, err)
 		}
-		fmt.Printf("Deleted interface %s from PID %d\n", ifaceName, pid)
 		return nil
 	})
 }

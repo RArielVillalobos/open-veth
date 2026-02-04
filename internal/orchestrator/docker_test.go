@@ -2,6 +2,8 @@ package orchestrator
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"open-veth/internal/models"
 	"testing"
 )
@@ -11,7 +13,8 @@ import (
 func TestCreateAndDeleteNode(t *testing.T) {
 	// 1. Setup
 	ctx := context.Background()
-	manager, err := NewManager()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil)) // Silent logger for tests
+	manager, err := NewManager(logger)
 	if err != nil {
 		t.Fatalf("Error inicializando manager: %v", err)
 	}

@@ -1,106 +1,166 @@
 # OpenVeth
 
-**OpenVeth** is a modern, high-performance network emulator that runs in your browser. It leverages native Linux networking (Namespaces, Veth pairs, Bridges) and Docker containers to emulate complex network topologies without the heavy overhead of traditional virtual machine-based emulators.
+**OpenVeth** is a web-based network emulator that uses real Linux kernel networking (Namespaces, Veth pairs, Bridges) and Docker containers to create network topologies. Design, deploy, and interact with network nodes directly from your browser.
 
-![Architecture](https://img.shields.io/badge/Architecture-Microservices-blue)
-![Backend](https://img.shields.io/badge/Backend-Go-cyan)
-![Frontend](https://img.shields.io/badge/Frontend-Angular_18+-red)
+![Backend](https://img.shields.io/badge/Backend-Go_1.23-00ADD8?logo=go)
+![Frontend](https://img.shields.io/badge/Frontend-Angular_21-DD0031?logo=angular)
+![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker)
 ![License](https://img.shields.io/badge/License-AGPL%20v3-green)
-![Status](https://img.shields.io/badge/Status-Beta%20(Phase%204)-orange)
+![Version](https://img.shields.io/badge/Version-0.4--beta-orange)
 
 ---
 
-<!-- 
-TODO: Upload a screenshot of your dashboard to 'docs/screenshots/dashboard.png' 
-or replace this link with a valid URL.
--->
-![OpenVeth Dashboard Preview](docs/screenshots/dashboard_placeholder.png)
+<!-- TODO: Replace with actual GIF demo -->
+<p align="center">
+  <img src="docs/screenshots/demo.gif" alt="OpenVeth Demo" width="800">
+</p>
 
-> *Design, deploy, and interact with real network nodes directly from your browser.*
+<p align="center">
+  <i>Create network topologies visually, connect to nodes via terminal, capture packets in real-time.</i>
+</p>
 
-## 🚀 Key Features
+---
 
-*   **⚡ Lightweight & Fast:** Uses Docker containers instead of heavy VMs. Boot a 50-node topology in seconds.
-*   **🎨 Visual Topology Builder:** Modern interactive canvas (Cytoscape.js) to design and manage your labs.
-*   **💾 Infrastructure as Code:** Export your labs to YAML. Share topologies easily.
-*   **🖥️ Integrated Terminals:** Professional shell access to nodes (sh, vtysh) powered by xterm.js directly in your browser.
-*   **🧠 "Smart" Networking:** Automatically handles `veth` pairs creation, interface naming, and bridge management.
-*   **🏢 Laboratory Management:** Create, save, and switch between different lab projects.
+## Features
 
-## 🛠️ Architecture
+| Feature | Description |
+|---------|-------------|
+| **Visual Topology Builder** | Drag-and-drop canvas (Cytoscape.js) to design network labs |
+| **Integrated Terminals** | Shell access to any node (bash, vtysh) via xterm.js |
+| **Live Packet Capture** | Wireshark-style traffic sniffing in real-time |
+| **Dynamic Routing** | Full FRRouting support (OSPF, BGP, IS-IS, Static) |
+| **SSH Between Nodes** | Connect from one node to another within the lab |
+| **DHCP Server** | Automatic IP assignment for realistic LAN labs |
+| **Infrastructure as Code** | Export/import topologies as YAML |
+| **Lab Management** | Create, save, and switch between lab projects |
 
-OpenVeth acts as an orchestrator that translates your visual design into real Linux kernel networking structures.
+---
+
+## Node Types
+
+| Type | Base Image | Use Case |
+|------|------------|----------|
+| **HOST** | Alpine Linux | End devices, servers, clients |
+| **ROUTER** | FRRouting | Dynamic routing, NAT, firewalls |
+| **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
+
+All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
+
+---
+
+## Quick Start
+
+### Requirements
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Docker | 20.10+ | Required |
+| Docker Compose | 2.0+ | Required |
+| Linux / WSL2 | - | Netlink operations require Linux kernel |
+| Go | 1.23+ | For backend development |
+| Node.js | 22+ | For frontend development |
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/RArielVillalobos/open-veth.git
+cd open-veth
+
+# 2. Start development environment
+make dev-env
+
+# 3. Build node images
+make images
+
+# 4. Run the backend (terminal 1)
+make run-api
+# → API available at http://localhost:8080
+
+# 5. Run the frontend (terminal 2)
+make run-ui
+# → UI available at http://localhost:4200
+```
+
+---
+
+## Architecture
+
+OpenVeth translates your visual topology into real Linux kernel networking structures.
 
 ```mermaid
 graph TD
-    User[User / Browser] <-->|HTTP / WebSocket| UI[Angular Frontend]
-    UI <-->|REST API| API[Go Backend]
-    
-    subgraph Host System
-        API -->|Docker SDK| Docker[Docker Daemon]
-        API -->|Netlink| Kernel[Linux Kernel]
-        
-        subgraph "Emulation Plane"
-            Docker --> NodeA["Node: Host (Alpine)"]
-            Docker --> NodeB["Node: Router (FRR)"]
-            
-            NodeA -.->|eth1| VethA[Veth Endpoint]
-            NodeB -.->|eth1| VethB[Veth Endpoint]
-            
-            VethA <==>|Virtual Cable| VethB
-        end
+    Browser[Browser] <-->|HTTP / WebSocket| Frontend[Angular + Cytoscape.js]
+    Frontend <-->|REST API| Backend[Go + Gin]
+
+    Backend --> Docker[Docker SDK]
+    Backend --> Netlink[Netlink API]
+    Backend --> DB[(SQLite / PostgreSQL)]
+
+    Docker --> Containers
+    Netlink --> Veth[Veth Pairs]
+
+    subgraph Containers [Network Nodes]
+        H[HOST - Alpine]
+        R[ROUTER - FRR]
+        S[SWITCH - Bridge]
     end
+
+    Veth -.->|connects| Containers
 ```
 
-### How it works under the hood
-1.  **Nodes** are lightweight Docker containers (Alpine Linux or FRRouting).
-2.  **Links** are native Linux `veth` (Virtual Ethernet) pairs. One end is injected into Container A's namespace, the other into Container B's namespace.
-3.  **Switches** are Linux Bridges (`br0`) inside a container, allowing standard L2 switching behavior.
+### How it works
 
-## 🏁 Getting Started
+1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH)
+2. **Links** → `veth` pairs connecting container namespaces
+3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching
 
-### Prerequisites
-*   **Docker** & **Docker Compose** installed.
-*   **Linux Environment** (Native Linux or Windows WSL2 is required for Netlink operations).
+---
 
-### Quick Start
+## Why OpenVeth?
 
-1.  **Initialize Infrastructure:**
-    Start the development environment and build the node images.
-    ```bash
-    make dev-env    # Starts the dev container and DB
-    make images     # Builds 'openveth/host' and 'openveth/router' images
-    ```
+| Feature | OpenVeth | GNS3 | EVE-NG | Packet Tracer |
+|---------|:--------:|:----:|:------:|:-------------:|
+| Real Linux networking | ✅ | ✅ | ✅ | ❌ |
+| Web-based UI | ✅ | ❌ | ✅ | ❌ |
+| Low resource usage | ✅ | ❌ | ❌ | ✅ |
+| No VMs required | ✅ | ❌ | ❌ | ✅ |
+| Free & Open Source | ✅ | ✅ | ⚠️ | ❌ |
+| FRRouting support | ✅ | ✅ | ✅ | ❌ |
+| Live packet capture | ✅ | ✅ | ✅ | ❌ |
+| SSH between nodes | ✅ | ✅ | ✅ | ❌ |
 
-2.  **Run the Backend (API):**
-    ```bash
-    make run-api
-    ```
-    *Server will start on `http://localhost:8080`*
+---
 
-3.  **Run the Frontend (UI):**
-    Open a new terminal:
-    ```bash
-    make run-ui
-    ```
-    *Access the dashboard at `http://localhost:4200`*
+## Use Cases
 
-## 🧪 Usage Examples
+- **Networking Courses**: Hands-on labs for CCNA, Network+, Linux networking
+- **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets
+- **Network Administration**: Practice SSH, remote management, and troubleshooting
+- **Infrastructure Design**: Prototype topologies before production deployment
 
-*   **Data Center Fabrics (BGP/EVPN):** Emulate complex Spine-Leaf topologies using FRRouting (FRR) containers with minimal CPU/RAM footprint.
-*   **Network Automation Sandbox:** The perfect environment to test **Ansible** playbooks, Nornir scripts, or Go automation against a fleet of network nodes before production.
-*   **Advanced Switching Labs:** Design and troubleshoot Layer 2 domains, bridge interactions, and ARP handling in a fully isolated environment.
+---
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! Feel free to open issues or pull requests to improve the project.
+Contributions are welcome! Please follow these steps:
 
-1.  Fork the project.
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the branch (`git push origin feature/AmazingFeature`).
-5.  Open a Pull Request.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📄 License
+---
 
-This project is licensed under the GNU Affero General Public License v3 (AGPLv3). See the [LICENSE](LICENSE) file for details.
+## License
+
+This project is licensed under the **GNU Affero General Public License v3 (AGPLv3)**.
+
+See the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  Made with ❤️ for the networking community
+</p>
