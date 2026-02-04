@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"context"
@@ -6,8 +6,9 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"open-veth/internal/models"
 	"time"
+
+	"open-veth/internal/models"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -15,7 +16,14 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+	"github.com/gorilla/websocket"
 )
+
+var wsUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow any origin in development
+	},
+}
 
 // PacketSummary defines the lightweight structure sent to the UI
 type PacketSummary struct {
@@ -28,10 +36,87 @@ type PacketSummary struct {
 	Info        string `json:"info"`
 }
 
-// upgrader is already defined in terminal.go
+// HandleTerminal manages WebSocket connection for terminal access
+func (h *Handler) HandleTerminal(c *gin.Context) {
+	nodeName := c.Query("node")
+	if nodeName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node name is required"})
+		return
+	}
 
-// handleSniff starts a live capture session over WebSockets
-func (s *Server) handleSniff(c *gin.Context) {
+	// 1. Upgrade HTTP to WebSocket
+	ws, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		h.Logger.Error("failed to upgrade to websocket", "error", err)
+		return
+	}
+	defer ws.Close()
+
+	// 2. Prepare command (bash for now, could detect router for vtysh)
+	shell := "bash"
+
+	execConfig := container.ExecOptions{
+		AttachStdout: true,
+		AttachStderr: true,
+		AttachStdin:  true,
+		Tty:          true,
+		Cmd:          []string{shell},
+	}
+
+	// 3. Create exec instance in container
+	ctx := c.Request.Context()
+	execID, err := h.Manager.GetDockerClient().ContainerExecCreate(ctx, nodeName, execConfig)
+	if err != nil {
+		h.Logger.Error("failed to create exec", "node", nodeName, "error", err)
+		return
+	}
+
+	// 4. Attach to exec (Hijack)
+	resp, err := h.Manager.GetDockerClient().ContainerExecAttach(ctx, execID.ID, container.ExecStartOptions{
+		Tty: true,
+	})
+	if err != nil {
+		h.Logger.Error("failed to attach to exec", "node", nodeName, "error", err)
+		return
+	}
+	defer resp.Close()
+
+	h.Logger.Info("terminal session started", "node", nodeName)
+
+	// 5. Bidirectional data bridge
+
+	// Output: Docker -> WebSocket
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := resp.Reader.Read(buf)
+			if n > 0 {
+				if err := ws.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
+					return
+				}
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	// Input: WebSocket -> Docker
+	for {
+		_, msg, err := ws.ReadMessage()
+		if err != nil {
+			break
+		}
+		if _, err := resp.Conn.Write(msg); err != nil {
+			break
+		}
+	}
+
+	h.Logger.Info("terminal session ended", "node", nodeName)
+}
+
+// HandleSniff starts a live capture session over WebSockets
+func (h *Handler) HandleSniff(c *gin.Context) {
 	nodeID := c.Query("node_id")
 	iface := c.Query("interface")
 
@@ -40,15 +125,15 @@ func (s *Server) handleSniff(c *gin.Context) {
 		return
 	}
 
-	node, found := s.repo.GetNode(nodeID)
+	node, found := h.Repo.GetNode(nodeID)
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
 
-	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	ws, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		fmt.Printf("Sniff WS Upgrade error: %v\n", err)
+		h.Logger.Error("sniff websocket upgrade failed", "error", err)
 		return
 	}
 	defer ws.Close()
@@ -56,65 +141,61 @@ func (s *Server) handleSniff(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// 1. Prepare tcpdump command
-	// -i: interface
-	// -w -: write to stdout in binary format
-	// -U: unbuffered
-	// -s 0: capture full packet
 	cmd := []string{"tcpdump", "-i", iface, "-w", "-", "-U", "-s", "0"}
 
 	execConfig := container.ExecOptions{
 		Cmd:          cmd,
 		AttachStdout: true,
-		AttachStderr: true,  // We need stderr to capture errors, but we filter it out
-		Tty:          false, // TTY adds formatting, we want raw binary
+		AttachStderr: true,
+		Tty:          false,
 	}
 
-	execID, err := s.manager.GetDockerClient().ContainerExecCreate(ctx, node.ContainerID, execConfig)
+	execID, err := h.Manager.GetDockerClient().ContainerExecCreate(ctx, node.ContainerID, execConfig)
 	if err != nil {
 		ws.WriteJSON(gin.H{"error": "failed to create sniffer: " + err.Error()})
 		return
 	}
 
 	// 2. Start the capture stream
-	resp, err := s.manager.GetDockerClient().ContainerExecAttach(ctx, execID.ID, container.ExecStartOptions{})
+	resp, err := h.Manager.GetDockerClient().ContainerExecAttach(ctx, execID.ID, container.ExecStartOptions{})
 	if err != nil {
 		ws.WriteJSON(gin.H{"error": "failed to start sniffer: " + err.Error()})
 		return
 	}
 	defer resp.Close()
 
-	// CLEANUP: Ensure tcpdump is killed when we exit (e.g. client disconnect)
+	// CLEANUP: Ensure tcpdump is killed when we exit
 	defer func() {
-		// We use the helper to kill the specific tcpdump process on this interface
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), h.Config.Docker.CleanupTimeout)
+		defer cancel()
+
 		pattern := fmt.Sprintf("tcpdump -i %s", iface)
-		_ = s.manager.KillProcessByName(context.Background(), node.ContainerID, pattern)
-		fmt.Printf("Sniffer cleanup: killed tcpdump on %s (%s)\n", node.Name, iface)
+		if err := h.Manager.KillProcessByName(cleanupCtx, node.ContainerID, pattern); err != nil {
+			h.Logger.Warn("failed to kill tcpdump process", "node", node.Name, "interface", iface, "error", err)
+		}
+		h.Logger.Info("sniffer cleanup completed", "node", node.Name, "interface", iface)
 	}()
 
-	// 3. Demultiplex Docker Stream (Header + Payload)
-	// We need a pipe: StdCopy writes to PipeWriter -> PipeReader feeds pcapgo
+	// 3. Demultiplex Docker Stream
 	pr, pw := io.Pipe()
 
-	// Start a goroutine to copy Docker STDOUT to the Pipe
 	go func() {
 		defer pw.Close()
-		// StdCopy demultiplexes execution stream. We discard Stderr.
 		_, err := stdcopy.StdCopy(pw, io.Discard, resp.Reader)
 		if err != nil {
-			fmt.Printf("Sniffer Stream Error: %v\n", err)
+			h.Logger.Warn("sniffer stream error", "error", err)
 		}
 	}()
 
-	// 4. Use pcapgo to read from the Pipe (Clean STDOUT)
+	// 4. Use pcapgo to read from the Pipe
 	pcapReader, err := pcapgo.NewReader(pr)
 	if err != nil {
-		// Pcap header might be delayed or stream might be empty initially
-		fmt.Printf("PCAP Reader Init Error (might be empty stream): %v\n", err)
+		h.Logger.Warn("pcap reader init error (might be empty stream)", "error", err)
 		ws.WriteJSON(gin.H{"error": "pcap init error: " + err.Error()})
 		return
 	}
 
-	fmt.Printf("Live capture started on %s (%s)\n", node.Name, iface)
+	h.Logger.Info("live capture started", "node", node.Name, "interface", iface)
 
 	// 5. Packet processing loop
 	for {
@@ -123,133 +204,82 @@ func (s *Server) handleSniff(c *gin.Context) {
 			if err == io.EOF {
 				break
 			}
-			// Don't crash on read errors, just wait or break
-			fmt.Printf("Packet read error: %v\n", err)
+			h.Logger.Warn("packet read error", "error", err)
 			break
 		}
 
-		// Parse packet for summary
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
-		summary := s.parsePacket(packet, ci.Timestamp)
+		summary := parsePacket(packet, ci.Timestamp)
 
-		// Send to WebSocket
 		if err := ws.WriteJSON(summary); err != nil {
-			break // Connection closed by client
+			break
 		}
 	}
 
-	fmt.Printf("Live capture stopped on %s (%s)\n", node.Name, iface)
+	h.Logger.Info("live capture stopped", "node", node.Name, "interface", iface)
 }
 
 // parsePacket extracts human-readable info from raw packet data
-
-func (s *Server) parsePacket(packet gopacket.Packet, ts time.Time) PacketSummary {
-
+func parsePacket(packet gopacket.Packet, ts time.Time) PacketSummary {
 	summary := PacketSummary{
-
-		Timestamp: ts.Format(time.RFC3339), // Send ISO8601 (e.g., 2023-10-10T15:00:00Z)
-
-		Length: len(packet.Data()),
-
-		Protocol: "L2",
-
-		Info: "Ethernet Frame",
+		Timestamp: ts.Format(time.RFC3339),
+		Length:    len(packet.Data()),
+		Protocol:  "L2",
+		Info:      "Ethernet Frame",
 	}
 
 	// Layer 3: IP (v4 or v6)
-
 	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-
 		ip, _ := ipLayer.(*layers.IPv4)
-
 		summary.Source = ip.SrcIP.String()
-
 		summary.Destination = ip.DstIP.String()
-
 		summary.Protocol = ip.Protocol.String()
-
 		summary.TTL = int(ip.TTL)
-
 	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-
 		ip, _ := ipLayer.(*layers.IPv6)
-
 		summary.Source = ip.SrcIP.String()
-
 		summary.Destination = ip.DstIP.String()
-
 		summary.Protocol = ip.NextHeader.String()
-
 		summary.TTL = int(ip.HopLimit)
-
 	}
 
 	// Layer 4: TCP / UDP / ICMP
-
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-
 		tcp, _ := tcpLayer.(*layers.TCP)
-
 		summary.Protocol = "TCP"
-
 		flags := ""
-
 		if tcp.SYN {
 			flags += "S"
 		}
-
 		if tcp.ACK {
 			flags += "A"
 		}
-
 		if tcp.FIN {
 			flags += "F"
 		}
-
 		if tcp.RST {
 			flags += "R"
 		}
-
 		if tcp.PSH {
 			flags += "P"
 		}
-
-		summary.Info = fmt.Sprintf("%d → %d [%s] Seq=%d Ack=%d",
-
-			tcp.SrcPort, tcp.DstPort, flags, tcp.Seq, tcp.Ack)
-
+		summary.Info = fmt.Sprintf("%d → %d [%s] Seq=%d Ack=%d", tcp.SrcPort, tcp.DstPort, flags, tcp.Seq, tcp.Ack)
 	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
-
 		udp, _ := udpLayer.(*layers.UDP)
-
 		summary.Protocol = "UDP"
-
 		summary.Info = fmt.Sprintf("%d → %d len=%d", udp.SrcPort, udp.DstPort, udp.Length)
-
 	} else if icmpLayer := packet.Layer(layers.LayerTypeICMPv4); icmpLayer != nil {
-
 		icmp, _ := icmpLayer.(*layers.ICMPv4)
-
 		summary.Protocol = "ICMP"
-
 		typeStr := "Unknown"
-
 		if icmp.TypeCode.Type() == layers.ICMPv4TypeEchoRequest {
-
 			typeStr = "Echo Request"
-
 		} else if icmp.TypeCode.Type() == layers.ICMPv4TypeEchoReply {
-
 			typeStr = "Echo Reply"
-
 		} else if icmp.TypeCode.Type() == layers.ICMPv4TypeTimeExceeded {
-
 			typeStr = "Time Exceeded (TTL Expired)"
-
 		}
-
 		summary.Info = fmt.Sprintf("%s (id=%d, seq=%d)", typeStr, icmp.Id, icmp.Seq)
-
 	} else if icmpLayer := packet.Layer(layers.LayerTypeICMPv6); icmpLayer != nil {
 		icmp6, _ := icmpLayer.(*layers.ICMPv6)
 		summary.Protocol = "ICMPv6"

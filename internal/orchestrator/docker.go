@@ -1,16 +1,12 @@
 package orchestrator
 
 import (
-	"context"
-
-	"fmt"
-
-	"io"
-
 	"bytes"
-
+	"context"
 	"encoding/json"
-
+	"fmt"
+	"io"
+	"log/slog"
 	"time"
 
 	"open-veth/internal/models"
@@ -19,16 +15,14 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
-
 	"github.com/docker/docker/client"
-
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // Manager handles communication with the Docker Daemon
-
 type Manager struct {
-	cli *client.Client
+	cli    *client.Client
+	logger *slog.Logger
 }
 
 // GetNodeInterfaces executes 'ip -j addr' inside the container and returns parsed info
@@ -85,11 +79,8 @@ func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]
 	}
 
 	// Log stderr warning if not critical
-
 	if errBuf.Len() > 0 {
-
-		fmt.Printf("Warning: 'ip -j addr' stderr: %s\n", errBuf.String())
-
+		m.logger.Warn("ip addr stderr output", "stderr", errBuf.String())
 	}
 
 	// 5. Parse JSON
@@ -147,19 +138,13 @@ func (m *Manager) GetNodeRoutes(ctx context.Context, containerID string) ([]mode
 }
 
 // NewManager creates a new orchestrator instance
-
-func NewManager() (*Manager, error) {
-
+func NewManager(logger *slog.Logger) (*Manager, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-
 	if err != nil {
-
 		return nil, fmt.Errorf("error connecting to Docker: %v", err)
-
 	}
 
-	return &Manager{cli: cli}, nil
-
+	return &Manager{cli: cli, logger: logger}, nil
 }
 
 // GetDockerClient returns the internal Docker client
@@ -171,41 +156,24 @@ func (m *Manager) GetDockerClient() *client.Client {
 }
 
 // CreateNode creates and starts a container for a topology node
-
 func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, error) {
-
-	fmt.Printf("Orchestrating node: %s (Image: %s)...\n", node.Name, node.Image)
+	m.logger.Info("orchestrating node", "name", node.Name, "image", node.Image)
 
 	// 1. Check if image exists locally
-
 	_, _, errInspect := m.cli.ImageInspectWithRaw(ctx, node.Image)
-
 	if errInspect != nil {
-
 		if client.IsErrNotFound(errInspect) {
-
 			// Pull image if not found locally
-
-			fmt.Printf("Image %s not found locally, pulling...\n", node.Image)
-
+			m.logger.Info("image not found locally, pulling", "image", node.Image)
 			reader, errPull := m.cli.ImagePull(ctx, node.Image, image.PullOptions{})
-
 			if errPull != nil {
-
 				return "", fmt.Errorf("error pulling image %s: %v", node.Image, errPull)
-
 			}
-
 			defer reader.Close()
-
 			io.Copy(io.Discard, reader)
-
 		} else {
-
 			return "", fmt.Errorf("error inspecting image %s: %v", node.Image, errInspect)
-
 		}
-
 	}
 
 	// 2. Container configuration
@@ -250,25 +218,16 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		}
 
 		// If container exists, try to recover it
-
 		inspect, inspectErr := m.cli.ContainerInspect(ctx, node.Name)
-
 		if inspectErr == nil {
-
-			fmt.Printf("Node %s already exists (ID: %s). Reusing...\n", node.Name, inspect.ID[:12])
+			m.logger.Info("node already exists, reusing", "name", node.Name, "id", inspect.ID[:12])
 
 			// Ensure it's running
-
 			if !inspect.State.Running {
-
-				fmt.Printf("Node %s was stopped. Starting...\n", node.Name)
-
+				m.logger.Info("node was stopped, starting", "name", node.Name)
 				if errStart := m.cli.ContainerStart(ctx, inspect.ID, container.StartOptions{}); errStart != nil {
-
 					return "", fmt.Errorf("error starting existing node: %v", errStart)
-
 				}
-
 			}
 
 			// Ensure Switch Bridge exists (it might be lost on restart)
@@ -304,7 +263,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.setupSwitchBridge(ctx, resp.ID, node.Name)
 	}
 
-	fmt.Printf("Node %s created and started successfully (ID: %s).\n", node.Name, resp.ID[:12])
+	m.logger.Info("node created and started", "name", node.Name, "id", resp.ID[:12])
 
 	return resp.ID, nil
 
@@ -339,14 +298,14 @@ func (m *Manager) setupSwitchBridge(ctx context.Context, containerID, nodeName s
 		Privileged:   true, // Ensure privileges for netlink ops
 	}
 
-	fmt.Printf("Initializing Bridge br0 for Switch %s...\n", nodeName)
+	m.logger.Info("initializing bridge for switch", "name", nodeName)
 
 	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfigSwitch); err == nil {
 		if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
-			fmt.Printf("Error starting switch setup: %v\n", errStart)
+			m.logger.Error("failed to start switch setup", "name", nodeName, "error", errStart)
 		}
 	} else {
-		fmt.Printf("Error creating switch setup exec: %v\n", err)
+		m.logger.Error("failed to create switch setup exec", "name", nodeName, "error", err)
 	}
 }
 
@@ -388,10 +347,8 @@ func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID strin
 }
 
 // DeleteNode stops and removes a container (Cleanup)
-
 func (m *Manager) DeleteNode(ctx context.Context, nodeName string) error {
-
-	fmt.Printf("Deleting node %s...\n", nodeName)
+	m.logger.Info("deleting node", "name", nodeName)
 
 	// Force removal (kills process if running)
 
@@ -417,45 +374,29 @@ func (m *Manager) DeleteNode(ctx context.Context, nodeName string) error {
 }
 
 // TestConnection checks if Docker daemon is responsive
-
 func (m *Manager) TestConnection(ctx context.Context) error {
-
 	_, err := m.cli.Ping(ctx)
-
 	if err != nil {
-
 		return fmt.Errorf("could not connect to Docker: %v. Is Docker running?", err)
-
 	}
 
-	fmt.Println("Docker connection established successfully.")
-
+	m.logger.Info("docker connection established")
 	return nil
-
 }
 
 // ListNodes displays containers managed by OpenVeth
-
 func (m *Manager) ListNodes(ctx context.Context) error {
-
 	containers, err := m.cli.ContainerList(ctx, container.ListOptions{All: true})
-
 	if err != nil {
-
 		return err
-
 	}
 
-	fmt.Printf("Found %d containers on host.\n", len(containers))
-
+	m.logger.Info("containers found", "count", len(containers))
 	for _, c := range containers {
-
-		fmt.Printf("- %s (ID: %s)\n", c.Names[0], c.ID[:10])
-
+		m.logger.Debug("container", "name", c.Names[0], "id", c.ID[:10])
 	}
 
 	return nil
-
 }
 
 // GetOpenVethContainers returns all containers managed by OpenVeth (label openveth=true)
