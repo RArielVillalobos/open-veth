@@ -342,7 +342,16 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       });
 
       // 2. Add/Update Links
+      // Create a set of valid node IDs for fast lookup
+      const validNodeIds = new Set(nodes.map((n: any) => n.id));
+
       this.links().forEach(link => {
+        // Safety check: Ensure both endpoints exist
+        if (!validNodeIds.has(link.source) || !validNodeIds.has(link.target)) {
+          console.warn(`Skipping orphan link ${link.id}: source ${link.source} or target ${link.target} not found.`);
+          return;
+        }
+
         const existingLink = this.cy.getElementById(link.id);
         if (existingLink.empty()) {
           this.cy.add({

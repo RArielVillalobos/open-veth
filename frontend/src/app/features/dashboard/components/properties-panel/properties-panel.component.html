@@ -137,6 +137,15 @@ iptables -t nat -A POSTROUTING -o mgmt0 -j MASQUERADE</pre>
 ssh root@&lt;ROUTER_IP&gt;
 # Password: openveth</pre>
               </div>
+
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">DNS Resolver (Static Names):</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-amber-300 overflow-x-auto border border-slate-800">
+# Add name to hosts file:
+echo "192.168.1.100 web.lab" >> /etc/hosts
+# Start service:
+dnsmasq --no-daemon --log-queries</pre>
+              </div>
             }
 
             @if (selectedNode()?.type === 'host') {
@@ -144,6 +153,13 @@ ssh root@&lt;ROUTER_IP&gt;
                 <p class="text-[10px] text-slate-400 font-semibold uppercase">Request IP via DHCP:</p>
                 <pre class="p-2 bg-slate-950 rounded text-[9px] text-blue-300 overflow-x-auto border border-slate-800">
 udhcpc -i eth1</pre>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Configure DNS Client:</p>
+                <pre class="p-2 bg-slate-950 rounded text-[9px] text-amber-300 overflow-x-auto border border-slate-800">
+echo "nameserver &lt;ROUTER_IP&gt;" > /etc/resolv.conf
+ping web.lab</pre>
               </div>
 
               <div class="space-y-2">

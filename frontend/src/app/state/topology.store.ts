@@ -79,8 +79,8 @@ export const TopologyStore = signalStore(
               ...state.topology,
               id: state.currentLabId,
               name: currentLab?.name || 'Unknown Lab',
-              nodes: state.topology.nodes.length > 0 ? state.topology.nodes : (nodes || []),
-              links: state.topology.links.length > 0 ? state.topology.links : (links || [])
+              nodes: nodes || [],
+              links: links || []
             }
           }));
         } catch (err: any) {
