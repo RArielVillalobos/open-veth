@@ -49,9 +49,9 @@ export class DashboardComponent implements OnInit {
   selectedNodeId = signal<string | null>(null);
   selectedLinkId = signal<string | null>(null);
 
-  // Mostrar modal si la topología está vacía Y el usuario no ha interactuado aún
+  // Mostrar modal solo cuando la carga terminó, la topología está vacía y el usuario no ha interactuado
   showWelcomeModal = computed(() =>
-    this.store.topology().nodes.length === 0 && !this.userHasInteracted()
+    !this.store.isLoading() && this.store.topology().nodes.length === 0 && !this.userHasInteracted()
   );
 
   selectedNode = computed(() =>

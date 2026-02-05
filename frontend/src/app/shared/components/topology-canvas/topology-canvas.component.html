@@ -27,17 +27,17 @@
 
   <!-- Común para todos -->
     @if (contextMenu.elementType === 'edge') {
-      <div class="menu-header">Packet Capture</div>
-      <button (click)="triggerOpenSniff(contextMenu.sourceNode)">
+      <div class="context-menu__header">Packet Capture</div>
+      <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.sourceNode)">
         <span class="icon">🔍</span> Sniff on {{ contextMenu.sourceNode.nodeName }} ({{ contextMenu.sourceNode.iface }})
       </button>
-      <button (click)="triggerOpenSniff(contextMenu.targetNode)">
+      <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.targetNode)">
         <span class="icon">🔍</span> Sniff on {{ contextMenu.targetNode.nodeName }} ({{ contextMenu.targetNode.iface }})
       </button>
-      <div class="h-[1px] bg-slate-700 my-1"></div>
+      <div class="context-menu__separator"></div>
     }
 
-    <button (click)="onContextMenuAction('delete')" class="delete">
+    <button class="context-menu__item text-red-600" (click)="onContextMenuAction('delete')">
       <span class="icon">🗑️</span> Delete {{ contextMenu.elementType === 'edge' ? 'Link' : 'Node' }}
     </button>
 

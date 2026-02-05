@@ -1,0 +1,20 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Body -->
+  <rect x="4" y="16" width="56" height="32" rx="4" fill="white" stroke="#d97706" stroke-width="2"/>
+  <rect x="8" y="20" width="48" height="24" rx="2" fill="#fef3c7"/>
+
+  <!-- Arrows (bidirectional switching) -->
+  <g fill="#d97706">
+    <!-- Left arrows -->
+    <path d="M4 28 L10 25 V31 Z"/>
+    <path d="M4 36 L10 33 V39 Z"/>
+
+    <!-- Right arrows -->
+    <path d="M60 28 L54 25 V31 Z"/>
+    <path d="M60 36 L54 33 V39 Z"/>
+
+    <!-- Horizontal lines (connections) -->
+    <rect x="10" y="27" width="44" height="2"/>
+    <rect x="10" y="35" width="44" height="2"/>
+  </g>
+</svg>
