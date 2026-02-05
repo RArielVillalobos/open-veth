@@ -15,6 +15,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   
   nodes = input.required<TopologyNode[]>();
   links = input.required<Link[]>();
+  terminalNode = input<string | null>(null);
   edgeCreated = output<Link>();
   openTerminalRequest = output<string>();
   openSniffRequest = output<{nodeId: string, nodeName: string, iface: string}>();
@@ -25,6 +26,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   linkDelete = output<string>();
 
   private cy!: cytoscape.Core;
+  private canvasReady = false;
   sourceNodeId: string | null = null;
   
   // Context menu state
@@ -42,10 +44,19 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
   constructor() {
     effect(() => {
-      // Use this.nodes() to access the signal value
-      const currentNodes = this.nodes();
+      this.nodes();
       if (this.cy) {
         this.updateCanvas();
+      }
+    });
+
+    effect(() => {
+      const name = this.terminalNode();
+      if (!this.cy) return;
+      this.cy.nodes().removeClass('terminal-active');
+      if (name) {
+        const match = this.cy.nodes().filter(n => n.data('name') === name);
+        match.addClass('terminal-active');
       }
     });
   }
@@ -154,6 +165,14 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           }
         },
         {
+          selector: '.terminal-active',
+          style: {
+            'border-width': 2,
+            'border-color': '#34d399',
+            'border-opacity': 0.9,
+          }
+        },
+        {
           selector: '.selected-source',
           style: {
             'border-width': 3,
@@ -222,7 +241,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           };
 
           const newLink: Link = {
-            id: 'link-' + Math.random().toString(36).substr(2, 5),
+            id: 'link-' + Math.random().toString(36).substring(2, 7),
             source: this.sourceNodeId,
             target: clickedId,
             source_int: getNextInterface(this.sourceNodeId),
@@ -316,24 +335,25 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private updateCanvas(): void {
     // Access signal value once
     const nodes = this.nodes();
-    
+    const newNodeIds: string[] = [];
+
     this.cy.batch(() => {
       // 1. Add/Update Nodes
-      nodes.forEach((node: any) => {
+      nodes.forEach(node => {
         // Build rich label with IPs (Limited to 2 for clarity)
         let label = node.name;
         if (node.interfaces && node.interfaces.length > 0) {
           const relevantIfaces = node.interfaces
-            .filter((i: any) => i.ifname !== 'lo' && i.ifname !== 'mgmt0');
-          
+            .filter(i => i.ifname !== 'lo' && i.ifname !== 'mgmt0');
+
           const ips = relevantIfaces
-            .slice(0, 2) // Limit to 2 IPs
-            .map((i: any) => {
-              const ipv4 = i.addr_info?.find((addr: any) => !addr.local.includes(':'));
+            .slice(0, 2)
+            .map(i => {
+              const ipv4 = i.addr_info?.find(addr => !addr.local.includes(':'));
               return ipv4 ? `${ipv4.local}/${ipv4.prefixlen} (${i.ifname})` : null;
             })
             .filter(Boolean);
-          
+
           if (ips.length > 0) {
             label += '\n' + ips.join('\n');
             if (relevantIfaces.length > 2) {
@@ -346,9 +366,10 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         if (existing.empty()) {
           this.cy.add({
             group: 'nodes',
-            data: { id: node.id, label: label, type: node.type },
+            data: { id: node.id, label: label, name: node.name, type: node.type },
             position: { x: node.x || 100, y: node.y || 100 }
           });
+          if (this.canvasReady) newNodeIds.push(node.id);
         } else {
           // Update Label if changed
           if (existing.data('label') !== label) {
@@ -359,7 +380,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
       // 2. Add/Update Links
       // Create a set of valid node IDs for fast lookup
-      const validNodeIds = new Set(nodes.map((n: any) => n.id));
+      const validNodeIds = new Set(nodes.map(n => n.id));
 
       this.links().forEach(link => {
         // Safety check: Ensure both endpoints exist
@@ -372,9 +393,9 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         if (existingLink.empty()) {
           this.cy.add({
             group: 'edges',
-            data: { 
-              id: link.id, 
-              source: link.source, 
+            data: {
+              id: link.id,
+              source: link.source,
               target: link.target,
               source_int: link.source_int,
               target_int: link.target_int
@@ -384,7 +405,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       });
 
       // 3. Remove deleted Nodes
-      const currentIds = new Set(nodes.map((n: any) => n.id));
+      const currentIds = new Set(nodes.map(n => n.id));
       this.cy.nodes().forEach(ele => {
         if (!currentIds.has(ele.id())) {
           this.cy.remove(ele);
@@ -397,6 +418,22 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         if (!currentLinkIds.has(ele.id())) {
           this.cy.remove(ele);
         }
+      });
+    });
+
+    if (!this.canvasReady) {
+      this.canvasReady = true;
+      return;
+    }
+
+    // Highlight newly added nodes
+    newNodeIds.forEach(id => {
+      const el = this.cy.getElementById(id);
+      el.style({ 'border-width': 2, 'border-color': '#60a5fa', 'border-opacity': 1 });
+      el.animate({
+        style: { 'border-opacity': 0 },
+        duration: 1500,
+        complete: () => el.removeStyle('border-width border-color border-opacity'),
       });
     });
   }

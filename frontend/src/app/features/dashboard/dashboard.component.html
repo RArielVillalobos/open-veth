@@ -55,6 +55,7 @@
             <app-topology-canvas
                 [nodes]="store.topology().nodes"
                 [links]="store.topology().links"
+                [terminalNode]="activeTab()"
                 (edgeCreated)="store.addLink($event)"
                 (nodeMoved)="store.updateNodePosition($event.id, $event.x, $event.y)"
                 (openTerminalRequest)="openTerminal($event)"
