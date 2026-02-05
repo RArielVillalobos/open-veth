@@ -82,13 +82,51 @@ export class DashboardComponent implements OnInit {
 
   onAddNode(event: { type: 'router' | 'host' | 'switch'; name: string }) {
     this.userHasInteracted.set(true);
+    const { x, y } = this.nextNodePosition();
     this.store.addNode({
       id: 'node-' + Math.random().toString(36).substring(2, 7),
       name: event.name,
       type: event.type,
-      x: 100,
-      y: 100
+      x,
+      y
     });
+  }
+
+  private nextNodePosition(): { x: number; y: number } {
+    const { nodes, links } = this.store.topology();
+    const cols = 5;
+    const spacingX = 150;
+    const spacingY = 120;
+    const minNodeDist = 80;
+    const minLinkDist = 50;
+
+    for (let i = 0; i < 100; i++) {
+      const x = 200 + (i % cols) * spacingX;
+      const y = 150 + Math.floor(i / cols) * spacingY;
+
+      if (nodes.some(n => Math.abs((n.x ?? 0) - x) < minNodeDist && Math.abs((n.y ?? 0) - y) < minNodeDist)) {
+        continue;
+      }
+
+      const onLink = links.some(link => {
+        const src = nodes.find(n => n.id === link.source);
+        const tgt = nodes.find(n => n.id === link.target);
+        if (!src || !tgt) return false;
+        return this.pointToSegmentDist(x, y, src.x ?? 0, src.y ?? 0, tgt.x ?? 0, tgt.y ?? 0) < minLinkDist;
+      });
+
+      if (!onLink) return { x, y };
+    }
+    return { x: 200, y: 150 };
+  }
+
+  private pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
   }
 
   onDeleteNode(id: string) {
