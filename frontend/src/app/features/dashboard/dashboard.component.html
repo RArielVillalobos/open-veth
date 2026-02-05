@@ -46,7 +46,7 @@
   <div class="flex-1 flex overflow-hidden">
       
       <!-- Left: Component Library (Fixed) -->
-      <app-node-palette class="shrink-0" (addNode)="onAddNode($event)"></app-node-palette>
+      <app-node-palette class="shrink-0" [nodes]="store.topology().nodes" (addNode)="onAddNode($event)"></app-node-palette>
 
       <!-- Center: Canvas -->
       <div class="flex-1 flex flex-col min-w-0 bg-slate-950 h-full relative">

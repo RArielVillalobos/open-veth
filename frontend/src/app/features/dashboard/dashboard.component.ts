@@ -80,12 +80,12 @@ export class DashboardComponent implements OnInit {
     this.selectedNodeId.set(null);
   }
 
-  onAddNode(type: 'router' | 'host' | 'switch') {
+  onAddNode(event: { type: 'router' | 'host' | 'switch'; name: string }) {
     this.userHasInteracted.set(true);
     this.store.addNode({
-      id: 'node-' + Math.random().toString(36).substr(2, 5),
-      name: type.toUpperCase() + '-' + (this.store.topology().nodes.length + 1),
-      type: type,
+      id: 'node-' + Math.random().toString(36).substring(2, 7),
+      name: event.name,
+      type: event.type,
       x: 100,
       y: 100
     });
