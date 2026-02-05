@@ -103,48 +103,64 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           selector: 'node',
           style: {
             'label': 'data(label)',
-            'color': '#334155', // Slate-700
-            'font-size': '9px',
+            'color': '#334155',
+            'font-size': '10px',
             'font-weight': 'bold',
-            'text-valign': 'top',
+            'text-valign': 'bottom',
             'text-wrap': 'wrap',
             'text-max-width': '120px',
-            'text-margin-y': -6,
-            'background-color': '#fff',
-            'border-width': 2,
-            'width': 40,
-            'height': 40,
-            'text-outline-color': '#fff',
-            'text-outline-width': 2
+            'text-margin-y': 4,
+            'width': 56,
+            'height': 48,
+            'shape': 'rectangle',
+            'background-color': 'transparent',
+            'background-opacity': 0,
+            'border-width': 0,
+            'text-outline-color': '#0f172a',
+            'text-outline-width': 0
           }
         },
-        // Router Style (Blue Circle)
+        // Router Style
         {
           selector: 'node[type="router"]',
           style: {
-            'shape': 'ellipse',
-            'background-color': '#eff6ff', // Blue-50
-            'border-color': '#3b82f6',     // Blue-500
-            'content': 'data(label)',
+            'background-image': 'assets/icons/router.svg',
+            'background-fit': 'contain',
+            'background-clip': 'none',
+            'width': 52,
+            'height': 52
           }
         },
-        // Host Style (Green Square)
+        // Switch Style
+        {
+          selector: 'node[type="switch"]',
+          style: {
+            'background-image': 'assets/icons/switch.svg',
+            'background-fit': 'contain',
+            'background-clip': 'none',
+            'width': 52,
+            'height': 52
+          }
+        },
+        // Host Style
         {
           selector: 'node[type="host"]',
           style: {
-            'shape': 'round-rectangle',
-            'background-color': '#f0fdf4', // Green-50
-            'border-color': '#10b981',     // Green-500
-            'width': 40,
-            'height': 30
+            'background-image': 'assets/icons/host.svg',
+            'background-fit': 'contain',
+            'background-clip': 'none',
+            'width': 52,
+            'height': 52
           }
         },
         {
           selector: '.selected-source',
           style: {
-            'border-width': 4,
-            'border-color': '#f59e0b', // Amber-500
-            'background-color': '#fffbeb'
+            'border-width': 3,
+            'border-color': '#8b5cf6',
+            'border-style': 'solid',
+            'background-color': '#ede9fe',
+            'background-opacity': 0.6
           }
         },
         {

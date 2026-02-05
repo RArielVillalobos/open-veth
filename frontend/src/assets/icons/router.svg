@@ -1,0 +1,15 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="32" cy="32" r="30" fill="white" stroke="#2563eb" stroke-width="2"/>
+  <circle cx="32" cy="32" r="26" fill="#eff6ff"/>
+  <!-- Arrows -->
+  <g fill="#2563eb">
+    <path d="M32 10 L36 16 H28 Z"/> <!-- Top -->
+    <path d="M32 54 L28 48 H36 Z"/> <!-- Bottom -->
+    <path d="M54 32 L48 28 V36 Z"/> <!-- Right -->
+    <path d="M10 32 L16 36 V28 Z"/> <!-- Left -->
+
+    <!-- Lines connecting arrows -->
+    <rect x="31" y="16" width="2" height="32"/>
+    <rect x="16" y="31" width="32" height="2"/>
+  </g>
+</svg>
