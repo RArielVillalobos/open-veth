@@ -103,7 +103,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           selector: 'node',
           style: {
             'label': 'data(label)',
-            'color': '#334155',
+            'color': '#94a3b8',
             'font-size': '10px',
             'font-weight': 'bold',
             'text-valign': 'bottom',
