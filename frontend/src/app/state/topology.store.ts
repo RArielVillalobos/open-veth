@@ -301,15 +301,17 @@ export const TopologyStore = signalStore(
         }
       },
 
-      async cleanup() {
+      async cleanupCurrentLab() {
+        const labId = store.currentLabId();
+        const labName = store.topology().name;
         patchState(store, { isLoading: true });
         try {
-          await firstValueFrom(service.cleanup());
-          patchState(store, { 
-            isLoading: false, 
-            topology: { ...initialState.topology, nodes: [], links: [] } 
-          });
-          toast.success('Topology cleaned successfully');
+          await firstValueFrom(service.cleanupLaboratory(labId));
+          patchState(store, (state) => ({
+            isLoading: false,
+            topology: { ...state.topology, nodes: [], links: [] }
+          }));
+          toast.success(`Lab "${labName}" cleaned successfully`);
         } catch (err: any) {
           const msg = err.message || 'Cleanup error';
           patchState(store, { isLoading: false, error: msg });

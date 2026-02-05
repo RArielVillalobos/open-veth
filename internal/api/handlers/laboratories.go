@@ -82,6 +82,62 @@ func (h *Handler) DeleteLaboratory(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// CleanupLaboratory removes all nodes and links from a specific laboratory
+func (h *Handler) CleanupLaboratory(c *gin.Context) {
+	labID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// Verify Lab Exists
+	lab, ok := h.Repo.GetLaboratory(labID)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "laboratory not found"})
+		return
+	}
+
+	h.Logger.Info("cleaning up laboratory", "id", labID, "name", lab.Name)
+
+	// 1. Get all nodes for this lab
+	nodes, err := h.Repo.ListNodesByLab(labID)
+	if err != nil {
+		h.Logger.Error("failed to list nodes for cleanup", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Delete containers and DB records for each node
+	deletedNodes := 0
+	for _, node := range nodes {
+		if node.ContainerID != "" {
+			if err := h.Manager.DeleteNode(ctx, node.ContainerID); err != nil {
+				h.Logger.Warn("failed to delete container during lab cleanup", "node", node.Name, "error", err)
+			}
+		}
+		if err := h.Repo.DeleteNode(node.ID); err != nil {
+			h.Logger.Warn("failed to delete node from DB", "node", node.ID, "error", err)
+		} else {
+			deletedNodes++
+		}
+	}
+
+	// 3. Delete all links for this lab
+	links, _ := h.Repo.ListLinksByLab(labID)
+	deletedLinks := 0
+	for _, link := range links {
+		if err := h.Repo.DeleteLink(link.ID); err != nil {
+			h.Logger.Warn("failed to delete link from DB", "link", link.ID, "error", err)
+		} else {
+			deletedLinks++
+		}
+	}
+
+	h.Logger.Info("laboratory cleanup completed", "id", labID, "nodes_deleted", deletedNodes, "links_deleted", deletedLinks)
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "laboratory cleaned",
+		"nodes_deleted": deletedNodes,
+		"links_deleted": deletedLinks,
+	})
+}
+
 // ActivateLaboratory stops all containers and revives the specified lab
 func (h *Handler) ActivateLaboratory(c *gin.Context) {
 	labID := c.Param("id")
