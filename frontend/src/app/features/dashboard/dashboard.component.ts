@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../state/topology.store';
 import { TopologyService } from '../../core/services/topology.service';
@@ -61,6 +61,13 @@ export class DashboardComponent implements OnInit {
   selectedLink = computed(() =>
     this.store.topology().links.find(l => l.id === this.selectedLinkId()) || null
   );
+
+  constructor() {
+    effect(() => {
+      this.store.topology().id;
+      this.clearSessionState();
+    });
+  }
 
   ngOnInit() {
     this.store.loadTopology();
@@ -205,5 +212,12 @@ export class DashboardComponent implements OnInit {
     if (node) {
       this.store.openCapture(node.id, node.name, iface);
     }
+  }
+
+  private clearSessionState() {
+    this.activeTerminals.set([]);
+    this.activeTab.set(null);
+    this.selectedNodeId.set(null);
+    this.selectedLinkId.set(null);
   }
 }
