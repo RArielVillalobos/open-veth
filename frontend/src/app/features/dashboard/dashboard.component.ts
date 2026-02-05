@@ -214,6 +214,14 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  onCleanupLab() {
+    const labName = this.store.topology().name;
+    if (confirm(`Are you sure you want to delete all nodes and links in "${labName}"? This cannot be undone.`)) {
+      this.store.cleanupCurrentLab();
+      this.clearSessionState();
+    }
+  }
+
   private clearSessionState() {
     this.activeTerminals.set([]);
     this.activeTab.set(null);

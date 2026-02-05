@@ -87,6 +87,7 @@ func (s *Server) setupRoutes() {
 		api.GET("/laboratories", s.handler.ListLaboratories)
 		api.POST("/laboratories", s.handler.CreateLaboratory)
 		api.POST("/laboratories/:id/activate", s.handler.ActivateLaboratory)
+		api.DELETE("/laboratories/:id/cleanup", s.handler.CleanupLaboratory)
 		api.PATCH("/laboratories/:id", s.handler.UpdateLaboratory)
 		api.DELETE("/laboratories/:id", s.handler.DeleteLaboratory)
 

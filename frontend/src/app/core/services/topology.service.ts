@@ -79,8 +79,8 @@ export class TopologyService {
 
   // --- Sistema ---
 
-  cleanup(): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/system/cleanup`);
+  cleanupLaboratory(labId: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/laboratories/${labId}/cleanup`);
   }
 
   exportTopology(): Observable<Blob> {
