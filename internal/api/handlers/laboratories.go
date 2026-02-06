@@ -63,7 +63,11 @@ func (h *Handler) UpdateLaboratory(c *gin.Context) {
 	}
 
 	lab.Name = data.Name
-	h.Repo.SaveLaboratory(lab)
+	if err := h.Repo.SaveLaboratory(lab); err != nil {
+		h.Logger.Error("failed to update laboratory", "id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update laboratory"})
+		return
+	}
 
 	h.Logger.Info("laboratory updated", "id", id, "name", data.Name)
 	c.JSON(http.StatusOK, lab)
@@ -250,12 +254,17 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 
 		// Update Runtime Info in Struct (PID, ID)
-		pid, _ := h.Manager.GetNodePID(ctx, containerID)
+		pid, err := h.Manager.GetNodePID(ctx, containerID)
+		if err != nil {
+			h.Logger.Warn("failed to get PID for revived node", "node", n.Name, "error", err)
+		}
 		nodes[i].ContainerID = containerID
 		nodes[i].PID = pid
 
 		// CRITICAL: Persist the new ContainerID and PID to DB
-		h.Repo.SaveNode(nodes[i])
+		if err := h.Repo.SaveNode(nodes[i]); err != nil {
+			h.Logger.Error("failed to persist revived node", "node", n.Name, "error", err)
+		}
 	}
 
 	// 4. Rebuild Links

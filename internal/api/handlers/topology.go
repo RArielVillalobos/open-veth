@@ -14,8 +14,18 @@ import (
 func (h *Handler) HandleExport(c *gin.Context) {
 	labID := c.DefaultQuery("lab_id", "lab-1")
 
-	nodes, _ := h.Repo.ListNodesByLab(labID)
-	links, _ := h.Repo.ListLinksByLab(labID)
+	nodes, err := h.Repo.ListNodesByLab(labID)
+	if err != nil {
+		h.Logger.Error("failed to list nodes for export", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to export topology"})
+		return
+	}
+	links, err := h.Repo.ListLinksByLab(labID)
+	if err != nil {
+		h.Logger.Error("failed to list links for export", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to export topology"})
+		return
+	}
 	lab, _ := h.Repo.GetLaboratory(labID)
 
 	export := models.LabExport{
@@ -85,8 +95,14 @@ func (h *Handler) HandleImport(c *gin.Context) {
 		}
 	}
 
-	h.Repo.DeleteLaboratory(labID)
-	h.Repo.SaveLaboratory(models.Laboratory{ID: labID, Name: imported.Name})
+	if err := h.Repo.DeleteLaboratory(labID); err != nil {
+		h.Logger.Warn("failed to delete old lab during import", "lab", labID, "error", err)
+	}
+	if err := h.Repo.SaveLaboratory(models.Laboratory{ID: labID, Name: imported.Name}); err != nil {
+		h.Logger.Error("failed to create lab during import", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create laboratory"})
+		return
+	}
 
 	// 3. Recreate Nodes
 	var errors []string
@@ -111,10 +127,17 @@ func (h *Handler) HandleImport(c *gin.Context) {
 			continue
 		}
 
-		pid, _ := h.Manager.GetNodePID(ctx, containerID)
+		pid, err := h.Manager.GetNodePID(ctx, containerID)
+		if err != nil {
+			h.Logger.Warn("failed to get PID during import", "node", n.Name, "error", err)
+		}
 		nodeModel.ContainerID = containerID
 		nodeModel.PID = pid
-		h.Repo.SaveNode(nodeModel)
+		if err := h.Repo.SaveNode(nodeModel); err != nil {
+			msg := fmt.Sprintf("Failed to save node %s: %v", n.Name, err)
+			h.Logger.Error("import node save failed", "node", n.Name, "error", err)
+			errors = append(errors, msg)
+		}
 	}
 
 	// 4. Recreate Links
@@ -144,7 +167,10 @@ func (h *Handler) HandleImport(c *gin.Context) {
 				if target.Type == models.SWITCH {
 					_ = h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt)
 				}
-				h.Repo.SaveLink(linkModel)
+				if err := h.Repo.SaveLink(linkModel); err != nil {
+					h.Logger.Error("import link save failed", "link", l.ID, "error", err)
+					errors = append(errors, fmt.Sprintf("Failed to save link %s: %v", l.ID, err))
+				}
 			}
 		} else {
 			errors = append(errors, fmt.Sprintf("Link %s skipped: source or target not found", l.ID))

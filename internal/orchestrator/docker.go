@@ -202,7 +202,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	hostConfig := &container.HostConfig{
 
-		CapAdd: []string{"NET_ADMIN", "SYS_ADMIN"},
+		CapAdd: []string{"NET_ADMIN"},
 	}
 
 	// 3. Create container (Conflict handling)
@@ -310,40 +310,44 @@ func (m *Manager) setupSwitchBridge(ctx context.Context, containerID, nodeName s
 }
 
 // AttachInterfaceToBridge connects a network interface to the main bridge (br0) inside a container
-
 func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID string, ifaceName string) error {
+	if err := models.ValidateInterfaceName(ifaceName); err != nil {
+		return fmt.Errorf("bridge attach rejected: %v", err)
+	}
 
-	cmd := fmt.Sprintf("ip link set dev %s master br0 && ip link set dev %s up", ifaceName, ifaceName)
-
+	// Step 1: Set interface master to br0
 	execConfig := container.ExecOptions{
-
-		Cmd: []string{"sh", "-c", cmd},
-
+		Cmd:          []string{"ip", "link", "set", "dev", ifaceName, "master", "br0"},
 		AttachStdout: true,
-
 		AttachStderr: true,
-
-		Privileged: true,
+		Privileged:   true,
 	}
 
 	execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
-
 	if err != nil {
-
 		return fmt.Errorf("failed to create exec for bridge attach: %v", err)
-
+	}
+	if err := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); err != nil {
+		return fmt.Errorf("failed to start exec for bridge attach: %v", err)
 	}
 
-	err = m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{})
+	// Step 2: Bring interface up
+	execConfig2 := container.ExecOptions{
+		Cmd:          []string{"ip", "link", "set", "dev", ifaceName, "up"},
+		AttachStdout: true,
+		AttachStderr: true,
+		Privileged:   true,
+	}
 
+	execID2, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig2)
 	if err != nil {
-
-		return fmt.Errorf("failed to start exec for bridge attach: %v", err)
-
+		return fmt.Errorf("failed to create exec for interface up: %v", err)
+	}
+	if err := m.cli.ContainerExecStart(ctx, execID2.ID, container.ExecStartOptions{}); err != nil {
+		return fmt.Errorf("failed to start exec for interface up: %v", err)
 	}
 
 	return nil
-
 }
 
 // DeleteNode stops and removes a container (Cleanup)
@@ -438,10 +442,15 @@ func (m *Manager) GetNodePID(ctx context.Context, containerID string) (int, erro
 
 // ConfigureInterface adds an IP address to an interface inside a container
 func (m *Manager) ConfigureInterface(ctx context.Context, containerID, ifaceName, address string) error {
-	cmd := fmt.Sprintf("ip addr add %s dev %s", address, ifaceName)
+	if err := models.ValidateInterfaceName(ifaceName); err != nil {
+		return fmt.Errorf("configure interface rejected: %v", err)
+	}
+	if err := models.ValidateIPCIDR(address); err != nil {
+		return fmt.Errorf("configure interface rejected: %v", err)
+	}
 
 	execConfig := container.ExecOptions{
-		Cmd:          []string{"sh", "-c", cmd},
+		Cmd:          []string{"ip", "addr", "add", address, "dev", ifaceName},
 		AttachStdout: true,
 		AttachStderr: true,
 	}

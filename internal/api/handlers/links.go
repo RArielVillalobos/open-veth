@@ -41,6 +41,22 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		link.LabID = "lab-1"
 	}
 
+	// Validate interface names
+	if err := models.ValidateInterfaceName(link.SourceInt); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source interface name"})
+		return
+	}
+	if err := models.ValidateInterfaceName(link.TargetInt); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid target interface name"})
+		return
+	}
+
+	// Validate link ID length for veth name generation
+	if err := models.ValidateLinkID(link.ID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	source, okS := h.Repo.GetNode(link.SourceID)
 	target, okT := h.Repo.GetNode(link.TargetID)
 
@@ -94,7 +110,11 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		}
 	}
 
-	h.Repo.SaveLink(link)
+	if err := h.Repo.SaveLink(link); err != nil {
+		h.Logger.Error("failed to save link to DB", "id", link.ID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist link"})
+		return
+	}
 	h.Logger.Info("link created", "id", link.ID)
 	c.JSON(http.StatusCreated, link)
 }

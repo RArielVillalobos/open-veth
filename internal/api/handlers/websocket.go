@@ -44,6 +44,37 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		return
 	}
 
+	// SECURITY: Verify the node exists in our repository before allowing terminal access.
+	// This prevents accessing arbitrary containers on the host.
+	node, found := h.Repo.GetNode(nodeName)
+	if !found {
+		// Also try lookup by name (frontend may send name instead of ID)
+		nodes, err := h.Repo.ListNodes()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify node"})
+			return
+		}
+		found = false
+		for _, n := range nodes {
+			if n.Name == nodeName {
+				node = n
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+		return
+	}
+
+	// Use the validated container ID instead of raw user input
+	containerID := node.ContainerID
+
 	// 1. Upgrade HTTP to WebSocket
 	ws, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -65,9 +96,9 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 
 	// 3. Create exec instance in container
 	ctx := c.Request.Context()
-	execID, err := h.Manager.GetDockerClient().ContainerExecCreate(ctx, nodeName, execConfig)
+	execID, err := h.Manager.GetDockerClient().ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
-		h.Logger.Error("failed to create exec", "node", nodeName, "error", err)
+		h.Logger.Error("failed to create exec", "node", node.Name, "error", err)
 		return
 	}
 
@@ -76,12 +107,12 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		Tty: true,
 	})
 	if err != nil {
-		h.Logger.Error("failed to attach to exec", "node", nodeName, "error", err)
+		h.Logger.Error("failed to attach to exec", "node", node.Name, "error", err)
 		return
 	}
 	defer resp.Close()
 
-	h.Logger.Info("terminal session started", "node", nodeName)
+	h.Logger.Info("terminal session started", "node", node.Name)
 
 	// 5. Bidirectional data bridge
 
@@ -112,7 +143,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		}
 	}
 
-	h.Logger.Info("terminal session ended", "node", nodeName)
+	h.Logger.Info("terminal session ended", "node", node.Name)
 }
 
 // HandleSniff starts a live capture session over WebSockets
@@ -122,6 +153,11 @@ func (h *Handler) HandleSniff(c *gin.Context) {
 
 	if nodeID == "" || iface == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "node_id and interface are required"})
+		return
+	}
+
+	if err := models.ValidateInterfaceName(iface); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid interface name"})
 		return
 	}
 
