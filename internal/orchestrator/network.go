@@ -129,6 +129,10 @@ func renameAndBringUp(currentName, newName string) error {
 
 // CreateLink creates a veth pair and connects two namespaces (PIDs)
 func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int) error {
+	if err := models.ValidateLinkID(link.ID); err != nil {
+		return err
+	}
+
 	// Generate temporary names for host
 	vethSource := fmt.Sprintf("veth%s_s", link.ID[:5])
 	vethTarget := fmt.Sprintf("veth%s_t", link.ID[:5])

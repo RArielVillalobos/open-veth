@@ -74,7 +74,12 @@ func (h *Handler) CreateNode(c *gin.Context) {
 
 	node.ContainerID = containerID
 	node.PID = pid
-	h.Repo.SaveNode(node)
+	if err := h.Repo.SaveNode(node); err != nil {
+		h.Logger.Error("failed to save node to DB, cleaning up container", "name", node.Name, "error", err)
+		_ = h.Manager.DeleteNode(c.Request.Context(), node.Name)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist node"})
+		return
+	}
 
 	h.Logger.Info("node created", "name", node.Name, "container_id", containerID[:12])
 	c.JSON(http.StatusCreated, node)
@@ -101,7 +106,11 @@ func (h *Handler) UpdateNodePosition(c *gin.Context) {
 
 	node.X = pos.X
 	node.Y = pos.Y
-	h.Repo.SaveNode(node)
+	if err := h.Repo.SaveNode(node); err != nil {
+		h.Logger.Error("failed to save node position", "id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save position"})
+		return
+	}
 
 	c.Status(http.StatusNoContent)
 }

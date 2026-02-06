@@ -6,7 +6,6 @@ import (
 
 	"open-veth/internal/models"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/gin-gonic/gin"
 )
 
@@ -88,16 +87,19 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 
 	h.Logger.Info("starting system cleanup")
 
-	containers, _ := h.Manager.GetDockerClient().ContainerList(ctx, container.ListOptions{All: true})
+	containers, err := h.Manager.GetOpenVethContainers(ctx)
+	if err != nil {
+		h.Logger.Error("failed to list containers for cleanup", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list containers"})
+		return
+	}
 
 	cleaned := 0
 	for _, ct := range containers {
-		if ct.Labels["openveth"] == "true" {
-			if err := h.Manager.GetDockerClient().ContainerRemove(ctx, ct.ID, container.RemoveOptions{Force: true}); err != nil {
-				h.Logger.Warn("failed to remove container during cleanup", "container", ct.ID[:12], "error", err)
-			} else {
-				cleaned++
-			}
+		if err := h.Manager.DeleteNode(ctx, ct.ID); err != nil {
+			h.Logger.Warn("failed to remove container during cleanup", "container", ct.ID[:12], "error", err)
+		} else {
+			cleaned++
 		}
 	}
 
@@ -161,10 +163,15 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		}
 
 		// Update DB with fresh PID
-		pid, _ := h.Manager.GetNodePID(ctx, cid)
+		pid, err := h.Manager.GetNodePID(ctx, cid)
+		if err != nil {
+			h.Logger.Warn("failed to get PID during reconciliation", "node", node.Name, "error", err)
+		}
 		node.ContainerID = cid
 		node.PID = pid
-		h.Repo.SaveNode(node)
+		if err := h.Repo.SaveNode(node); err != nil {
+			h.Logger.Error("failed to persist reconciled node", "node", node.Name, "error", err)
+		}
 	}
 
 	// 6. Restore Links
