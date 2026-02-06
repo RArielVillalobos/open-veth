@@ -436,6 +436,45 @@ func (m *Manager) GetNodePID(ctx context.Context, containerID string) (int, erro
 
 }
 
+// ConfigureInterface adds an IP address to an interface inside a container
+func (m *Manager) ConfigureInterface(ctx context.Context, containerID, ifaceName, address string) error {
+	cmd := fmt.Sprintf("ip addr add %s dev %s", address, ifaceName)
+
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"sh", "-c", cmd},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create ip addr exec: %v", err)
+	}
+
+	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to attach to ip addr exec: %v", err)
+	}
+	defer resp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
+		return fmt.Errorf("failed to read exec output: %v", err)
+	}
+
+	// Check exec exit code
+	inspectResp, err := m.cli.ContainerExecInspect(ctx, execIDResp.ID)
+	if err != nil {
+		return fmt.Errorf("failed to inspect exec: %v", err)
+	}
+
+	if inspectResp.ExitCode != 0 {
+		return fmt.Errorf("ip addr add failed: %s", errBuf.String())
+	}
+
+	return nil
+}
+
 // KillProcessByName finds processes matching a name pattern inside a container and kills them
 func (m *Manager) KillProcessByName(ctx context.Context, containerID, pattern string) error {
 	// We use pkill -f to match the full command line

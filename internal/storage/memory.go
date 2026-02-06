@@ -7,17 +7,19 @@ import (
 )
 
 type MemoryRepository struct {
-	nodes map[string]models.Node
-	links map[string]models.Link
-	labs  map[string]models.Laboratory
-	mu    sync.RWMutex
+	nodes          map[string]models.Node
+	links          map[string]models.Link
+	labs           map[string]models.Laboratory
+	interfaceConfs map[string][]models.InterfaceConfig // keyed by labID
+	mu             sync.RWMutex
 }
 
 func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
-		nodes: make(map[string]models.Node),
-		links: make(map[string]models.Link),
-		labs:  make(map[string]models.Laboratory),
+		nodes:          make(map[string]models.Node),
+		links:          make(map[string]models.Link),
+		labs:           make(map[string]models.Laboratory),
+		interfaceConfs: make(map[string][]models.InterfaceConfig),
 	}
 }
 
@@ -169,5 +171,19 @@ func (m *MemoryRepository) ClearAll() error {
 	m.nodes = make(map[string]models.Node)
 	m.links = make(map[string]models.Link)
 	m.labs = make(map[string]models.Laboratory)
+	m.interfaceConfs = make(map[string][]models.InterfaceConfig)
 	return nil
+}
+
+func (m *MemoryRepository) SaveInterfaceConfigs(labID string, configs []models.InterfaceConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.interfaceConfs[labID] = configs
+	return nil
+}
+
+func (m *MemoryRepository) GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.interfaceConfs[labID], nil
 }

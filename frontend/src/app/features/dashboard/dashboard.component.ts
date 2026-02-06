@@ -227,6 +227,17 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  async onSaveState() {
+    const labId = this.store.topology().id;
+    try {
+      const result = await firstValueFrom(this.service.saveLabState(labId));
+      this.toast.success(`State saved: ${result.configs_saved} IP configurations persisted`);
+    } catch (err: any) {
+      console.error('Failed to save lab state', err);
+      this.toast.error('Save failed: ' + (err.error?.error || err.message));
+    }
+  }
+
   private clearSessionState() {
     this.activeTerminals.set([]);
     this.activeTab.set(null);
