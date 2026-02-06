@@ -62,10 +62,15 @@ export class DashboardComponent implements OnInit {
     this.store.topology().links.find(l => l.id === this.selectedLinkId()) || null
   );
 
+  private lastLabId: string | null = null;
+
   constructor() {
     effect(() => {
-      this.store.topology().id;
-      this.clearSessionState();
+      const currentId = this.store.topology().id;
+      if (this.lastLabId !== null && this.lastLabId !== currentId) {
+        this.clearSessionState();
+      }
+      this.lastLabId = currentId;
     });
   }
 
