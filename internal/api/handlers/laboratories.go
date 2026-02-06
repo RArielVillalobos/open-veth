@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"open-veth/internal/models"
@@ -80,6 +81,76 @@ func (h *Handler) DeleteLaboratory(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// SaveLabState captures and persists the current IP configuration of all nodes in a lab
+func (h *Handler) SaveLabState(c *gin.Context) {
+	labID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// Verify Lab Exists
+	lab, ok := h.Repo.GetLaboratory(labID)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "laboratory not found"})
+		return
+	}
+
+	h.Logger.Info("saving lab state", "id", labID, "name", lab.Name)
+
+	// Get all nodes for this lab
+	nodes, err := h.Repo.ListNodesByLab(labID)
+	if err != nil {
+		h.Logger.Error("failed to list nodes for save state", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Collect interface configs from all nodes
+	var configs []models.InterfaceConfig
+	for _, node := range nodes {
+		if node.ContainerID == "" {
+			continue
+		}
+
+		ifaces, err := h.Manager.GetNodeInterfaces(ctx, node.ContainerID)
+		if err != nil {
+			h.Logger.Warn("failed to get interfaces for node", "node", node.Name, "error", err)
+			continue
+		}
+
+		for _, iface := range ifaces {
+			// Skip loopback and management interfaces
+			if iface.Name == "lo" || iface.Name == "mgmt0" {
+				continue
+			}
+
+			for _, addr := range iface.IPAddresses {
+				// Skip link-local addresses
+				if len(addr.Address) > 4 && addr.Address[:4] == "fe80" {
+					continue
+				}
+				configs = append(configs, models.InterfaceConfig{
+					LabID:     labID,
+					NodeID:    node.ID,
+					Interface: iface.Name,
+					Address:   fmt.Sprintf("%s/%d", addr.Address, addr.Prefix),
+				})
+			}
+		}
+	}
+
+	// Save to DB
+	if err := h.Repo.SaveInterfaceConfigs(labID, configs); err != nil {
+		h.Logger.Error("failed to save interface configs", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.Logger.Info("lab state saved", "id", labID, "configs_saved", len(configs))
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "state saved",
+		"configs_saved": len(configs),
+	})
 }
 
 // CleanupLaboratory removes all nodes and links from a specific laboratory
@@ -224,6 +295,34 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", len(nodes))
-	c.JSON(http.StatusOK, gin.H{"message": "laboratory activated", "nodes_revived": len(nodes)})
+	// 5. Restore saved IP configurations
+	savedConfigs, err := h.Repo.GetInterfaceConfigsByLab(labID)
+	if err != nil {
+		h.Logger.Warn("failed to fetch saved configs", "lab", labID, "error", err)
+	}
+
+	// Build node lookup map for O(1) access
+	nodeMap := make(map[string]models.Node, len(nodes))
+	for _, n := range nodes {
+		nodeMap[n.ID] = n
+	}
+
+	restoredIPs := 0
+	for _, cfg := range savedConfigs {
+		if n, ok := nodeMap[cfg.NodeID]; ok && n.ContainerID != "" {
+			if err := h.Manager.ConfigureInterface(ctx, n.ContainerID, cfg.Interface, cfg.Address); err != nil {
+				h.Logger.Warn("failed to restore IP config",
+					"node", n.Name, "interface", cfg.Interface, "address", cfg.Address, "error", err)
+			} else {
+				restoredIPs++
+			}
+		}
+	}
+
+	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", len(nodes), "ips_restored", restoredIPs)
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "laboratory activated",
+		"nodes_revived": len(nodes),
+		"ips_restored":  restoredIPs,
+	})
 }

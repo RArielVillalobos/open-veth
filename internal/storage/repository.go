@@ -24,6 +24,10 @@ type Repository interface {
 	ListLaboratories() ([]models.Laboratory, error)
 	DeleteLaboratory(id string) error
 
+	// Interface Configs
+	SaveInterfaceConfigs(labID string, configs []models.InterfaceConfig) error
+	GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error)
+
 	// Cleanup
 	ClearAll() error
 }

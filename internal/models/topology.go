@@ -92,6 +92,15 @@ type Laboratory struct {
 	UpdatedAt int64  `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
+// InterfaceConfig stores saved IP configuration for node interfaces
+type InterfaceConfig struct {
+	ID        uint   `json:"-" gorm:"primaryKey;autoIncrement"`
+	LabID     string `json:"lab_id" gorm:"index"`
+	NodeID    string `json:"node_id" gorm:"index"`
+	Interface string `json:"interface"`
+	Address   string `json:"address"` // CIDR format: "192.168.1.1/24"
+}
+
 // Topology is the object that encompasses a full laboratory state for frontend
 type Topology struct {
 	ID    string `json:"id"`

@@ -48,8 +48,8 @@ export const TopologyStore = signalStore(
           // Load labs list and current topology in parallel
           const [nodes, links, labs] = await firstValueFrom(
             forkJoin([
-              service.getNodes(false, labId), 
-              service.getLinks(labId), 
+              service.getNodes(true, labId),
+              service.getLinks(labId),
               service.getLaboratories()
             ])
           );

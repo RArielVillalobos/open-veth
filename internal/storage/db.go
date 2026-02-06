@@ -32,7 +32,7 @@ func NewGormRepository(driver string, dsn string) (*GormRepository, error) {
 	}
 
 	// Auto Migrate models
-	err = db.AutoMigrate(&models.Node{}, &models.Link{}, &models.Laboratory{})
+	err = db.AutoMigrate(&models.Node{}, &models.Link{}, &models.Laboratory{}, &models.InterfaceConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %v", err)
 	}
@@ -141,6 +141,32 @@ func (r *GormRepository) ClearAll() error {
 		if err := tx.Exec("DELETE FROM laboratories").Error; err != nil {
 			return err
 		}
+		if err := tx.Exec("DELETE FROM interface_configs").Error; err != nil {
+			return err
+		}
 		return nil
 	})
+}
+
+func (r *GormRepository) SaveInterfaceConfigs(labID string, configs []models.InterfaceConfig) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete existing configs for this lab
+		if err := tx.Delete(&models.InterfaceConfig{}, "lab_id = ?", labID).Error; err != nil {
+			return err
+		}
+		// Insert new configs
+		for _, cfg := range configs {
+			cfg.LabID = labID
+			if err := tx.Create(&cfg).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *GormRepository) GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error) {
+	var configs []models.InterfaceConfig
+	err := r.db.Where("lab_id = ?", labID).Find(&configs).Error
+	return configs, err
 }

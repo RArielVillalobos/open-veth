@@ -83,6 +83,12 @@ export class TopologyService {
     return this.http.delete(`${this.apiUrl}/laboratories/${labId}/cleanup`);
   }
 
+  saveLabState(labId: string): Observable<{ message: string; configs_saved: number }> {
+    return this.http.post<{ message: string; configs_saved: number }>(
+      `${this.apiUrl}/laboratories/${labId}/save-state`, {}
+    );
+  }
+
   exportTopology(): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/topology/export`, { responseType: 'blob' });
   }
