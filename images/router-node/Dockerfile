@@ -10,7 +10,10 @@ RUN apk add --no-cache \
     dnsmasq \
     iptables \
     openssh \
-    bash
+    bash \
+    nano \
+    traceroute \
+    bind-tools
 
 # Configure SSH
 RUN ssh-keygen -A
