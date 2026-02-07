@@ -184,8 +184,6 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 		Hostname: node.Name, // Set hostname to node name (e.g. ROUTER-1)
 
-		Cmd: []string{"sleep", "infinity"},
-
 		Labels: map[string]string{
 
 			"openveth": "true",
@@ -230,6 +228,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				}
 			}
 
+			// Wait for network stack to be ready
+			if err := m.WaitForReady(ctx, inspect.ID); err != nil {
+				m.logger.Warn("container not ready after start", "name", node.Name, "error", err)
+			}
+
 			// Ensure Switch Bridge exists (it might be lost on restart)
 			if node.Type == models.SWITCH {
 				m.setupSwitchBridge(ctx, inspect.ID, node.Name)
@@ -254,10 +257,15 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	}
 
-	// 5. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
+	// 5. Wait for network stack to be ready
+	if err := m.WaitForReady(ctx, resp.ID); err != nil {
+		m.logger.Warn("container not ready after start", "name", node.Name, "error", err)
+	}
+
+	// 6. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
 	m.renameMgmtInterface(ctx, resp.ID, node.Name)
 
-	// 6. If node is SWITCH, initialize bridge 'br0'
+	// 7. If node is SWITCH, initialize bridge 'br0'
 
 	if node.Type == models.SWITCH {
 		m.setupSwitchBridge(ctx, resp.ID, node.Name)
@@ -267,6 +275,31 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	return resp.ID, nil
 
+}
+
+// WaitForReady polls the container until its network stack is ready (loopback is up).
+// It retries up to 5 times with 500ms between attempts.
+func (m *Manager) WaitForReady(ctx context.Context, containerID string) error {
+	for i := 0; i < 5; i++ {
+		execConfig := container.ExecOptions{
+			Cmd: []string{"ip", "link", "show", "lo"},
+		}
+		execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+		if err == nil {
+			if err := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); err == nil {
+				inspect, err := m.cli.ContainerExecInspect(ctx, execID.ID)
+				if err == nil && inspect.ExitCode == 0 {
+					return nil
+				}
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	shortID := containerID
+	if len(shortID) > 12 {
+		shortID = shortID[:12]
+	}
+	return fmt.Errorf("container %s not ready after 2.5s", shortID)
 }
 
 // renameMgmtInterface attempts to rename eth0 to mgmt0. It's safe to call multiple times.

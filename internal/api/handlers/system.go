@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"open-veth/internal/models"
 
+	"github.com/docker/docker/api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -132,6 +135,14 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		validContainers[node.Name] = true
 	}
 
+	// Build map of running containers by name for smart reconciliation
+	runningContainers := make(map[string]types.Container)
+	for _, ctr := range containers {
+		for _, name := range ctr.Names {
+			runningContainers[strings.TrimPrefix(name, "/")] = ctr
+		}
+	}
+
 	// 4. Hunt for Zombies
 	zombieCount := 0
 	for _, ctr := range containers {
@@ -153,12 +164,31 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		}
 	}
 
-	// 5. Revive Missing/Stopped Nodes (The Resurrection)
-	h.Logger.Info("reviving nodes from database", "count", len(nodes))
+	// 5. Revive Missing/Stopped Nodes (The Resurrection) - skip already running ones
+	skipped, revived, failed := 0, 0, 0
+	var failedNodes []string
+
+	h.Logger.Info("reconciling nodes from database", "count", len(nodes))
 	for _, node := range nodes {
+		// Check if container is already running
+		if ctr, running := runningContainers[node.Name]; running && ctr.State == "running" {
+			pid, _ := h.Manager.GetNodePID(ctx, ctr.ID)
+			node.ContainerID = ctr.ID
+			node.PID = pid
+			if err := h.Repo.SaveNode(node); err != nil {
+				h.Logger.Error("failed to persist running node", "node", node.Name, "error", err)
+			}
+			skipped++
+			h.Logger.Debug("node already running, skipped", "node", node.Name)
+			continue
+		}
+
+		// Create missing node
 		cid, err := h.Manager.CreateNode(ctx, node)
 		if err != nil {
 			h.Logger.Warn("failed to revive node", "node", node.Name, "error", err)
+			failed++
+			failedNodes = append(failedNodes, node.Name)
 			continue
 		}
 
@@ -172,9 +202,11 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		if err := h.Repo.SaveNode(node); err != nil {
 			h.Logger.Error("failed to persist reconciled node", "node", node.Name, "error", err)
 		}
+		revived++
 	}
 
 	// 6. Restore Links
+	linksRestored, linksFailed := 0, 0
 	h.Logger.Info("restoring network links")
 	links, err := h.Repo.ListLinks()
 	if err != nil {
@@ -186,8 +218,10 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 
 			if okS && okT && src.PID > 0 && tgt.PID > 0 {
 				if err := h.Network.CreateLink(l, src.PID, tgt.PID); err != nil {
-					// Likely "File exists" if partially there
 					h.Logger.Debug("link restoration note", "link", l.ID, "error", err)
+					linksFailed++
+				} else {
+					linksRestored++
 				}
 
 				// Re-attach to bridges
@@ -224,10 +258,77 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		}
 	}
 
-	if zombieCount > 0 {
-		h.Logger.Info("cleanup summary", "zombies_killed", zombieCount)
+	// 8. Final summary
+	if len(failedNodes) > 0 {
+		h.Logger.Warn("nodes failed to revive", "nodes", failedNodes)
 	}
-	h.Logger.Info("system state reconciled", "zombies_killed", zombieCount, "ips_restored", restoredIPs)
+	h.Logger.Info("reconciliation complete",
+		"zombies_killed", zombieCount,
+		"nodes_skipped", skipped,
+		"nodes_revived", revived,
+		"nodes_failed", failed,
+		"links_restored", linksRestored,
+		"links_failed", linksFailed,
+		"ips_restored", restoredIPs,
+	)
 
+	return nil
+}
+
+// SaveAllLabsState captures and persists IP configuration for all laboratories.
+// Called during graceful shutdown to preserve state without manual user action.
+func (h *Handler) SaveAllLabsState(ctx context.Context) error {
+	labs, err := h.Repo.ListLaboratories()
+	if err != nil {
+		return fmt.Errorf("failed to list laboratories: %w", err)
+	}
+
+	totalSaved := 0
+	for _, lab := range labs {
+		nodes, err := h.Repo.ListNodesByLab(lab.ID)
+		if err != nil {
+			h.Logger.Warn("failed to list nodes for save state", "lab", lab.ID, "error", err)
+			continue
+		}
+
+		var configs []models.InterfaceConfig
+		for _, node := range nodes {
+			if node.ContainerID == "" {
+				continue
+			}
+
+			ifaces, err := h.Manager.GetNodeInterfaces(ctx, node.ContainerID)
+			if err != nil {
+				h.Logger.Warn("failed to get interfaces for node", "node", node.Name, "error", err)
+				continue
+			}
+
+			for _, iface := range ifaces {
+				if iface.Name == "lo" || iface.Name == "mgmt0" {
+					continue
+				}
+
+				for _, addr := range iface.IPAddresses {
+					if len(addr.Address) > 4 && addr.Address[:4] == "fe80" {
+						continue
+					}
+					configs = append(configs, models.InterfaceConfig{
+						LabID:     lab.ID,
+						NodeID:    node.ID,
+						Interface: iface.Name,
+						Address:   fmt.Sprintf("%s/%d", addr.Address, addr.Prefix),
+					})
+				}
+			}
+		}
+
+		if err := h.Repo.SaveInterfaceConfigs(lab.ID, configs); err != nil {
+			h.Logger.Warn("failed to save interface configs", "lab", lab.ID, "error", err)
+			continue
+		}
+		totalSaved += len(configs)
+	}
+
+	h.Logger.Info("all labs state saved", "labs", len(labs), "configs_saved", totalSaved)
 	return nil
 }

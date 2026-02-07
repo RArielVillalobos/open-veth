@@ -114,20 +114,20 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           selector: 'node',
           style: {
             'label': 'data(label)',
-            'color': '#94a3b8',
-            'font-size': '10px',
+            'color': '#1e293b',
+            'font-size': '11px',
             'font-weight': 'bold',
             'text-valign': 'bottom',
             'text-wrap': 'wrap',
-            'text-max-width': '120px',
-            'text-margin-y': 4,
+            'text-max-width': '150px',
+            'text-margin-y': 6,
             'width': 56,
             'height': 48,
             'shape': 'rectangle',
             'background-color': 'transparent',
             'background-opacity': 0,
             'border-width': 0,
-            'text-outline-color': '#0f172a',
+            'text-outline-color': '#f8fafc',
             'text-outline-width': 0
           }
         },
@@ -186,16 +186,16 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           selector: 'edge',
           style: {
             'width': 3,
-            'line-color': '#94a3b8', // Gray standard
+            'line-color': '#94a3b8',
             'curve-style': 'bezier',
             'source-label': 'data(source_int)',
             'target-label': 'data(target_int)',
-            'source-text-offset': 20,
-            'target-text-offset': 20,
-            'font-size': '9px',
-            'color': '#64748b',
+            'source-text-offset': 24,
+            'target-text-offset': 24,
+            'font-size': '8px',
+            'color': '#6366f1',
             'text-background-opacity': 1,
-            'text-background-color': '#f8fafc',
+            'text-background-color': '#eef2ff',
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle'
           }
@@ -270,7 +270,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         x: pos.x + 20,
         y: pos.y + 20,
         elementId: node.id(),
-        elementName: node.data('label').split('\n')[0],
+        elementName: node.data('name'),
         elementType: node.data('type'),
         sourceNode: { nodeId: '', nodeName: '', iface: '' },
         targetNode: { nodeId: '', nodeName: '', iface: '' }
@@ -350,7 +350,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
             .slice(0, 2)
             .map(i => {
               const ipv4 = i.addr_info?.find(addr => !addr.local.includes(':'));
-              return ipv4 ? `${ipv4.local}/${ipv4.prefixlen} (${i.ifname})` : null;
+              return ipv4 ? `${ipv4.local}/${ipv4.prefixlen}` : null;
             })
             .filter(Boolean);
 

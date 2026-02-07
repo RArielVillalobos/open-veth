@@ -116,6 +116,11 @@ func (s *Server) Reconcile(ctx context.Context) error {
 	return s.handler.ReconcileState(ctx)
 }
 
+// SaveState saves the IP configuration of all laboratories before shutdown
+func (s *Server) SaveState(ctx context.Context) error {
+	return s.handler.SaveAllLabsState(ctx)
+}
+
 // Run starts the HTTP server (simple mode, no graceful shutdown)
 func (s *Server) Run(addr string) error {
 	s.logger.Info("starting OpenVeth API server", "address", addr)
