@@ -201,11 +201,33 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		}
 	}
 
+	// 7. Restore saved IP configurations
+	h.Logger.Info("restoring saved IP configurations")
+	labs, _ := h.Repo.ListLaboratories()
+	restoredIPs := 0
+	for _, lab := range labs {
+		configs, err := h.Repo.GetInterfaceConfigsByLab(lab.ID)
+		if err != nil {
+			h.Logger.Warn("failed to fetch saved configs", "lab", lab.ID, "error", err)
+			continue
+		}
+		for _, cfg := range configs {
+			node, ok := h.Repo.GetNode(cfg.NodeID)
+			if !ok || node.ContainerID == "" {
+				continue
+			}
+			if err := h.Manager.ConfigureInterface(ctx, node.ContainerID, cfg.Interface, cfg.Address); err != nil {
+				h.Logger.Warn("failed to restore IP config", "node", node.Name, "interface", cfg.Interface, "address", cfg.Address, "error", err)
+			} else {
+				restoredIPs++
+			}
+		}
+	}
+
 	if zombieCount > 0 {
 		h.Logger.Info("cleanup summary", "zombies_killed", zombieCount)
-	} else {
-		h.Logger.Info("system state reconciled successfully")
 	}
+	h.Logger.Info("system state reconciled", "zombies_killed", zombieCount, "ips_restored", restoredIPs)
 
 	return nil
 }
