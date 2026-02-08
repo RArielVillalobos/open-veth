@@ -114,7 +114,7 @@ export const TopologyStore = signalStore(
           return;
         }
 
-        const id = 'lab-' + new Date().getTime(); // Simple ID generation
+        const id = 'lab-' + crypto.randomUUID().substring(0, 8);
         patchState(store, { isLoading: true });
         try {
           await firstValueFrom(service.createLaboratory({ id, name }));
