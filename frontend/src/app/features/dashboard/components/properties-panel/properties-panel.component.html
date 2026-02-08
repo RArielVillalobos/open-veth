@@ -51,8 +51,11 @@
                   @if (iface.ifname !== 'lo' && iface.ifname !== 'mgmt0') {
                     <tr class="hover:bg-slate-900">
                       <td class="p-2 font-mono text-slate-400 border-r border-slate-800 w-16">{{ iface.ifname }}</td>
-                      <td class="p-2 text-slate-200">
-                        {{ getIPv4(iface.addr_info) }}
+                      <td class="p-2">
+                        <div class="text-slate-200">{{ getIPv4(iface.addr_info) }}</div>
+                        @if (getNetwork(iface.addr_info); as net) {
+                          <div class="text-[9px] text-slate-500">net {{ net }}</div>
+                        }
                       </td>
                     </tr>
                   }
@@ -83,20 +86,34 @@
                     <th class="p-1 px-2 font-normal">Dest</th>
                     <th class="p-1 px-2 font-normal">Via</th>
                     <th class="p-1 px-2 font-normal">Dev</th>
+                    <th class="p-1 px-2 font-normal w-6"></th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                  @for (r of routes(); track r.dst) {
+                  @for (r of routes(); track r.dst + r.dev) {
                     <tr class="hover:bg-slate-900">
                       <td class="p-1 px-2 text-slate-300 font-mono">{{ r.dst === 'default' ? '0.0.0.0/0' : r.dst }}</td>
                       <td class="p-1 px-2 text-slate-400 truncate max-w-[80px]" [title]="r.gateway || 'Direct'">
                         {{ r.gateway || 'Direct' }}
                       </td>
                       <td class="p-1 px-2 text-blue-400 font-mono">{{ r.dev }}</td>
+                      <td class="p-1 px-2 text-center">
+                        @if (r.protocol === 'kernel') {
+                          <span class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-400"
+                                title="Connected — auto-generated from IP assignment">C</span>
+                        } @else {
+                          <span class="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400"
+                                title="Static — persisted across restarts">S</span>
+                        }
+                      </td>
                     </tr>
                   }
                 </tbody>
               </table>
+            </div>
+            <div class="flex gap-3 text-[9px] text-slate-600 mt-1">
+              <span><span class="px-1 rounded bg-emerald-900/50 text-emerald-400">S</span> Static</span>
+              <span><span class="px-1 rounded bg-slate-700 text-slate-400">C</span> Connected</span>
             </div>
           } @else if (!loadingRoutes()) {
             <div class="text-xs text-slate-600 italic">No routes found</div>

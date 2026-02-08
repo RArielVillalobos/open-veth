@@ -108,9 +108,10 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 
 	h.Repo.ClearAll()
 	h.Runtime.Clear()
+	volumesRemoved := h.Manager.RemoveAllOpenVethVolumes(ctx)
 
-	h.Logger.Info("cleanup completed", "containers_removed", cleaned)
-	c.JSON(http.StatusOK, gin.H{"message": "cleanup complete", "containers_removed": cleaned})
+	h.Logger.Info("cleanup completed", "containers_removed", cleaned, "volumes_removed", volumesRemoved)
+	c.JSON(http.StatusOK, gin.H{"message": "cleanup complete", "containers_removed": cleaned, "volumes_removed": volumesRemoved})
 }
 
 // ReconcileState ensures Docker matches the Database state (The Janitor)
@@ -145,7 +146,7 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 	zombies := h.killZombies(ctx, containers, knownNames)
 	nodeMap, skipped, revived, failed := h.reconcileNodes(ctx, nodes, containerByName)
 	linksOK, linksFail := h.restoreLinks(ctx, nodeMap)
-	restoredIPs := h.restoreIPs(ctx, nodeMap)
+	restoredIPs, restoredRoutes := h.restoreIPsAndRoutes(ctx, nodeMap)
 
 	// 4. Summary
 	h.Logger.Info("reconciliation complete",
@@ -156,6 +157,7 @@ func (h *Handler) ReconcileState(ctx context.Context) error {
 		"links_restored", linksOK,
 		"links_failed", linksFail,
 		"ips_restored", restoredIPs,
+		"routes_restored", restoredRoutes,
 	)
 	return nil
 }
@@ -257,12 +259,12 @@ func (h *Handler) restoreLinks(ctx context.Context, nodeMap map[string]models.No
 	return
 }
 
-// restoreIPs reapplies saved IP configurations using the pre-built nodeMap
-func (h *Handler) restoreIPs(ctx context.Context, nodeMap map[string]models.Node) int {
+// restoreIPsAndRoutes reapplies saved IP and route configurations using the pre-built nodeMap
+func (h *Handler) restoreIPsAndRoutes(ctx context.Context, nodeMap map[string]models.Node) (restoredIPs, restoredRoutes int) {
 	labs, _ := h.Repo.ListLaboratories()
-	restored := 0
 
 	for _, lab := range labs {
+		// Restore IPs first
 		configs, err := h.Repo.GetInterfaceConfigsByLab(lab.ID)
 		if err != nil {
 			continue
@@ -275,14 +277,31 @@ func (h *Handler) restoreIPs(ctx context.Context, nodeMap map[string]models.Node
 			if err := h.Manager.ConfigureInterface(ctx, node.ContainerID, cfg.Interface, cfg.Address); err != nil {
 				h.Logger.Warn("failed to restore IP", "node", node.Name, "iface", cfg.Interface, "error", err)
 			} else {
-				restored++
+				restoredIPs++
+			}
+		}
+
+		// Then restore routes (routes depend on IPs being configured)
+		routes, err := h.Repo.GetRouteConfigsByLab(lab.ID)
+		if err != nil {
+			continue
+		}
+		for _, cfg := range routes {
+			node, ok := nodeMap[cfg.NodeID]
+			if !ok || node.ContainerID == "" {
+				continue
+			}
+			if err := h.Manager.ConfigureRoute(ctx, node.ContainerID, cfg.Dst, cfg.Gateway, cfg.Dev); err != nil {
+				h.Logger.Warn("failed to restore route", "node", node.Name, "dst", cfg.Dst, "error", err)
+			} else {
+				restoredRoutes++
 			}
 		}
 	}
-	return restored
+	return
 }
 
-// SaveAllLabsState captures and persists IP configuration for all laboratories.
+// SaveAllLabsState captures and persists IP and route configuration for all laboratories.
 // Called during graceful shutdown to preserve state without manual user action.
 func (h *Handler) SaveAllLabsState(ctx context.Context) error {
 	labs, err := h.Repo.ListLaboratories()
@@ -290,7 +309,7 @@ func (h *Handler) SaveAllLabsState(ctx context.Context) error {
 		return fmt.Errorf("failed to list laboratories: %w", err)
 	}
 
-	totalSaved := 0
+	totalIPs, totalRoutes := 0, 0
 	for _, lab := range labs {
 		nodes, err := h.Repo.ListNodesByLab(lab.ID)
 		if err != nil {
@@ -300,11 +319,13 @@ func (h *Handler) SaveAllLabsState(ctx context.Context) error {
 		h.hydrateNodes(nodes)
 
 		var configs []models.InterfaceConfig
+		var routeConfigs []models.RouteConfig
 		for _, node := range nodes {
 			if node.ContainerID == "" {
 				continue
 			}
 
+			// Capture IPs
 			ifaces, err := h.Manager.GetNodeInterfaces(ctx, node.ContainerID)
 			if err != nil {
 				h.Logger.Warn("failed to get interfaces for node", "node", node.Name, "error", err)
@@ -328,15 +349,40 @@ func (h *Handler) SaveAllLabsState(ctx context.Context) error {
 					})
 				}
 			}
+
+			// Capture routes
+			routes, err := h.Manager.GetNodeRoutes(ctx, node.ContainerID)
+			if err != nil {
+				h.Logger.Warn("failed to get routes for node", "node", node.Name, "error", err)
+				continue
+			}
+
+			for _, r := range routes {
+				if r.Protocol == "kernel" {
+					continue
+				}
+				routeConfigs = append(routeConfigs, models.RouteConfig{
+					LabID:   lab.ID,
+					NodeID:  node.ID,
+					Dst:     r.Dst,
+					Gateway: r.Gateway,
+					Dev:     r.Dev,
+				})
+			}
 		}
 
 		if err := h.Repo.SaveInterfaceConfigs(lab.ID, configs); err != nil {
 			h.Logger.Warn("failed to save interface configs", "lab", lab.ID, "error", err)
 			continue
 		}
-		totalSaved += len(configs)
+		if err := h.Repo.SaveRouteConfigs(lab.ID, routeConfigs); err != nil {
+			h.Logger.Warn("failed to save route configs", "lab", lab.ID, "error", err)
+			continue
+		}
+		totalIPs += len(configs)
+		totalRoutes += len(routeConfigs)
 	}
 
-	h.Logger.Info("all labs state saved", "labs", len(labs), "configs_saved", totalSaved)
+	h.Logger.Info("all labs state saved", "labs", len(labs), "ips_saved", totalIPs, "routes_saved", totalRoutes)
 	return nil
 }

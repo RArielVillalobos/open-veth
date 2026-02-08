@@ -190,10 +190,11 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
             'curve-style': 'bezier',
             'source-label': 'data(source_int)',
             'target-label': 'data(target_int)',
-            'source-text-offset': 24,
-            'target-text-offset': 24,
-            'font-size': '8px',
+            'source-text-offset': 32,
+            'target-text-offset': 32,
+            'font-size': '9px',
             'color': '#6366f1',
+            'text-wrap': 'wrap',
             'text-background-opacity': 1,
             'text-background-color': '#eef2ff',
             'text-background-padding': '2px',
@@ -338,42 +339,35 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     const newNodeIds: string[] = [];
 
     this.cy.batch(() => {
-      // 1. Add/Update Nodes
+      // Build a lookup: nodeId -> { ifaceName -> ip }
+      const nodeIfaceIPs = new Map<string, Map<string, string>>();
       nodes.forEach(node => {
-        // Build rich label with IPs (Limited to 2 for clarity)
-        let label = node.name;
-        if (node.interfaces && node.interfaces.length > 0) {
-          const relevantIfaces = node.interfaces
-            .filter(i => i.ifname !== 'lo' && i.ifname !== 'mgmt0');
-
-          const ips = relevantIfaces
-            .slice(0, 2)
-            .map(i => {
-              const ipv4 = i.addr_info?.find(addr => !addr.local.includes(':'));
-              return ipv4 ? `${ipv4.local}/${ipv4.prefixlen}` : null;
-            })
-            .filter(Boolean);
-
-          if (ips.length > 0) {
-            label += '\n' + ips.join('\n');
-            if (relevantIfaces.length > 2) {
-                label += '\n...';
+        const ifaceMap = new Map<string, string>();
+        if (node.interfaces) {
+          for (const iface of node.interfaces) {
+            if (iface.ifname === 'lo' || iface.ifname === 'mgmt0') continue;
+            const ipv4 = iface.addr_info?.find(a => !a.local.includes(':'));
+            if (ipv4) {
+              ifaceMap.set(iface.ifname, `${ipv4.local}/${ipv4.prefixlen}`);
             }
           }
         }
+        nodeIfaceIPs.set(node.id, ifaceMap);
+      });
 
+      // 1. Add/Update Nodes
+      nodes.forEach(node => {
         const existing = this.cy.getElementById(node.id);
         if (existing.empty()) {
           this.cy.add({
             group: 'nodes',
-            data: { id: node.id, label: label, name: node.name, type: node.type },
+            data: { id: node.id, label: node.name, name: node.name, type: node.type },
             position: { x: node.x || 100, y: node.y || 100 }
           });
           if (this.canvasReady) newNodeIds.push(node.id);
         } else {
-          // Update Label if changed
-          if (existing.data('label') !== label) {
-            existing.data('label', label);
+          if (existing.data('label') !== node.name) {
+            existing.data('label', node.name);
           }
         }
       });
@@ -389,6 +383,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           return;
         }
 
+        // Build edge labels: "eth1\n10.0.1.1/24" or just "eth1" if no IP
+        const srcIP = nodeIfaceIPs.get(link.source)?.get(link.source_int);
+        const tgtIP = nodeIfaceIPs.get(link.target)?.get(link.target_int);
+        const srcLabel = srcIP ? `${link.source_int}\n${srcIP}` : link.source_int;
+        const tgtLabel = tgtIP ? `${link.target_int}\n${tgtIP}` : link.target_int;
+
         const existingLink = this.cy.getElementById(link.id);
         if (existingLink.empty()) {
           this.cy.add({
@@ -397,10 +397,18 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
               id: link.id,
               source: link.source,
               target: link.target,
-              source_int: link.source_int,
-              target_int: link.target_int
+              source_int: srcLabel,
+              target_int: tgtLabel
             }
           });
+        } else {
+          // Update labels if IPs changed
+          if (existingLink.data('source_int') !== srcLabel) {
+            existingLink.data('source_int', srcLabel);
+          }
+          if (existingLink.data('target_int') !== tgtLabel) {
+            existingLink.data('target_int', tgtLabel);
+          }
         }
       });
 

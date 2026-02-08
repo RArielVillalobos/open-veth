@@ -144,17 +144,51 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 		}
 	}
 
+	// Collect route configs from all nodes
+	var routeConfigs []models.RouteConfig
+	for _, node := range nodes {
+		if node.ContainerID == "" {
+			continue
+		}
+
+		routes, err := h.Manager.GetNodeRoutes(ctx, node.ContainerID)
+		if err != nil {
+			h.Logger.Warn("failed to get routes for node", "node", node.Name, "error", err)
+			continue
+		}
+
+		for _, r := range routes {
+			// Skip kernel-generated connected routes (they come back automatically with the IP)
+			if r.Protocol == "kernel" {
+				continue
+			}
+			routeConfigs = append(routeConfigs, models.RouteConfig{
+				LabID:   labID,
+				NodeID:  node.ID,
+				Dst:     r.Dst,
+				Gateway: r.Gateway,
+				Dev:     r.Dev,
+			})
+		}
+	}
+
 	// Save to DB
 	if err := h.Repo.SaveInterfaceConfigs(labID, configs); err != nil {
 		h.Logger.Error("failed to save interface configs", "lab", labID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if err := h.Repo.SaveRouteConfigs(labID, routeConfigs); err != nil {
+		h.Logger.Error("failed to save route configs", "lab", labID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-	h.Logger.Info("lab state saved", "id", labID, "configs_saved", len(configs))
+	h.Logger.Info("lab state saved", "id", labID, "ips_saved", len(configs), "routes_saved", len(routeConfigs))
 	c.JSON(http.StatusOK, gin.H{
-		"message":       "state saved",
-		"configs_saved": len(configs),
+		"message":      "state saved",
+		"ips_saved":    len(configs),
+		"routes_saved": len(routeConfigs),
 	})
 }
 
@@ -184,13 +218,16 @@ func (h *Handler) CleanupLaboratory(c *gin.Context) {
 	links, _ := h.Repo.ListLinksByLab(labID)
 	deletedLinks := len(links) // cascade via DeleteNode will handle these
 
-	// 2. Delete containers and DB records for each node (cascade deletes links + configs)
+	// 2. Delete containers, volumes, and DB records for each node (cascade deletes links + configs)
 	deletedNodes := 0
 	for _, node := range nodes {
 		if node.ContainerID != "" {
 			if err := h.Manager.DeleteNode(ctx, node.ContainerID); err != nil {
 				h.Logger.Warn("failed to delete container during lab cleanup", "node", node.Name, "error", err)
 			}
+		}
+		if h.Manager != nil {
+			h.Manager.RemoveNodeVolumes(ctx, node.Name)
 		}
 		if err := h.Repo.DeleteNode(node.ID); err != nil {
 			h.Logger.Warn("failed to delete node from DB", "node", node.ID, "error", err)
@@ -320,10 +357,29 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", len(nodes), "ips_restored", restoredIPs)
+	// 6. Restore saved route configurations (must happen after IPs are restored)
+	savedRoutes, err := h.Repo.GetRouteConfigsByLab(labID)
+	if err != nil {
+		h.Logger.Warn("failed to fetch saved routes", "lab", labID, "error", err)
+	}
+
+	restoredRoutes := 0
+	for _, cfg := range savedRoutes {
+		if n, ok := nodeMap[cfg.NodeID]; ok && n.ContainerID != "" {
+			if err := h.Manager.ConfigureRoute(ctx, n.ContainerID, cfg.Dst, cfg.Gateway, cfg.Dev); err != nil {
+				h.Logger.Warn("failed to restore route",
+					"node", n.Name, "dst", cfg.Dst, "gw", cfg.Gateway, "error", err)
+			} else {
+				restoredRoutes++
+			}
+		}
+	}
+
+	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", len(nodes), "ips_restored", restoredIPs, "routes_restored", restoredRoutes)
 	c.JSON(http.StatusOK, gin.H{
-		"message":       "laboratory activated",
-		"nodes_revived": len(nodes),
-		"ips_restored":  restoredIPs,
+		"message":         "laboratory activated",
+		"nodes_revived":   len(nodes),
+		"ips_restored":    restoredIPs,
+		"routes_restored": restoredRoutes,
 	})
 }

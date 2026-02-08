@@ -53,8 +53,14 @@ export class PropertiesPanelComponent {
     this.loadingRoutes.set(true);
     this.service.getNodeRoutes(id).subscribe({
       next: (data) => {
-        // CRITICAL: Handle null data from backend to avoid 'reading length' errors
-        this.routes.set(data || []);
+        // Sort: Connected (C) first, then Static (S), then by destination
+        const sorted = (data || []).sort((a, b) => {
+          const aIsKernel = a.protocol === 'kernel' ? 0 : 1;
+          const bIsKernel = b.protocol === 'kernel' ? 0 : 1;
+          if (aIsKernel !== bIsKernel) return aIsKernel - bIsKernel;
+          return a.dst.localeCompare(b.dst);
+        });
+        this.routes.set(sorted);
         this.loadingRoutes.set(false);
       },
       error: () => {
@@ -68,5 +74,17 @@ export class PropertiesPanelComponent {
     if (!addrInfo || addrInfo.length === 0) return 'No IP';
     const ipv4 = addrInfo.find((a: any) => !a.local.includes(':'));
     return ipv4 ? `${ipv4.local}/${ipv4.prefixlen}` : 'No IPv4';
+  }
+
+  getNetwork(addrInfo: any[] | undefined): string | null {
+    if (!addrInfo || addrInfo.length === 0) return null;
+    const ipv4 = addrInfo.find((a: any) => !a.local.includes(':'));
+    if (!ipv4) return null;
+    const parts = ipv4.local.split('.').map(Number);
+    const prefix = ipv4.prefixlen;
+    const mask = ~((1 << (32 - prefix)) - 1) >>> 0;
+    const ip = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+    const net = ip & mask;
+    return `${(net >>> 24) & 255}.${(net >>> 16) & 255}.${(net >>> 8) & 255}.${net & 255}/${prefix}`;
   }
 }

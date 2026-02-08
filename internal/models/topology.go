@@ -101,6 +101,16 @@ type InterfaceConfig struct {
 	Address   string `json:"address"` // CIDR format: "192.168.1.1/24"
 }
 
+// RouteConfig stores saved static route configuration for node interfaces
+type RouteConfig struct {
+	ID      uint   `json:"-" gorm:"primaryKey;autoIncrement"`
+	LabID   string `json:"lab_id" gorm:"index"`
+	NodeID  string `json:"node_id" gorm:"index"`
+	Dst     string `json:"dst"`     // e.g., "10.0.2.0/24"
+	Gateway string `json:"gateway"` // e.g., "10.0.1.1"
+	Dev     string `json:"dev"`     // e.g., "eth0"
+}
+
 // Topology is the object that encompasses a full laboratory state for frontend
 type Topology struct {
 	ID    string `json:"id"`

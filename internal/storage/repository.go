@@ -29,6 +29,10 @@ type Repository interface {
 	SaveInterfaceConfigs(labID string, configs []models.InterfaceConfig) error
 	GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error)
 
+	// Route Configs
+	SaveRouteConfigs(labID string, configs []models.RouteConfig) error
+	GetRouteConfigsByLab(labID string) ([]models.RouteConfig, error)
+
 	// Cleanup
 	ClearAll() error
 }

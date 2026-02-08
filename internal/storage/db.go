@@ -37,7 +37,7 @@ func NewGormRepository(driver string, dsn string) (*GormRepository, error) {
 	}
 
 	// Auto Migrate models (parent tables first)
-	err = db.AutoMigrate(&models.Laboratory{}, &models.Node{}, &models.Link{}, &models.InterfaceConfig{})
+	err = db.AutoMigrate(&models.Laboratory{}, &models.Node{}, &models.Link{}, &models.InterfaceConfig{}, &models.RouteConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %v", err)
 	}
@@ -60,6 +60,9 @@ func (r *GormRepository) GetNode(id string) (models.Node, bool) {
 func (r *GormRepository) DeleteNode(id string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Delete(&models.InterfaceConfig{}, "node_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.RouteConfig{}, "node_id = ?", id).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(&models.Link{}, "source_id = ? OR target_id = ?", id, id).Error; err != nil {
@@ -142,6 +145,9 @@ func (r *GormRepository) DeleteLaboratory(id string) error {
 		if err := tx.Delete(&models.InterfaceConfig{}, "lab_id = ?", id).Error; err != nil {
 			return err
 		}
+		if err := tx.Delete(&models.RouteConfig{}, "lab_id = ?", id).Error; err != nil {
+			return err
+		}
 		if err := tx.Delete(&models.Link{}, "lab_id = ?", id).Error; err != nil {
 			return err
 		}
@@ -159,6 +165,9 @@ func (r *GormRepository) ClearAll() error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Most dependent first to respect FK order
 		if err := tx.Exec("DELETE FROM interface_configs").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DELETE FROM route_configs").Error; err != nil {
 			return err
 		}
 		if err := tx.Exec("DELETE FROM links").Error; err != nil {
@@ -193,6 +202,29 @@ func (r *GormRepository) SaveInterfaceConfigs(labID string, configs []models.Int
 
 func (r *GormRepository) GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error) {
 	var configs []models.InterfaceConfig
+	err := r.db.Where("lab_id = ?", labID).Find(&configs).Error
+	return configs, err
+}
+
+func (r *GormRepository) SaveRouteConfigs(labID string, configs []models.RouteConfig) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&models.RouteConfig{}, "lab_id = ?", labID).Error; err != nil {
+			return err
+		}
+		if len(configs) > 0 {
+			for i := range configs {
+				configs[i].LabID = labID
+			}
+			if err := tx.Create(&configs).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *GormRepository) GetRouteConfigsByLab(labID string) ([]models.RouteConfig, error) {
+	var configs []models.RouteConfig
 	err := r.db.Where("lab_id = ?", labID).Find(&configs).Error
 	return configs, err
 }

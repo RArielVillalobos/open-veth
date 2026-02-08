@@ -15,6 +15,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 )
@@ -199,8 +201,18 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	hostConfig := &container.HostConfig{
-
 		CapAdd: []string{"NET_ADMIN"},
+	}
+
+	// Mount named volume for FRR config persistence on routers
+	if node.Type == models.ROUTER {
+		hostConfig.Mounts = []mount.Mount{
+			{
+				Type:   mount.TypeVolume,
+				Source: frrVolumeName(node.Name),
+				Target: "/etc/frr",
+			},
+		}
 	}
 
 	// 3. Create container (Conflict handling)
@@ -515,6 +527,84 @@ func (m *Manager) ConfigureInterface(ctx context.Context, containerID, ifaceName
 	}
 
 	return nil
+}
+
+// ConfigureRoute adds a static route inside a container
+func (m *Manager) ConfigureRoute(ctx context.Context, containerID, dst, gateway, dev string) error {
+	if err := models.ValidateInterfaceName(dev); err != nil {
+		return fmt.Errorf("configure route rejected: %v", err)
+	}
+	if err := models.ValidateIPCIDR(dst); err != nil {
+		return fmt.Errorf("configure route rejected: %v", err)
+	}
+
+	cmd := []string{"ip", "route", "add", dst, "via", gateway, "dev", dev}
+	execConfig := container.ExecOptions{
+		Cmd:          cmd,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create route exec: %v", err)
+	}
+
+	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to attach to route exec: %v", err)
+	}
+	defer resp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
+		return fmt.Errorf("failed to read route exec output: %v", err)
+	}
+
+	inspectResp, err := m.cli.ContainerExecInspect(ctx, execIDResp.ID)
+	if err != nil {
+		return fmt.Errorf("failed to inspect route exec: %v", err)
+	}
+
+	if inspectResp.ExitCode != 0 {
+		return fmt.Errorf("ip route add failed: %s", errBuf.String())
+	}
+
+	return nil
+}
+
+// frrVolumeName returns the deterministic volume name for a router node's FRR config
+func frrVolumeName(nodeName string) string {
+	return "openveth-frr-" + nodeName
+}
+
+// RemoveNodeVolumes removes any named volumes associated with a node
+func (m *Manager) RemoveNodeVolumes(ctx context.Context, nodeName string) {
+	volName := frrVolumeName(nodeName)
+	if err := m.cli.VolumeRemove(ctx, volName, true); err != nil {
+		// Ignore errors — volume may not exist (host/switch nodes)
+		m.logger.Debug("volume removal skipped", "volume", volName, "reason", err)
+	}
+}
+
+// RemoveAllOpenVethVolumes removes all volumes with the openveth-frr- prefix
+func (m *Manager) RemoveAllOpenVethVolumes(ctx context.Context) int {
+	f := filters.NewArgs()
+	f.Add("name", "openveth-frr-")
+	listResp, err := m.cli.VolumeList(ctx, volume.ListOptions{Filters: f})
+	if err != nil {
+		m.logger.Warn("failed to list volumes for cleanup", "error", err)
+		return 0
+	}
+	removed := 0
+	for _, v := range listResp.Volumes {
+		if err := m.cli.VolumeRemove(ctx, v.Name, true); err != nil {
+			m.logger.Warn("failed to remove volume", "volume", v.Name, "error", err)
+		} else {
+			removed++
+		}
+	}
+	return removed
 }
 
 // KillProcessByName finds processes matching a name pattern inside a container and kills them

@@ -11,6 +11,7 @@ type MemoryRepository struct {
 	links          map[string]models.Link
 	labs           map[string]models.Laboratory
 	interfaceConfs map[string][]models.InterfaceConfig // keyed by labID
+	routeConfs     map[string][]models.RouteConfig     // keyed by labID
 	mu             sync.RWMutex
 }
 
@@ -20,6 +21,7 @@ func NewMemoryRepository() *MemoryRepository {
 		links:          make(map[string]models.Link),
 		labs:           make(map[string]models.Laboratory),
 		interfaceConfs: make(map[string][]models.InterfaceConfig),
+		routeConfs:     make(map[string][]models.RouteConfig),
 	}
 }
 
@@ -63,6 +65,17 @@ func (m *MemoryRepository) DeleteNode(id string) error {
 			}
 		}
 		m.interfaceConfs[node.LabID] = filtered
+	}
+
+	// Cascade: remove route configs for this node
+	if confs, exists := m.routeConfs[node.LabID]; exists {
+		filtered := make([]models.RouteConfig, 0, len(confs))
+		for _, cfg := range confs {
+			if cfg.NodeID != id {
+				filtered = append(filtered, cfg)
+			}
+		}
+		m.routeConfs[node.LabID] = filtered
 	}
 
 	delete(m.nodes, id)
@@ -181,8 +194,9 @@ func (m *MemoryRepository) DeleteLaboratory(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Cascade: delete interface configs, links, nodes
+	// Cascade: delete configs, links, nodes
 	delete(m.interfaceConfs, id)
+	delete(m.routeConfs, id)
 
 	for linkID, link := range m.links {
 		if link.LabID == id {
@@ -206,6 +220,7 @@ func (m *MemoryRepository) ClearAll() error {
 	m.links = make(map[string]models.Link)
 	m.labs = make(map[string]models.Laboratory)
 	m.interfaceConfs = make(map[string][]models.InterfaceConfig)
+	m.routeConfs = make(map[string][]models.RouteConfig)
 	return nil
 }
 
@@ -220,4 +235,17 @@ func (m *MemoryRepository) GetInterfaceConfigsByLab(labID string) ([]models.Inte
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.interfaceConfs[labID], nil
+}
+
+func (m *MemoryRepository) SaveRouteConfigs(labID string, configs []models.RouteConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.routeConfs[labID] = configs
+	return nil
+}
+
+func (m *MemoryRepository) GetRouteConfigsByLab(labID string) ([]models.RouteConfig, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.routeConfs[labID], nil
 }

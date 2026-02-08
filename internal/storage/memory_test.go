@@ -184,6 +184,12 @@ func TestDeleteLaboratoryCascade(t *testing.T) {
 	repo.SaveInterfaceConfigs("lab-2", []models.InterfaceConfig{
 		{NodeID: "n3", Interface: "eth0", Address: "10.0.1.1/24"},
 	})
+	repo.SaveRouteConfigs("lab-1", []models.RouteConfig{
+		{NodeID: "n1", Dst: "10.0.2.0/24", Gateway: "10.0.0.1", Dev: "eth0"},
+	})
+	repo.SaveRouteConfigs("lab-2", []models.RouteConfig{
+		{NodeID: "n3", Dst: "10.0.3.0/24", Gateway: "10.0.1.1", Dev: "eth0"},
+	})
 
 	if err := repo.DeleteLaboratory("lab-1"); err != nil {
 		t.Fatalf("DeleteLaboratory failed: %v", err)
@@ -234,6 +240,18 @@ func TestDeleteLaboratoryCascade(t *testing.T) {
 	if len(configs2) != 1 {
 		t.Error("expected lab-2 interface configs to survive")
 	}
+
+	// Route configs from lab-1 deleted
+	routes, _ := repo.GetRouteConfigsByLab("lab-1")
+	if len(routes) != 0 {
+		t.Error("expected lab-1 route configs to be cascade deleted")
+	}
+
+	// Route configs from lab-2 survive
+	routes2, _ := repo.GetRouteConfigsByLab("lab-2")
+	if len(routes2) != 1 {
+		t.Error("expected lab-2 route configs to survive")
+	}
 }
 
 func TestDeleteNodeCascade(t *testing.T) {
@@ -247,6 +265,10 @@ func TestDeleteNodeCascade(t *testing.T) {
 	repo.SaveInterfaceConfigs("lab-1", []models.InterfaceConfig{
 		{NodeID: "n1", Interface: "eth0", Address: "10.0.0.1/24"},
 		{NodeID: "n2", Interface: "eth0", Address: "10.0.0.2/24"},
+	})
+	repo.SaveRouteConfigs("lab-1", []models.RouteConfig{
+		{NodeID: "n1", Dst: "10.0.2.0/24", Gateway: "10.0.0.1", Dev: "eth0"},
+		{NodeID: "n2", Dst: "10.0.3.0/24", Gateway: "10.0.0.2", Dev: "eth0"},
 	})
 
 	if err := repo.DeleteNode("n1"); err != nil {
@@ -278,10 +300,19 @@ func TestDeleteNodeCascade(t *testing.T) {
 	// Interface configs for n1 gone, n2 survives
 	configs, _ := repo.GetInterfaceConfigsByLab("lab-1")
 	if len(configs) != 1 {
-		t.Errorf("expected 1 config (n2's), got %d", len(configs))
+		t.Errorf("expected 1 interface config (n2's), got %d", len(configs))
 	}
 	if len(configs) > 0 && configs[0].NodeID != "n2" {
 		t.Errorf("expected surviving config to belong to n2, got %s", configs[0].NodeID)
+	}
+
+	// Route configs for n1 gone, n2 survives
+	routes, _ := repo.GetRouteConfigsByLab("lab-1")
+	if len(routes) != 1 {
+		t.Errorf("expected 1 route config (n2's), got %d", len(routes))
+	}
+	if len(routes) > 0 && routes[0].NodeID != "n2" {
+		t.Errorf("expected surviving route to belong to n2, got %s", routes[0].NodeID)
 	}
 
 	// n2 still exists
@@ -358,6 +389,44 @@ func TestInterfaceConfigs(t *testing.T) {
 	}
 }
 
+// --- Route Configs ---
+
+func TestRouteConfigs(t *testing.T) {
+	repo := newTestRepo()
+
+	routes := []models.RouteConfig{
+		{LabID: "lab-1", NodeID: "n1", Dst: "10.0.2.0/24", Gateway: "10.0.1.1", Dev: "eth0"},
+		{LabID: "lab-1", NodeID: "n1", Dst: "10.0.3.0/24", Gateway: "10.0.1.1", Dev: "eth0"},
+	}
+
+	if err := repo.SaveRouteConfigs("lab-1", routes); err != nil {
+		t.Fatalf("SaveRouteConfigs failed: %v", err)
+	}
+
+	got, err := repo.GetRouteConfigsByLab("lab-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Errorf("expected 2 routes, got %d", len(got))
+	}
+
+	// Overwrite replaces
+	repo.SaveRouteConfigs("lab-1", []models.RouteConfig{
+		{LabID: "lab-1", NodeID: "n1", Dst: "0.0.0.0/0", Gateway: "10.0.1.1", Dev: "eth0"},
+	})
+	got, _ = repo.GetRouteConfigsByLab("lab-1")
+	if len(got) != 1 {
+		t.Errorf("expected 1 route after overwrite, got %d", len(got))
+	}
+
+	// Empty lab returns nil/empty
+	empty, _ := repo.GetRouteConfigsByLab("lab-999")
+	if len(empty) != 0 {
+		t.Errorf("expected 0 routes for non-existent lab, got %d", len(empty))
+	}
+}
+
 // --- ClearAll ---
 
 func TestClearAll(t *testing.T) {
@@ -367,6 +436,7 @@ func TestClearAll(t *testing.T) {
 	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1"})
 	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1"})
 	repo.SaveInterfaceConfigs("lab-1", []models.InterfaceConfig{{NodeID: "n1"}})
+	repo.SaveRouteConfigs("lab-1", []models.RouteConfig{{NodeID: "n1", Dst: "0.0.0.0/0", Gateway: "10.0.0.1", Dev: "eth0"}})
 
 	if err := repo.ClearAll(); err != nil {
 		t.Fatalf("ClearAll failed: %v", err)
@@ -376,10 +446,11 @@ func TestClearAll(t *testing.T) {
 	links, _ := repo.ListLinks()
 	labs, _ := repo.ListLaboratories()
 	configs, _ := repo.GetInterfaceConfigsByLab("lab-1")
+	routes, _ := repo.GetRouteConfigsByLab("lab-1")
 
-	if len(nodes) != 0 || len(links) != 0 || len(labs) != 0 || len(configs) != 0 {
-		t.Errorf("expected all empty after ClearAll, got nodes=%d links=%d labs=%d configs=%d",
-			len(nodes), len(links), len(labs), len(configs))
+	if len(nodes) != 0 || len(links) != 0 || len(labs) != 0 || len(configs) != 0 || len(routes) != 0 {
+		t.Errorf("expected all empty after ClearAll, got nodes=%d links=%d labs=%d configs=%d routes=%d",
+			len(nodes), len(links), len(labs), len(configs), len(routes))
 	}
 }
 

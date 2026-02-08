@@ -231,7 +231,7 @@ export class DashboardComponent implements OnInit {
     const labId = this.store.topology().id;
     try {
       const result = await firstValueFrom(this.service.saveLabState(labId));
-      this.toast.success(`State saved: ${result.configs_saved} IP configurations persisted`);
+      this.toast.success(`State saved: ${result.ips_saved} IPs, ${result.routes_saved} routes persisted`);
     } catch (err: any) {
       console.error('Failed to save lab state', err);
       this.toast.error('Save failed: ' + (err.error?.error || err.message));
