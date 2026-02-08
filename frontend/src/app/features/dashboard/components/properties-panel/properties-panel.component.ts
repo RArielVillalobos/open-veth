@@ -1,7 +1,9 @@
 import { Component, input, output, inject, computed, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { Node, Link, RouteInfo } from '../../../../models/topology.model';
 import { TopologyService } from '../../../../core/services/topology.service';
+import { ToastService } from '../../../../core/services/toast.service';
 
 @Component({
   selector: 'app-properties-panel',
@@ -20,6 +22,7 @@ export class PropertiesPanelComponent {
   close = output<void>();
 
   private service = inject(TopologyService);
+  private toast = inject(ToastService);
   
   // Internal state
   routes = signal<RouteInfo[]>([]);
@@ -46,28 +49,27 @@ export class PropertiesPanelComponent {
     });
   }
 
-  loadRoutes(nodeId?: string) {
+  async loadRoutes(nodeId?: string) {
     const id = nodeId || this.selectedNode()?.id;
     if (!id) return;
 
     this.loadingRoutes.set(true);
-    this.service.getNodeRoutes(id).subscribe({
-      next: (data) => {
-        // Sort: Connected (C) first, then Static (S), then by destination
-        const sorted = (data || []).sort((a, b) => {
-          const aIsKernel = a.protocol === 'kernel' ? 0 : 1;
-          const bIsKernel = b.protocol === 'kernel' ? 0 : 1;
-          if (aIsKernel !== bIsKernel) return aIsKernel - bIsKernel;
-          return a.dst.localeCompare(b.dst);
-        });
-        this.routes.set(sorted);
-        this.loadingRoutes.set(false);
-      },
-      error: () => {
-        this.routes.set([]);
-        this.loadingRoutes.set(false);
-      }
-    });
+    try {
+      const data = await firstValueFrom(this.service.getNodeRoutes(id));
+      // Sort: Connected (C) first, then Static (S), then by destination
+      const sorted = (data || []).sort((a, b) => {
+        const aIsKernel = a.protocol === 'kernel' ? 0 : 1;
+        const bIsKernel = b.protocol === 'kernel' ? 0 : 1;
+        if (aIsKernel !== bIsKernel) return aIsKernel - bIsKernel;
+        return a.dst.localeCompare(b.dst);
+      });
+      this.routes.set(sorted);
+    } catch (err: any) {
+      this.routes.set([]);
+      this.toast.error('Failed to load routes: ' + (err.error?.error || err.message || 'unknown error'));
+    } finally {
+      this.loadingRoutes.set(false);
+    }
   }
 
   getIPv4(addrInfo: any[] | undefined): string {

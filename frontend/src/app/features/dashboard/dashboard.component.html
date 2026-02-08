@@ -87,7 +87,7 @@
       <app-properties-panel *ngIf="selectedNode() || selectedLink()" class="shrink-0"
           [selectedNode]="selectedNode()"
           [selectedLink]="selectedLink()"
-          (openTerminal)="openTerminal(selectedNode()?.id!)"
+          (openTerminal)="selectedNode() && openTerminal(selectedNode()!.id)"
           (openCapture)="onOpenCapture($any($event))"
           (deleteNode)="onDeleteNode($event)"
           (deleteLink)="onDeleteLink($event)"

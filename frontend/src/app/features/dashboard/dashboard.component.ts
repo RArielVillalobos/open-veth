@@ -90,7 +90,7 @@ export class DashboardComponent implements OnInit {
     const target_int = this.layoutService.getNextInterface(event.target, links);
 
     this.store.addLink({
-      id: 'link-' + Math.random().toString(36).substring(2, 7),
+      id: 'link-' + crypto.randomUUID().substring(0, 8),
       source: event.source,
       target: event.target,
       source_int,
@@ -103,7 +103,7 @@ export class DashboardComponent implements OnInit {
     const { nodes, links } = this.store.topology();
     const { x, y } = this.layoutService.getNextNodePosition(nodes, links);
     this.store.addNode({
-      id: 'node-' + Math.random().toString(36).substring(2, 7),
+      id: 'node-' + crypto.randomUUID().substring(0, 8),
       name: event.name,
       type: event.type,
       x,

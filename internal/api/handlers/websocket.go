@@ -66,10 +66,10 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 			found = true
 			node = candidates[0]
 			// If we have multiple, try to find the one with a container_id
-			for _, c := range candidates {
-				h.hydrateNode(&c)
-				if c.ContainerID != "" {
-					node = c
+			for _, candidate := range candidates {
+				h.hydrateNode(&candidate)
+				if candidate.ContainerID != "" {
+					node = candidate
 					break
 				}
 			}

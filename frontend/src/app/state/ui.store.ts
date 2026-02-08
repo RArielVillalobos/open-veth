@@ -108,9 +108,9 @@ export const UIStore = signalStore(
     },
 
     closeCapture(nodeId: string, interfaceName: string) {
-        patchState(store, (state) => ({ 
-          activeCaptures: state.activeCaptures.filter(c => !(c.nodeId === nodeId && c.interfaceName === interfaceName)) 
-        }));
+      patchState(store, (state) => ({
+        activeCaptures: state.activeCaptures.filter(c => !(c.nodeId === nodeId && c.interfaceName === interfaceName))
+      }));
     },
 
     // --- Reset ---
