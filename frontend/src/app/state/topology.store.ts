@@ -1,9 +1,10 @@
-import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
+import { signalStore, withState, withMethods, patchState, withHooks } from '@ngrx/signals';
 import { Topology, Node, Link, Laboratory } from '../models/topology.model';
-import { inject } from '@angular/core';
+import { inject, effect } from '@angular/core';
 import { firstValueFrom, forkJoin } from 'rxjs';
 import { TopologyService } from '../core/services/topology.service';
 import { ToastService } from '../core/services/toast.service';
+import { UIStore } from './ui.store';
 
 export interface TopologyState {
   topology: Topology;
@@ -315,5 +316,16 @@ export const TopologyStore = signalStore(
         }
       }
     };
+  }),
+  withHooks({
+    onInit(store, ui = inject(UIStore)) {
+      // Reactive side-effect: Whenever a node is selected, fetch its interfaces automatically
+      effect(() => {
+        const selectedId = ui.selectedNodeId();
+        if (selectedId) {
+          store.fetchNodeInterfaces(selectedId);
+        }
+      });
+    }
   })
 );

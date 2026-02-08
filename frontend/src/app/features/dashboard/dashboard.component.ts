@@ -75,9 +75,6 @@ export class DashboardComponent implements OnInit {
 
   onNodeSelected(id: string | null) {
     this.ui.selectNode(id);
-    if (id) {
-      this.store.fetchNodeInterfaces(id);
-    }
   }
 
   onLinkSelected(id: string | null) {
