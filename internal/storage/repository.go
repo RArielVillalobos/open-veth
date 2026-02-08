@@ -17,6 +17,7 @@ type Repository interface {
 	DeleteLink(id string) error
 	ListLinks() ([]models.Link, error)
 	ListLinksByLab(labID string) ([]models.Link, error)
+	ListLinksByNode(nodeID string) ([]models.Link, error)
 
 	// Laboratories
 	SaveLaboratory(lab models.Laboratory) error

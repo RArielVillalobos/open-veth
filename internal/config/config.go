@@ -15,8 +15,9 @@ type Config struct {
 
 // ServerConfig holds HTTP server settings
 type ServerConfig struct {
-	Address         string
-	ShutdownTimeout time.Duration
+	Address          string
+	ShutdownTimeout  time.Duration
+	AutoSaveInterval time.Duration
 }
 
 // DatabaseConfig holds database connection settings
@@ -35,8 +36,9 @@ type DockerConfig struct {
 func Load() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Address:         getEnv("SERVER_ADDRESS", ":8080"),
-			ShutdownTimeout: getDurationEnv("SERVER_SHUTDOWN_TIMEOUT", 10*time.Second),
+			Address:          getEnv("SERVER_ADDRESS", ":8080"),
+			ShutdownTimeout:  getDurationEnv("SERVER_SHUTDOWN_TIMEOUT", 10*time.Second),
+			AutoSaveInterval: getDurationEnv("AUTO_SAVE_INTERVAL", 30*time.Second),
 		},
 		Database: DatabaseConfig{
 			Driver: getEnv("DB_DRIVER", "sqlite"),

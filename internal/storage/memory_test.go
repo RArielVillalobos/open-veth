@@ -171,13 +171,19 @@ func TestLaboratoryCRUD(t *testing.T) {
 func TestDeleteLaboratoryCascade(t *testing.T) {
 	repo := newTestRepo()
 
-	// Setup: lab with nodes and links
+	// Setup: lab with nodes, links, and interface configs
 	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Lab"})
 	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1"})
 	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1"})
 	repo.SaveNode(models.Node{ID: "n3", LabID: "lab-2"}) // different lab
 	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1"})
 	repo.SaveLink(models.Link{ID: "l2", LabID: "lab-2"}) // different lab
+	repo.SaveInterfaceConfigs("lab-1", []models.InterfaceConfig{
+		{NodeID: "n1", Interface: "eth0", Address: "10.0.0.1/24"},
+	})
+	repo.SaveInterfaceConfigs("lab-2", []models.InterfaceConfig{
+		{NodeID: "n3", Interface: "eth0", Address: "10.0.1.1/24"},
+	})
 
 	if err := repo.DeleteLaboratory("lab-1"); err != nil {
 		t.Fatalf("DeleteLaboratory failed: %v", err)
@@ -215,6 +221,102 @@ func TestDeleteLaboratoryCascade(t *testing.T) {
 	_, ok = repo.GetLink("l2")
 	if !ok {
 		t.Error("expected l2 (lab-2) to survive")
+	}
+
+	// Interface configs from lab-1 deleted
+	configs, _ := repo.GetInterfaceConfigsByLab("lab-1")
+	if len(configs) != 0 {
+		t.Error("expected lab-1 interface configs to be cascade deleted")
+	}
+
+	// Interface configs from lab-2 survive
+	configs2, _ := repo.GetInterfaceConfigsByLab("lab-2")
+	if len(configs2) != 1 {
+		t.Error("expected lab-2 interface configs to survive")
+	}
+}
+
+func TestDeleteNodeCascade(t *testing.T) {
+	repo := newTestRepo()
+
+	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1"})
+	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1"})
+	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1", SourceID: "n1", TargetID: "n2"})
+	repo.SaveLink(models.Link{ID: "l2", LabID: "lab-1", SourceID: "n2", TargetID: "n1"})
+	repo.SaveLink(models.Link{ID: "l3", LabID: "lab-1", SourceID: "n2", TargetID: "n2"}) // unrelated
+	repo.SaveInterfaceConfigs("lab-1", []models.InterfaceConfig{
+		{NodeID: "n1", Interface: "eth0", Address: "10.0.0.1/24"},
+		{NodeID: "n2", Interface: "eth0", Address: "10.0.0.2/24"},
+	})
+
+	if err := repo.DeleteNode("n1"); err != nil {
+		t.Fatalf("DeleteNode failed: %v", err)
+	}
+
+	// n1 gone
+	_, ok := repo.GetNode("n1")
+	if ok {
+		t.Error("expected n1 to be deleted")
+	}
+
+	// Links referencing n1 gone
+	_, ok = repo.GetLink("l1")
+	if ok {
+		t.Error("expected l1 to be cascade deleted")
+	}
+	_, ok = repo.GetLink("l2")
+	if ok {
+		t.Error("expected l2 to be cascade deleted")
+	}
+
+	// Unrelated link survives
+	_, ok = repo.GetLink("l3")
+	if !ok {
+		t.Error("expected l3 to survive")
+	}
+
+	// Interface configs for n1 gone, n2 survives
+	configs, _ := repo.GetInterfaceConfigsByLab("lab-1")
+	if len(configs) != 1 {
+		t.Errorf("expected 1 config (n2's), got %d", len(configs))
+	}
+	if len(configs) > 0 && configs[0].NodeID != "n2" {
+		t.Errorf("expected surviving config to belong to n2, got %s", configs[0].NodeID)
+	}
+
+	// n2 still exists
+	_, ok = repo.GetNode("n2")
+	if !ok {
+		t.Error("expected n2 to survive")
+	}
+}
+
+func TestListLinksByNode(t *testing.T) {
+	repo := newTestRepo()
+
+	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1", SourceID: "n1", TargetID: "n2"})
+	repo.SaveLink(models.Link{ID: "l2", LabID: "lab-1", SourceID: "n2", TargetID: "n3"})
+	repo.SaveLink(models.Link{ID: "l3", LabID: "lab-1", SourceID: "n3", TargetID: "n1"})
+
+	// n1 is source in l1, target in l3
+	links, err := repo.ListLinksByNode("n1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(links) != 2 {
+		t.Errorf("expected 2 links for n1, got %d", len(links))
+	}
+
+	// n2 is target in l1, source in l2
+	links, _ = repo.ListLinksByNode("n2")
+	if len(links) != 2 {
+		t.Errorf("expected 2 links for n2, got %d", len(links))
+	}
+
+	// Non-existent node
+	links, _ = repo.ListLinksByNode("n999")
+	if len(links) != 0 {
+		t.Errorf("expected 0 links for non-existent node, got %d", len(links))
 	}
 }
 

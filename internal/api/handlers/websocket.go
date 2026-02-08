@@ -67,6 +67,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
+	h.hydrateNode(&node)
 	if node.ContainerID == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
 		return
@@ -166,6 +167,7 @@ func (h *Handler) HandleSniff(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
+	h.hydrateNode(&node)
 
 	ws, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

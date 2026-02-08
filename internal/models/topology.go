@@ -43,9 +43,9 @@ type Node struct {
 	X          float64  `json:"x"` // Canvas position
 	Y          float64  `json:"y"` // Canvas position
 
-	// Internal state
-	ContainerID string `json:"container_id"`
-	PID         int    `json:"pid"`
+	// Runtime state (not persisted, rebuilt from Docker on startup)
+	ContainerID string `json:"container_id" gorm:"-"`
+	PID         int    `json:"pid" gorm:"-"`
 
 	// Runtime Info (Not persisted in DB)
 	Interfaces []InterfaceInfo `json:"interfaces" gorm:"-"`
@@ -77,8 +77,8 @@ type RouteInfo struct {
 type Link struct {
 	ID        string `json:"id" gorm:"primaryKey"`
 	LabID     string `json:"lab_id" gorm:"index"` // Associated laboratory
-	SourceID  string `json:"source"`
-	TargetID  string `json:"target"`
+	SourceID  string `json:"source" gorm:"index"`
+	TargetID  string `json:"target" gorm:"index"`
 	SourceInt string `json:"source_int"`
 	TargetInt string `json:"target_int"`
 }

@@ -32,6 +32,7 @@ func newTestHandler() (*Handler, *storage.MemoryRepository) {
 		Manager: nil, // no Docker in unit tests
 		Network: nil,
 		Repo:    repo,
+		Runtime: NewRuntimeStore(),
 		Logger:  logger,
 		Config:  cfg,
 	}
@@ -225,8 +226,10 @@ func TestCreateLinkValidation(t *testing.T) {
 	h, repo := newTestHandler()
 	r := setupRouter(h)
 
-	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1", Name: "HOST-1", ContainerID: "abc123"})
-	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1", Name: "HOST-2", ContainerID: "def456"})
+	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1", Name: "HOST-1"})
+	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1", Name: "HOST-2"})
+	h.Runtime.Set("n1", "abc123", 1000)
+	h.Runtime.Set("n2", "def456", 1001)
 
 	// Bad source interface name (injection attempt)
 	w := doRequest(r, "POST", "/api/v1/links", models.Link{
@@ -360,8 +363,10 @@ func TestCreateLinkDuplicate(t *testing.T) {
 	h, repo := newTestHandler()
 	r := setupRouter(h)
 
-	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1", ContainerID: "c1"})
-	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1", ContainerID: "c2"})
+	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1"})
+	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1"})
+	h.Runtime.Set("n1", "c1", 1000)
+	h.Runtime.Set("n2", "c2", 1001)
 	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1", SourceID: "n1", TargetID: "n2"})
 
 	// Try to create duplicate (same direction)
@@ -463,7 +468,8 @@ func TestTerminalAcceptsNodeByID(t *testing.T) {
 	h, repo := newTestHandler()
 	r := setupRouter(h)
 
-	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1", ContainerID: "abc123"})
+	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1"})
+	h.Runtime.Set("n1", "abc123", 1000)
 
 	// This passes validation but fails at WebSocket upgrade (no real WS client).
 	// We verify it's NOT our validation error — the WS upgrade failure produces
@@ -482,7 +488,8 @@ func TestTerminalAcceptsNodeByName(t *testing.T) {
 	h, repo := newTestHandler()
 	r := setupRouter(h)
 
-	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1", ContainerID: "abc123"})
+	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1"})
+	h.Runtime.Set("n1", "abc123", 1000)
 
 	w := doRequest(r, "GET", "/api/v1/terminal?node=HOST-1", nil)
 	body := w.Body.String()
@@ -499,7 +506,8 @@ func TestTerminalRejectsArbitraryContainerName(t *testing.T) {
 	r := setupRouter(h)
 
 	// Only openveth nodes exist
-	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1", ContainerID: "abc123"})
+	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1"})
+	h.Runtime.Set("n1", "abc123", 1000)
 
 	// Attempt to access a non-openveth container
 	w := doRequest(r, "GET", "/api/v1/terminal?node=postgres-db", nil)
@@ -545,7 +553,8 @@ func TestSniffRejectsInjectionInInterface(t *testing.T) {
 	h, repo := newTestHandler()
 	r := setupRouter(h)
 
-	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1", ContainerID: "abc123"})
+	repo.SaveNode(models.Node{ID: "n1", Name: "HOST-1"})
+	h.Runtime.Set("n1", "abc123", 1000)
 
 	injections := []string{
 		"eth0;rm",

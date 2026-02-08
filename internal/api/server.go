@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"open-veth/internal/api/handlers"
 	"open-veth/internal/config"
@@ -16,10 +17,11 @@ import (
 
 // Server encapsulates the HTTP router and dependencies
 type Server struct {
-	router  *gin.Engine
-	handler *handlers.Handler
-	logger  *slog.Logger
-	config  *config.Config
+	router       *gin.Engine
+	handler      *handlers.Handler
+	logger       *slog.Logger
+	config       *config.Config
+	autoSaveStop chan struct{}
 }
 
 // NewServer creates and configures the API server instance
@@ -119,6 +121,39 @@ func (s *Server) Reconcile(ctx context.Context) error {
 // SaveState saves the IP configuration of all laboratories before shutdown
 func (s *Server) SaveState(ctx context.Context) error {
 	return s.handler.SaveAllLabsState(ctx)
+}
+
+// StartAutoSave begins periodic IP configuration saving
+func (s *Server) StartAutoSave(interval time.Duration) {
+	s.autoSaveStop = make(chan struct{})
+	ticker := time.NewTicker(interval)
+
+	go func() {
+		s.logger.Info("auto-save started", "interval", interval.String())
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				if err := s.handler.SaveAllLabsState(ctx); err != nil {
+					s.logger.Warn("auto-save failed", "error", err)
+				} else {
+					s.logger.Debug("auto-save completed")
+				}
+				cancel()
+			case <-s.autoSaveStop:
+				ticker.Stop()
+				s.logger.Info("auto-save stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopAutoSave signals the auto-save goroutine to stop
+func (s *Server) StopAutoSave() {
+	if s.autoSaveStop != nil {
+		close(s.autoSaveStop)
+	}
 }
 
 // Run starts the HTTP server (simple mode, no graceful shutdown)

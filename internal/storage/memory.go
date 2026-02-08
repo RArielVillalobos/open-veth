@@ -42,9 +42,29 @@ func (m *MemoryRepository) GetNode(id string) (models.Node, bool) {
 func (m *MemoryRepository) DeleteNode(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.nodes[id]; !ok {
+	node, ok := m.nodes[id]
+	if !ok {
 		return fmt.Errorf("node not found")
 	}
+
+	// Cascade: delete links referencing this node
+	for linkID, link := range m.links {
+		if link.SourceID == id || link.TargetID == id {
+			delete(m.links, linkID)
+		}
+	}
+
+	// Cascade: remove interface configs for this node
+	if confs, exists := m.interfaceConfs[node.LabID]; exists {
+		filtered := make([]models.InterfaceConfig, 0, len(confs))
+		for _, cfg := range confs {
+			if cfg.NodeID != id {
+				filtered = append(filtered, cfg)
+			}
+		}
+		m.interfaceConfs[node.LabID] = filtered
+	}
+
 	delete(m.nodes, id)
 	return nil
 }
@@ -119,6 +139,18 @@ func (m *MemoryRepository) ListLinksByLab(labID string) ([]models.Link, error) {
 	return list, nil
 }
 
+func (m *MemoryRepository) ListLinksByNode(nodeID string) ([]models.Link, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var list []models.Link
+	for _, l := range m.links {
+		if l.SourceID == nodeID || l.TargetID == nodeID {
+			list = append(list, l)
+		}
+	}
+	return list, nil
+}
+
 // --- Laboratories ---
 
 func (m *MemoryRepository) SaveLaboratory(lab models.Laboratory) error {
@@ -149,15 +181,17 @@ func (m *MemoryRepository) DeleteLaboratory(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Delete associated nodes and links
-	for nodeID, node := range m.nodes {
-		if node.LabID == id {
-			delete(m.nodes, nodeID)
-		}
-	}
+	// Cascade: delete interface configs, links, nodes
+	delete(m.interfaceConfs, id)
+
 	for linkID, link := range m.links {
 		if link.LabID == id {
 			delete(m.links, linkID)
+		}
+	}
+	for nodeID, node := range m.nodes {
+		if node.LabID == id {
+			delete(m.nodes, nodeID)
 		}
 	}
 

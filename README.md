@@ -33,6 +33,7 @@
 | **DHCP Server** | Automatic IP assignment for realistic LAN labs |
 | **Infrastructure as Code** | Export/import topologies as YAML |
 | **Lab Management** | Create, save, and switch between lab projects |
+| **State Persistence** | IP configurations auto-saved every 30s and restored on lab activation |
 
 ---
 
@@ -114,6 +115,7 @@ graph TD
 1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH)
 2. **Links** → `veth` pairs connecting container namespaces
 3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching
+4. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
 
 ---
 

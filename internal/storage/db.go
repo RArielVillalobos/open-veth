@@ -31,8 +31,13 @@ func NewGormRepository(driver string, dsn string) (*GormRepository, error) {
 		return nil, fmt.Errorf("failed to connect to database (%s): %v", driver, err)
 	}
 
-	// Auto Migrate models
-	err = db.AutoMigrate(&models.Node{}, &models.Link{}, &models.Laboratory{}, &models.InterfaceConfig{})
+	// Enable foreign key enforcement for SQLite
+	if driver == "sqlite" {
+		db.Exec("PRAGMA foreign_keys = ON")
+	}
+
+	// Auto Migrate models (parent tables first)
+	err = db.AutoMigrate(&models.Laboratory{}, &models.Node{}, &models.Link{}, &models.InterfaceConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %v", err)
 	}
@@ -53,7 +58,18 @@ func (r *GormRepository) GetNode(id string) (models.Node, bool) {
 }
 
 func (r *GormRepository) DeleteNode(id string) error {
-	return r.db.Delete(&models.Node{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&models.InterfaceConfig{}, "node_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.Link{}, "source_id = ? OR target_id = ?", id, id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.Node{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *GormRepository) ListNodes() ([]models.Node, error) {
@@ -96,6 +112,12 @@ func (r *GormRepository) ListLinksByLab(labID string) ([]models.Link, error) {
 	return links, err
 }
 
+func (r *GormRepository) ListLinksByNode(nodeID string) ([]models.Link, error) {
+	var links []models.Link
+	err := r.db.Where("source_id = ? OR target_id = ?", nodeID, nodeID).Find(&links).Error
+	return links, err
+}
+
 func (r *GormRepository) SaveLaboratory(lab models.Laboratory) error {
 	return r.db.Save(&lab).Error
 }
@@ -116,11 +138,14 @@ func (r *GormRepository) ListLaboratories() ([]models.Laboratory, error) {
 
 func (r *GormRepository) DeleteLaboratory(id string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Cascading delete nodes and links associated with this lab
-		if err := tx.Delete(&models.Node{}, "lab_id = ?", id).Error; err != nil {
+		// Cascade: most dependent first
+		if err := tx.Delete(&models.InterfaceConfig{}, "lab_id = ?", id).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(&models.Link{}, "lab_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.Node{}, "lab_id = ?", id).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(&models.Laboratory{}, "id = ?", id).Error; err != nil {
@@ -132,16 +157,17 @@ func (r *GormRepository) DeleteLaboratory(id string) error {
 
 func (r *GormRepository) ClearAll() error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("DELETE FROM nodes").Error; err != nil {
+		// Most dependent first to respect FK order
+		if err := tx.Exec("DELETE FROM interface_configs").Error; err != nil {
 			return err
 		}
 		if err := tx.Exec("DELETE FROM links").Error; err != nil {
 			return err
 		}
-		if err := tx.Exec("DELETE FROM laboratories").Error; err != nil {
+		if err := tx.Exec("DELETE FROM nodes").Error; err != nil {
 			return err
 		}
-		if err := tx.Exec("DELETE FROM interface_configs").Error; err != nil {
+		if err := tx.Exec("DELETE FROM laboratories").Error; err != nil {
 			return err
 		}
 		return nil
@@ -150,14 +176,14 @@ func (r *GormRepository) ClearAll() error {
 
 func (r *GormRepository) SaveInterfaceConfigs(labID string, configs []models.InterfaceConfig) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Delete existing configs for this lab
 		if err := tx.Delete(&models.InterfaceConfig{}, "lab_id = ?", labID).Error; err != nil {
 			return err
 		}
-		// Insert new configs
-		for _, cfg := range configs {
-			cfg.LabID = labID
-			if err := tx.Create(&cfg).Error; err != nil {
+		if len(configs) > 0 {
+			for i := range configs {
+				configs[i].LabID = labID
+			}
+			if err := tx.Create(&configs).Error; err != nil {
 				return err
 			}
 		}

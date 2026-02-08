@@ -108,6 +108,7 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.hydrateNodes(nodes)
 
 	// Collect interface configs from all nodes
 	var configs []models.InterfaceConfig
@@ -171,15 +172,19 @@ func (h *Handler) CleanupLaboratory(c *gin.Context) {
 
 	h.Logger.Info("cleaning up laboratory", "id", labID, "name", lab.Name)
 
-	// 1. Get all nodes for this lab
+	// 1. Get all nodes and links for this lab
 	nodes, err := h.Repo.ListNodesByLab(labID)
 	if err != nil {
 		h.Logger.Error("failed to list nodes for cleanup", "lab", labID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.hydrateNodes(nodes)
 
-	// 2. Delete containers and DB records for each node
+	links, _ := h.Repo.ListLinksByLab(labID)
+	deletedLinks := len(links) // cascade via DeleteNode will handle these
+
+	// 2. Delete containers and DB records for each node (cascade deletes links + configs)
 	deletedNodes := 0
 	for _, node := range nodes {
 		if node.ContainerID != "" {
@@ -192,17 +197,7 @@ func (h *Handler) CleanupLaboratory(c *gin.Context) {
 		} else {
 			deletedNodes++
 		}
-	}
-
-	// 3. Delete all links for this lab
-	links, _ := h.Repo.ListLinksByLab(labID)
-	deletedLinks := 0
-	for _, link := range links {
-		if err := h.Repo.DeleteLink(link.ID); err != nil {
-			h.Logger.Warn("failed to delete link from DB", "link", link.ID, "error", err)
-		} else {
-			deletedLinks++
-		}
+		h.Runtime.Delete(node.ID)
 	}
 
 	h.Logger.Info("laboratory cleanup completed", "id", labID, "nodes_deleted", deletedNodes, "links_deleted", deletedLinks)
@@ -227,6 +222,7 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 	h.Logger.Info("activating laboratory", "id", labID)
 
 	// 2. NUKE: Delete ALL running containers to free resources
+	h.Runtime.Clear()
 	containers, err := h.Manager.GetOpenVethContainers(ctx)
 	if err == nil {
 		for _, container := range containers {
@@ -253,18 +249,14 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 			continue
 		}
 
-		// Update Runtime Info in Struct (PID, ID)
+		// Update Runtime Info
 		pid, err := h.Manager.GetNodePID(ctx, containerID)
 		if err != nil {
 			h.Logger.Warn("failed to get PID for revived node", "node", n.Name, "error", err)
 		}
+		h.Runtime.Set(n.ID, containerID, pid)
 		nodes[i].ContainerID = containerID
 		nodes[i].PID = pid
-
-		// CRITICAL: Persist the new ContainerID and PID to DB
-		if err := h.Repo.SaveNode(nodes[i]); err != nil {
-			h.Logger.Error("failed to persist revived node", "node", n.Name, "error", err)
-		}
 	}
 
 	// 4. Rebuild Links

@@ -26,6 +26,8 @@ func (h *Handler) ListNodes(c *gin.Context) {
 		return
 	}
 
+	h.hydrateNodes(nodes)
+
 	// If real-time info is requested
 	if c.Query("live") == "true" {
 		for i := range nodes {
@@ -72,14 +74,18 @@ func (h *Handler) CreateNode(c *gin.Context) {
 		return
 	}
 
-	node.ContainerID = containerID
-	node.PID = pid
+	// Persist config (gorm:"-" fields are NOT saved)
 	if err := h.Repo.SaveNode(node); err != nil {
 		h.Logger.Error("failed to save node to DB, cleaning up container", "name", node.Name, "error", err)
 		_ = h.Manager.DeleteNode(c.Request.Context(), node.Name)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist node"})
 		return
 	}
+
+	// Store runtime state in memory
+	h.Runtime.Set(node.ID, containerID, pid)
+	node.ContainerID = containerID
+	node.PID = pid
 
 	h.Logger.Info("node created", "name", node.Name, "container_id", containerID[:12])
 	c.JSON(http.StatusCreated, node)
@@ -123,14 +129,62 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
+	h.hydrateNode(&node)
 
 	h.Logger.Info("deleting node", "name", node.Name, "id", id)
+	ctx := c.Request.Context()
 
-	if err := h.Manager.DeleteNode(c.Request.Context(), node.Name); err != nil {
-		h.Logger.Warn("failed to delete container", "name", node.Name, "error", err)
+	// 1. Clean up link interfaces on PEER nodes before cascade delete
+	links, err := h.Repo.ListLinksByNode(id)
+	if err != nil {
+		h.Logger.Warn("failed to list links for node cleanup", "node", node.Name, "error", err)
+	} else {
+		for _, link := range links {
+			var peerNodeID, peerInt string
+			if link.SourceID == id {
+				peerNodeID = link.TargetID
+				peerInt = link.TargetInt
+			} else {
+				peerNodeID = link.SourceID
+				peerInt = link.SourceInt
+			}
+
+			peerNode, ok := h.Repo.GetNode(peerNodeID)
+			if !ok {
+				continue
+			}
+			h.hydrateNode(&peerNode)
+			if peerNode.ContainerID == "" {
+				continue
+			}
+			pid, err := h.Manager.GetNodePID(ctx, peerNode.ContainerID)
+			if err != nil {
+				continue
+			}
+			if err := h.Network.RemoveInterface(pid, peerInt); err != nil {
+				h.Logger.Warn("failed to cleanup peer interface",
+					"interface", peerInt, "peer", peerNode.Name, "error", err)
+			}
+		}
 	}
 
-	h.Repo.DeleteNode(id)
+	// 2. Delete the container
+	if node.ContainerID != "" {
+		if err := h.Manager.DeleteNode(ctx, node.Name); err != nil {
+			h.Logger.Warn("failed to delete container", "name", node.Name, "error", err)
+		}
+	}
+
+	// 3. Delete from DB (cascade removes links + interface configs)
+	if err := h.Repo.DeleteNode(id); err != nil {
+		h.Logger.Error("failed to delete node from DB", "id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete node"})
+		return
+	}
+
+	// 4. Remove runtime state
+	h.Runtime.Delete(id)
+
 	c.Status(http.StatusNoContent)
 }
 
@@ -142,6 +196,7 @@ func (h *Handler) GetNodeInterfaces(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
+	h.hydrateNode(&node)
 
 	if node.ContainerID == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
@@ -166,6 +221,7 @@ func (h *Handler) GetNodeRoutes(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
+	h.hydrateNode(&node)
 
 	if node.ContainerID == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})

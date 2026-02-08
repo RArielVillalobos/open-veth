@@ -107,6 +107,7 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 	}
 
 	h.Repo.ClearAll()
+	h.Runtime.Clear()
 
 	h.Logger.Info("cleanup completed", "containers_removed", cleaned)
 	c.JSON(http.StatusOK, gin.H{"message": "cleanup complete", "containers_removed": cleaned})
@@ -116,163 +117,169 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 func (h *Handler) ReconcileState(ctx context.Context) error {
 	h.Logger.Info("running startup reconciliation")
 
-	// 1. Get all OpenVeth containers (The Reality)
+	// 1. Gather state from Docker and DB
 	containers, err := h.Manager.GetOpenVethContainers(ctx)
 	if err != nil {
 		return err
 	}
-
-	// 2. Get all Nodes from DB (The Desired State)
 	nodes, err := h.Repo.ListNodes()
 	if err != nil {
 		return err
 	}
 
-	// 3. Create a lookup map for valid container IDs
-	validContainers := make(map[string]bool)
-	for _, node := range nodes {
-		validContainers["/"+node.Name] = true
-		validContainers[node.Name] = true
+	// 2. Build lookup maps
+	knownNames := make(map[string]bool, len(nodes)*2)
+	for _, n := range nodes {
+		knownNames[n.Name] = true
+		knownNames["/"+n.Name] = true
 	}
 
-	// Build map of running containers by name for smart reconciliation
-	runningContainers := make(map[string]types.Container)
+	containerByName := make(map[string]types.Container, len(containers))
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
-			runningContainers[strings.TrimPrefix(name, "/")] = ctr
+			containerByName[strings.TrimPrefix(name, "/")] = ctr
 		}
 	}
 
-	// 4. Hunt for Zombies
-	zombieCount := 0
+	// 3. Reconcile
+	zombies := h.killZombies(ctx, containers, knownNames)
+	nodeMap, skipped, revived, failed := h.reconcileNodes(ctx, nodes, containerByName)
+	linksOK, linksFail := h.restoreLinks(ctx, nodeMap)
+	restoredIPs := h.restoreIPs(ctx, nodeMap)
+
+	// 4. Summary
+	h.Logger.Info("reconciliation complete",
+		"zombies_killed", zombies,
+		"nodes_skipped", skipped,
+		"nodes_revived", revived,
+		"nodes_failed", failed,
+		"links_restored", linksOK,
+		"links_failed", linksFail,
+		"ips_restored", restoredIPs,
+	)
+	return nil
+}
+
+// killZombies removes containers that exist in Docker but not in the DB
+func (h *Handler) killZombies(ctx context.Context, containers []types.Container, knownNames map[string]bool) int {
+	killed := 0
 	for _, ctr := range containers {
 		isZombie := true
 		for _, name := range ctr.Names {
-			if validContainers[name] {
+			if knownNames[name] {
 				isZombie = false
 				break
 			}
 		}
-
 		if isZombie {
-			h.Logger.Warn("zombie container detected, terminating", "names", ctr.Names, "id", ctr.ID[:12])
+			h.Logger.Warn("zombie container detected", "names", ctr.Names, "id", ctr.ID[:12])
 			if err := h.Manager.DeleteNode(ctx, ctr.ID); err != nil {
 				h.Logger.Error("failed to kill zombie", "id", ctr.ID[:12], "error", err)
 			} else {
-				zombieCount++
+				killed++
 			}
 		}
 	}
+	return killed
+}
 
-	// 5. Revive Missing/Stopped Nodes (The Resurrection) - skip already running ones
-	skipped, revived, failed := 0, 0, 0
-	var failedNodes []string
+// reconcileNodes ensures every DB node has a running container.
+// Returns a nodeMap with hydrated runtime state for use by restoreLinks/restoreIPs.
+func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, containerByName map[string]types.Container) (nodeMap map[string]models.Node, skipped, revived, failed int) {
+	nodeMap = make(map[string]models.Node, len(nodes))
 
-	h.Logger.Info("reconciling nodes from database", "count", len(nodes))
 	for _, node := range nodes {
-		// Check if container is already running
-		if ctr, running := runningContainers[node.Name]; running && ctr.State == "running" {
-			pid, _ := h.Manager.GetNodePID(ctx, ctr.ID)
+		// Already running → just capture runtime state
+		if ctr, ok := containerByName[node.Name]; ok && ctr.State == "running" {
+			pid, err := h.Manager.GetNodePID(ctx, ctr.ID)
+			if err != nil {
+				h.Logger.Warn("failed to get PID for running node", "node", node.Name, "error", err)
+			}
+			h.Runtime.Set(node.ID, ctr.ID, pid)
 			node.ContainerID = ctr.ID
 			node.PID = pid
-			if err := h.Repo.SaveNode(node); err != nil {
-				h.Logger.Error("failed to persist running node", "node", node.Name, "error", err)
-			}
+			nodeMap[node.ID] = node
 			skipped++
-			h.Logger.Debug("node already running, skipped", "node", node.Name)
 			continue
 		}
 
-		// Create missing node
+		// Missing → create container
 		cid, err := h.Manager.CreateNode(ctx, node)
 		if err != nil {
 			h.Logger.Warn("failed to revive node", "node", node.Name, "error", err)
 			failed++
-			failedNodes = append(failedNodes, node.Name)
 			continue
 		}
 
-		// Update DB with fresh PID
 		pid, err := h.Manager.GetNodePID(ctx, cid)
 		if err != nil {
-			h.Logger.Warn("failed to get PID during reconciliation", "node", node.Name, "error", err)
+			h.Logger.Warn("failed to get PID for revived node", "node", node.Name, "error", err)
 		}
+		h.Runtime.Set(node.ID, cid, pid)
 		node.ContainerID = cid
 		node.PID = pid
-		if err := h.Repo.SaveNode(node); err != nil {
-			h.Logger.Error("failed to persist reconciled node", "node", node.Name, "error", err)
-		}
+		nodeMap[node.ID] = node
 		revived++
 	}
+	return
+}
 
-	// 6. Restore Links
-	linksRestored, linksFailed := 0, 0
-	h.Logger.Info("restoring network links")
+// restoreLinks recreates veth pairs between nodes using the pre-built nodeMap
+func (h *Handler) restoreLinks(ctx context.Context, nodeMap map[string]models.Node) (restored, failed int) {
 	links, err := h.Repo.ListLinks()
 	if err != nil {
 		h.Logger.Warn("failed to list links for restoration", "error", err)
-	} else {
-		for _, l := range links {
-			src, okS := h.Repo.GetNode(l.SourceID)
-			tgt, okT := h.Repo.GetNode(l.TargetID)
-
-			if okS && okT && src.PID > 0 && tgt.PID > 0 {
-				if err := h.Network.CreateLink(l, src.PID, tgt.PID); err != nil {
-					h.Logger.Debug("link restoration note", "link", l.ID, "error", err)
-					linksFailed++
-				} else {
-					linksRestored++
-				}
-
-				// Re-attach to bridges
-				if src.Type == models.SWITCH {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt)
-				}
-				if tgt.Type == models.SWITCH {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt)
-				}
-			}
-		}
+		return
 	}
 
-	// 7. Restore saved IP configurations
-	h.Logger.Info("restoring saved IP configurations")
+	for _, l := range links {
+		src, okS := nodeMap[l.SourceID]
+		tgt, okT := nodeMap[l.TargetID]
+		if !okS || !okT || src.PID == 0 || tgt.PID == 0 {
+			failed++
+			continue
+		}
+
+		if err := h.Network.CreateLink(l, src.PID, tgt.PID); err != nil {
+			h.Logger.Debug("link restoration note", "link", l.ID, "error", err)
+			failed++
+			continue
+		}
+		restored++
+
+		if src.Type == models.SWITCH {
+			_ = h.Manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt)
+		}
+		if tgt.Type == models.SWITCH {
+			_ = h.Manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt)
+		}
+	}
+	return
+}
+
+// restoreIPs reapplies saved IP configurations using the pre-built nodeMap
+func (h *Handler) restoreIPs(ctx context.Context, nodeMap map[string]models.Node) int {
 	labs, _ := h.Repo.ListLaboratories()
-	restoredIPs := 0
+	restored := 0
+
 	for _, lab := range labs {
 		configs, err := h.Repo.GetInterfaceConfigsByLab(lab.ID)
 		if err != nil {
-			h.Logger.Warn("failed to fetch saved configs", "lab", lab.ID, "error", err)
 			continue
 		}
 		for _, cfg := range configs {
-			node, ok := h.Repo.GetNode(cfg.NodeID)
+			node, ok := nodeMap[cfg.NodeID]
 			if !ok || node.ContainerID == "" {
 				continue
 			}
 			if err := h.Manager.ConfigureInterface(ctx, node.ContainerID, cfg.Interface, cfg.Address); err != nil {
-				h.Logger.Warn("failed to restore IP config", "node", node.Name, "interface", cfg.Interface, "address", cfg.Address, "error", err)
+				h.Logger.Warn("failed to restore IP", "node", node.Name, "iface", cfg.Interface, "error", err)
 			} else {
-				restoredIPs++
+				restored++
 			}
 		}
 	}
-
-	// 8. Final summary
-	if len(failedNodes) > 0 {
-		h.Logger.Warn("nodes failed to revive", "nodes", failedNodes)
-	}
-	h.Logger.Info("reconciliation complete",
-		"zombies_killed", zombieCount,
-		"nodes_skipped", skipped,
-		"nodes_revived", revived,
-		"nodes_failed", failed,
-		"links_restored", linksRestored,
-		"links_failed", linksFailed,
-		"ips_restored", restoredIPs,
-	)
-
-	return nil
+	return restored
 }
 
 // SaveAllLabsState captures and persists IP configuration for all laboratories.
@@ -290,6 +297,7 @@ func (h *Handler) SaveAllLabsState(ctx context.Context) error {
 			h.Logger.Warn("failed to list nodes for save state", "lab", lab.ID, "error", err)
 			continue
 		}
+		h.hydrateNodes(nodes)
 
 		var configs []models.InterfaceConfig
 		for _, node := range nodes {

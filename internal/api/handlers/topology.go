@@ -131,6 +131,7 @@ func (h *Handler) HandleImport(c *gin.Context) {
 		if err != nil {
 			h.Logger.Warn("failed to get PID during import", "node", n.Name, "error", err)
 		}
+		h.Runtime.Set(nodeModel.ID, containerID, pid)
 		nodeModel.ContainerID = containerID
 		nodeModel.PID = pid
 		if err := h.Repo.SaveNode(nodeModel); err != nil {
@@ -153,6 +154,12 @@ func (h *Handler) HandleImport(c *gin.Context) {
 
 		source, okS := h.Repo.GetNode(l.Source)
 		target, okT := h.Repo.GetNode(l.Target)
+		if okS {
+			h.hydrateNode(&source)
+		}
+		if okT {
+			h.hydrateNode(&target)
+		}
 
 		if okS && okT {
 			if err := h.Network.CreateLink(linkModel, source.PID, target.PID); err != nil {

@@ -64,6 +64,8 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "source or target node not found"})
 		return
 	}
+	h.hydrateNode(&source)
+	h.hydrateNode(&target)
 
 	// Validation: Check for existing link between these nodes
 	existingLinks, _ := h.Repo.ListLinksByLab(link.LabID)
@@ -135,6 +137,12 @@ func (h *Handler) DeleteLink(c *gin.Context) {
 	// 2. Physically remove interfaces from containers
 	source, okS := h.Repo.GetNode(link.SourceID)
 	target, okT := h.Repo.GetNode(link.TargetID)
+	if okS {
+		h.hydrateNode(&source)
+	}
+	if okT {
+		h.hydrateNode(&target)
+	}
 
 	ctx := c.Request.Context()
 
