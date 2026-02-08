@@ -1,13 +1,15 @@
 import { Component, inject, signal, OnInit, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../state/topology.store';
+import { UIStore } from '../../state/ui.store';
 import { TopologyService } from '../../core/services/topology.service';
+import { LayoutService } from '../../core/services/layout.service';
 import { ToastService } from '../../core/services/toast.service';
 import { NodePaletteComponent } from './components/node-palette/node-palette.component';
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel.component';
+import { CaptureContainerComponent } from './components/capture-container/capture-container.component';
 import { TopologyCanvasComponent } from '../../shared/components/topology-canvas/topology-canvas.component';
 import { TerminalPanelComponent } from '../../shared/components/terminal-panel/terminal-panel.component';
-import { PacketCaptureWindowComponent } from '../../shared/components/packet-capture-window/packet-capture-window.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { LabManagerComponent } from './components/lab-manager/lab-manager.component';
 import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
@@ -20,9 +22,9 @@ import { firstValueFrom } from 'rxjs';
     CommonModule,
     NodePaletteComponent,
     PropertiesPanelComponent,
+    CaptureContainerComponent,
     TopologyCanvasComponent,
     TerminalPanelComponent,
-    PacketCaptureWindowComponent,
     ToastComponent,
     LabManagerComponent,
     WelcomeModalComponent
@@ -32,35 +34,28 @@ import { firstValueFrom } from 'rxjs';
 })
 export class DashboardComponent implements OnInit {
   readonly store = inject(TopologyStore);
+  readonly ui = inject(UIStore);
   private service = inject(TopologyService);
+  private layoutService = inject(LayoutService);
   private toast = inject(ToastService);
-
-  // Estado para gestión de terminales (Tabs)
-  activeTerminals = signal<string[]>([]);
-  activeTab = signal<string | null>(null);
-
-  // Estado para gestión de Labs
-  showLabManager = signal(false);
-
-  // Control para ocultar el modal de bienvenida tras la primera acción
-  userHasInteracted = signal(false);
-
-  // Selección de nodo y link
-  selectedNodeId = signal<string | null>(null);
-  selectedLinkId = signal<string | null>(null);
 
   // Mostrar modal solo cuando la carga terminó, la topología está vacía y el usuario no ha interactuado
   showWelcomeModal = computed(() =>
-    !this.store.isLoading() && this.store.topology().nodes.length === 0 && !this.userHasInteracted()
+    !this.store.isLoading() && this.store.topology().nodes.length === 0 && !this.ui.hasUserInteracted()
   );
 
   selectedNode = computed(() =>
-    this.store.topology().nodes.find(n => n.id === this.selectedNodeId()) || null
+    this.store.topology().nodes.find(n => n.id === this.ui.selectedNodeId()) || null
   );
 
   selectedLink = computed(() =>
-    this.store.topology().links.find(l => l.id === this.selectedLinkId()) || null
+    this.store.topology().links.find(l => l.id === this.ui.selectedLinkId()) || null
   );
+
+  activeTerminalNodeName = computed(() => {
+    const activeTabId = this.ui.activeTabId();
+    return this.store.topology().nodes.find(n => n.id === activeTabId)?.name || null;
+  });
 
   private lastLabId: string | null = null;
 
@@ -68,7 +63,7 @@ export class DashboardComponent implements OnInit {
     effect(() => {
       const currentId = this.store.topology().id;
       if (this.lastLabId !== null && this.lastLabId !== currentId) {
-        this.clearSessionState();
+        this.ui.resetSession();
       }
       this.lastLabId = currentId;
     });
@@ -79,24 +74,36 @@ export class DashboardComponent implements OnInit {
   }
 
   onNodeSelected(id: string | null) {
-    this.selectedNodeId.set(id);
-    this.selectedLinkId.set(null);
-
+    this.ui.selectNode(id);
     if (id) {
       this.store.fetchNodeInterfaces(id);
     }
   }
 
   onLinkSelected(id: string | null) {
-    this.selectedLinkId.set(id);
-    this.selectedNodeId.set(null);
+    this.ui.selectLink(id);
+  }
+
+  onLinkRequest(event: { source: string; target: string }) {
+    const { links } = this.store.topology();
+    const source_int = this.layoutService.getNextInterface(event.source, links);
+    const target_int = this.layoutService.getNextInterface(event.target, links);
+
+    this.store.addLink({
+      id: 'link-' + crypto.randomUUID().substring(0, 8),
+      source: event.source,
+      target: event.target,
+      source_int,
+      target_int
+    });
   }
 
   onAddNode(event: { type: 'router' | 'host' | 'switch'; name: string }) {
-    this.userHasInteracted.set(true);
-    const { x, y } = this.nextNodePosition();
+    this.ui.markInteraction();
+    const { nodes, links } = this.store.topology();
+    const { x, y } = this.layoutService.getNextNodePosition(nodes, links);
     this.store.addNode({
-      id: 'node-' + Math.random().toString(36).substring(2, 7),
+      id: 'node-' + crypto.randomUUID().substring(0, 8),
       name: event.name,
       type: event.type,
       x,
@@ -104,56 +111,18 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  private nextNodePosition(): { x: number; y: number } {
-    const { nodes, links } = this.store.topology();
-    const cols = 5;
-    const spacingX = 150;
-    const spacingY = 120;
-    const minNodeDist = 80;
-    const minLinkDist = 50;
-
-    for (let i = 0; i < 100; i++) {
-      const x = 200 + (i % cols) * spacingX;
-      const y = 150 + Math.floor(i / cols) * spacingY;
-
-      if (nodes.some(n => Math.abs((n.x ?? 0) - x) < minNodeDist && Math.abs((n.y ?? 0) - y) < minNodeDist)) {
-        continue;
-      }
-
-      const onLink = links.some(link => {
-        const src = nodes.find(n => n.id === link.source);
-        const tgt = nodes.find(n => n.id === link.target);
-        if (!src || !tgt) return false;
-        return this.pointToSegmentDist(x, y, src.x ?? 0, src.y ?? 0, tgt.x ?? 0, tgt.y ?? 0) < minLinkDist;
-      });
-
-      if (!onLink) return { x, y };
-    }
-    return { x: 200, y: 150 };
-  }
-
-  private pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) return Math.hypot(px - ax, py - ay);
-    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
-    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-  }
-
   onDeleteNode(id: string) {
     this.store.removeNode(id);
-    this.selectedNodeId.set(null);
+    this.ui.clearSelection();
   }
 
   onDeleteLink(id: string) {
     this.store.removeLink(id);
-    this.selectedLinkId.set(null);
+    this.ui.clearSelection();
   }
 
   onRename() {
-    this.userHasInteracted.set(true);
-    this.showLabManager.set(true);
+    this.ui.toggleLabManager(true);
   }
 
   async onExport() {
@@ -171,7 +140,7 @@ export class DashboardComponent implements OnInit {
   }
 
   async onImport(event: any) {
-    this.userHasInteracted.set(true);
+    this.ui.markInteraction();
     const file = event.target.files[0];
     if (!file) return;
 
@@ -192,30 +161,17 @@ export class DashboardComponent implements OnInit {
     event.target.value = '';
   }
 
-  openTerminal(nodeName: string) {
-    if (!this.activeTerminals().includes(nodeName)) {
-      this.activeTerminals.update(list => [...list, nodeName]);
+  openTerminal(nodeId: string) {
+    const node = this.store.topology().nodes.find(n => n.id === nodeId);
+    if (node) {
+      this.ui.openTerminal(nodeId, node.name);
     }
-    this.activeTab.set(nodeName);
-  }
-
-  closeTerminal(nodeName: string) {
-    this.activeTerminals.update(list => list.filter(n => n !== nodeName));
-
-    if (this.activeTab() === nodeName) {
-      const remaining = this.activeTerminals();
-      this.activeTab.set(remaining.length > 0 ? remaining[remaining.length - 1] : null);
-    }
-  }
-
-  setActiveTab(nodeName: string) {
-    this.activeTab.set(nodeName);
   }
 
   onOpenCapture(iface: string) {
     const node = this.selectedNode();
     if (node) {
-      this.store.openCapture(node.id, node.name, iface);
+      this.ui.openCapture(node.id, node.name, iface);
     }
   }
 
@@ -223,7 +179,7 @@ export class DashboardComponent implements OnInit {
     const labName = this.store.topology().name;
     if (confirm(`Are you sure you want to delete all nodes and links in "${labName}"? This cannot be undone.`)) {
       this.store.cleanupCurrentLab();
-      this.clearSessionState();
+      this.ui.resetSession();
     }
   }
 
@@ -237,11 +193,5 @@ export class DashboardComponent implements OnInit {
       this.toast.error('Save failed: ' + (err.error?.error || err.message));
     }
   }
-
-  private clearSessionState() {
-    this.activeTerminals.set([]);
-    this.activeTab.set(null);
-    this.selectedNodeId.set(null);
-    this.selectedLinkId.set(null);
-  }
 }
+

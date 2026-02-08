@@ -1,14 +1,15 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Topology, Node, Link, InterfaceInfo, RouteInfo } from '../../models/topology.model';
+import { Topology, Node, Link, InterfaceInfo, RouteInfo, Laboratory, LaboratoryCreate, SaveStateResponse } from '../../models/topology.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TopologyService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/v1';
+  private apiUrl = environment.apiUrl;
 
   // --- Nodos ---
   getNodes(live: boolean = false, labId?: string): Observable<Node[]> {
@@ -57,20 +58,20 @@ export class TopologyService {
   }
 
   // --- Laboratories ---
-  getLaboratories(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/laboratories`);
+  getLaboratories(): Observable<Laboratory[]> {
+    return this.http.get<Laboratory[]>(`${this.apiUrl}/laboratories`);
   }
 
-  createLaboratory(lab: { id: string, name: string }): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/laboratories`, lab);
+  createLaboratory(lab: LaboratoryCreate): Observable<Laboratory> {
+    return this.http.post<Laboratory>(`${this.apiUrl}/laboratories`, lab);
   }
 
-  activateLaboratory(id: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/laboratories/${id}/activate`, {});
+  activateLaboratory(id: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/laboratories/${id}/activate`, {});
   }
 
-  updateLaboratory(id: string, name: string): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/laboratories/${id}`, { name });
+  updateLaboratory(id: string, name: string): Observable<Laboratory> {
+    return this.http.patch<Laboratory>(`${this.apiUrl}/laboratories/${id}`, { name });
   }
 
   deleteLaboratory(id: string): Observable<void> {
@@ -79,12 +80,12 @@ export class TopologyService {
 
   // --- Sistema ---
 
-  cleanupLaboratory(labId: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/laboratories/${labId}/cleanup`);
+  cleanupLaboratory(labId: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/laboratories/${labId}/cleanup`);
   }
 
-  saveLabState(labId: string): Observable<{ message: string; ips_saved: number; routes_saved: number }> {
-    return this.http.post<{ message: string; ips_saved: number; routes_saved: number }>(
+  saveLabState(labId: string): Observable<SaveStateResponse> {
+    return this.http.post<SaveStateResponse>(
       `${this.apiUrl}/laboratories/${labId}/save-state`, {}
     );
   }
@@ -93,8 +94,8 @@ export class TopologyService {
     return this.http.get(`${this.apiUrl}/topology/export`, { responseType: 'blob' });
   }
 
-  importTopology(yamlContent: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/topology/import`, yamlContent, {
+  importTopology(yamlContent: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/topology/import`, yamlContent, {
       headers: { 'Content-Type': 'application/x-yaml' }
     });
   }
@@ -102,12 +103,9 @@ export class TopologyService {
   // --- Legacy (Batch Deploy) ---
 
   deploy(topology: Topology): Observable<any> {
-
     // Usamos el endpoint antiguo que restauramos en el backend
-
     return this.http.post(`${this.apiUrl}/topology/deploy`, topology);
-
   }
-
 }
+
 

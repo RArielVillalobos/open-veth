@@ -3,13 +3,13 @@
   <div class="terminal-panel__header">
     <div class="tabs-container">
       <div 
-        *ngFor="let node of activeNodes()" 
+        *ngFor="let t of ui.activeTerminals()" 
         class="tab" 
-        [class.tab--active]="node === activeTab()"
-        (click)="selectTab.emit(node)">
+        [class.tab--active]="t.nodeId === ui.activeTabId()"
+        (click)="setActiveTab(t.nodeId)">
         <span class="icon">💻</span>
-        <span class="label">{{ node }}</span>
-        <button class="close-btn" (click)="$event.stopPropagation(); closeTerminal.emit(node)">×</button>
+        <span class="label">{{ t.nodeName }}</span>
+        <button class="close-btn" (click)="$event.stopPropagation(); closeTerminal(t.nodeId)">×</button>
       </div>
     </div>
     
@@ -24,11 +24,11 @@
   <!-- Terminal Content (Mantener todos en DOM pero ocultar los inactivos para no perder sesión) -->
   <div class="terminal-panel__body">
     <div 
-      *ngFor="let node of activeNodes()" 
+      *ngFor="let t of ui.activeTerminals()" 
       #termContainer
-      [attr.data-node]="node"
+      [attr.data-node-id]="t.nodeId"
       class="xterm-wrapper"
-      [style.display]="node === activeTab() ? 'block' : 'none'">
+      [class.tab--inactive]="t.nodeId !== ui.activeTabId()">
     </div>
   </div>
 </div>

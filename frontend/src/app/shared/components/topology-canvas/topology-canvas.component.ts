@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild, AfterViewInit, input, output, effect,
 import { CommonModule } from '@angular/common';
 import cytoscape from 'cytoscape';
 import { Node as TopologyNode, Link } from '../../../models/topology.model';
+import { CYTOSCAPE_STYLES } from './cytoscape-styles';
 
 @Component({
   selector: 'app-topology-canvas',
@@ -16,7 +17,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   nodes = input.required<TopologyNode[]>();
   links = input.required<Link[]>();
   terminalNode = input<string | null>(null);
-  edgeCreated = output<Link>();
+  linkRequest = output<{source: string, target: string}>();
   openTerminalRequest = output<string>();
   openSniffRequest = output<{nodeId: string, nodeName: string, iface: string}>();
   nodeMoved = output<{id: string, x: number, y: number}>();
@@ -51,12 +52,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     });
 
     effect(() => {
-      const name = this.terminalNode();
+      const nodeId = this.terminalNode();
       if (!this.cy) return;
       this.cy.nodes().removeClass('terminal-active');
-      if (name) {
-        const match = this.cy.nodes().filter(n => n.data('name') === name);
-        match.addClass('terminal-active');
+      if (nodeId) {
+        const match = this.cy.getElementById(nodeId);
+        if (!match.empty()) match.addClass('terminal-active');
       }
     });
   }
@@ -84,7 +85,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
   onContextMenuAction(action: 'terminal' | 'delete' | 'properties') {
     if (action === 'terminal') {
-      this.openTerminalRequest.emit(this.contextMenu.elementName);
+      this.openTerminalRequest.emit(this.contextMenu.elementId);
     } else if (action === 'properties') {
       if (this.contextMenu.elementType === 'edge') {
         this.linkSelected.emit(this.contextMenu.elementId);
@@ -109,99 +110,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private initCytoscape() {
     this.cy = cytoscape({
       container: this.container.nativeElement,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'label': 'data(label)',
-            'color': '#1e293b',
-            'font-size': '11px',
-            'font-weight': 'bold',
-            'text-valign': 'bottom',
-            'text-wrap': 'wrap',
-            'text-max-width': '150px',
-            'text-margin-y': 6,
-            'width': 56,
-            'height': 48,
-            'shape': 'rectangle',
-            'background-color': 'transparent',
-            'background-opacity': 0,
-            'border-width': 0,
-            'text-outline-color': '#f8fafc',
-            'text-outline-width': 0
-          }
-        },
-        // Router Style
-        {
-          selector: 'node[type="router"]',
-          style: {
-            'background-image': 'assets/icons/router.svg',
-            'background-fit': 'contain',
-            'background-clip': 'none',
-            'width': 52,
-            'height': 52
-          }
-        },
-        // Switch Style
-        {
-          selector: 'node[type="switch"]',
-          style: {
-            'background-image': 'assets/icons/switch.svg',
-            'background-fit': 'contain',
-            'background-clip': 'none',
-            'width': 52,
-            'height': 52
-          }
-        },
-        // Host Style
-        {
-          selector: 'node[type="host"]',
-          style: {
-            'background-image': 'assets/icons/host.svg',
-            'background-fit': 'contain',
-            'background-clip': 'none',
-            'width': 52,
-            'height': 52
-          }
-        },
-        {
-          selector: '.terminal-active',
-          style: {
-            'border-width': 2,
-            'border-color': '#34d399',
-            'border-opacity': 0.9,
-          }
-        },
-        {
-          selector: '.selected-source',
-          style: {
-            'border-width': 3,
-            'border-color': '#8b5cf6',
-            'border-style': 'solid',
-            'background-color': '#ede9fe',
-            'background-opacity': 0.6
-          }
-        },
-        {
-          selector: 'edge',
-          style: {
-            'width': 3,
-            'line-color': '#94a3b8',
-            'curve-style': 'bezier',
-            'source-label': 'data(source_int)',
-            'target-label': 'data(target_int)',
-            'source-text-offset': 32,
-            'target-text-offset': 32,
-            'font-size': '9px',
-            'color': '#6366f1',
-            'text-wrap': 'wrap',
-            'text-background-opacity': 1,
-            'text-background-color': '#eef2ff',
-            'text-background-padding': '2px',
-            'text-background-shape': 'roundrectangle'
-          }
-        }
-      ]
+      style: CYTOSCAPE_STYLES
     });
 
     // --- Event Listeners ---
@@ -218,38 +127,10 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       } else {
         // Mode: End Link
         if (this.sourceNodeId !== clickedId) {
-          
-          // Calculate robust dynamic interface names
-          const getNextInterface = (nodeId: string) => {
-             const usedNames = this.links()
-               .filter(l => l.source === nodeId || l.target === nodeId)
-               .map(l => l.source === nodeId ? l.source_int : l.target_int);
-             
-             const usedNumbers = usedNames
-               .map(name => parseInt(name.replace('eth', ''), 10))
-               .filter(n => !isNaN(n))
-               .sort((a, b) => a - b);
-
-             let nextNum = 1;
-             for (const num of usedNumbers) {
-               if (num === nextNum) {
-                 nextNum++;
-               } else if (num > nextNum) {
-                 break;
-               }
-             }
-             return `eth${nextNum}`;
-          };
-
-          const newLink: Link = {
-            id: 'link-' + Math.random().toString(36).substring(2, 7),
+          this.linkRequest.emit({
             source: this.sourceNodeId,
-            target: clickedId,
-            source_int: getNextInterface(this.sourceNodeId),
-            target_int: getNextInterface(clickedId)
-          };
-          
-          this.edgeCreated.emit(newLink);
+            target: clickedId
+          });
           this.cancelLinking();
         }
       }
@@ -296,15 +177,15 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         elementName: 'Link',
         elementType: 'edge',
         // Populate with correct structure for the event
-        sourceNode: { 
-            nodeId: data.source, 
-            nodeName: sNode?.name || 'A', 
-            iface: data.source_int 
+        sourceNode: {
+            nodeId: data.source,
+            nodeName: sNode?.name || 'A',
+            iface: data.source_int.split('\n')[0]
         },
-        targetNode: { 
-            nodeId: data.target, 
-            nodeName: tNode?.name || 'B', 
-            iface: data.target_int 
+        targetNode: {
+            nodeId: data.target,
+            nodeName: tNode?.name || 'B',
+            iface: data.target_int.split('\n')[0]
         }
       };
     });

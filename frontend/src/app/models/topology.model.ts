@@ -43,3 +43,22 @@ export interface Topology {
   nodes: Node[];
   links: Link[];
 }
+
+export interface Laboratory {
+  id: string;
+  name: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface LaboratoryCreate {
+  id: string;
+  name: string;
+}
+
+export interface SaveStateResponse {
+  message: string;
+  ips_saved: number;
+  routes_saved: number;
+}
+

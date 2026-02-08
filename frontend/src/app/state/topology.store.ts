@@ -1,5 +1,5 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
-import { Topology, Node, Link } from '../models/topology.model';
+import { Topology, Node, Link, Laboratory } from '../models/topology.model';
 import { inject } from '@angular/core';
 import { firstValueFrom, forkJoin } from 'rxjs';
 import { TopologyService } from '../core/services/topology.service';
@@ -7,10 +7,8 @@ import { ToastService } from '../core/services/toast.service';
 
 export interface TopologyState {
   topology: Topology;
-  laboratories: any[]; // List of available labs
+  laboratories: Laboratory[]; // List of available labs
   currentLabId: string;
-  activeTerminals: { nodeId: string, nodeName: string }[];
-  activeCaptures: { nodeId: string, nodeName: string, interfaceName: string }[];
   isLoading: boolean;
   error: string | null;
 }
@@ -26,8 +24,6 @@ const initialState: TopologyState = {
   },
   laboratories: [],
   currentLabId: localStorage.getItem(LAB_ID_KEY) || 'lab-1',
-  activeTerminals: [],
-  activeCaptures: [],
   isLoading: false,
   error: null
 };
@@ -118,7 +114,7 @@ export const TopologyStore = signalStore(
           return;
         }
 
-        const id = 'lab-' + new Date().getTime(); // Simple ID generation
+        const id = 'lab-' + crypto.randomUUID().substring(0, 8);
         patchState(store, { isLoading: true });
         try {
           await firstValueFrom(service.createLaboratory({ id, name }));
@@ -317,33 +313,6 @@ export const TopologyStore = signalStore(
           patchState(store, { isLoading: false, error: msg });
           toast.error(msg);
         }
-      },
-
-      // --- UI Management ---
-      openTerminal(nodeId: string, nodeName: string) {
-        const exists = store.activeTerminals().find(t => t.nodeId === nodeId);
-        if (!exists) {
-          patchState(store, (state) => ({ activeTerminals: [...state.activeTerminals, { nodeId, nodeName }] }));
-        }
-      },
-
-      closeTerminal(nodeId: string) {
-        patchState(store, (state) => ({ activeTerminals: state.activeTerminals.filter(t => t.nodeId !== nodeId) }));
-      },
-
-      openCapture(nodeId: string, nodeName: string, interfaceName: string) {
-        const exists = store.activeCaptures().find(c => c.nodeId === nodeId && c.interfaceName === interfaceName);
-        if (!exists) {
-          patchState(store, (state) => ({ 
-            activeCaptures: [...state.activeCaptures, { nodeId, nodeName, interfaceName }] 
-          }));
-        }
-      },
-
-      closeCapture(nodeId: string, interfaceName: string) {
-        patchState(store, (state) => ({ 
-          activeCaptures: state.activeCaptures.filter(c => !(c.nodeId === nodeId && c.interfaceName === interfaceName)) 
-        }));
       }
     };
   })

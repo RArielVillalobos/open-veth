@@ -45,36 +45,48 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 	}
 
 	// SECURITY: Verify the node exists in our repository before allowing terminal access.
-	// This prevents accessing arbitrary containers on the host.
 	node, found := h.Repo.GetNode(nodeName)
 	if !found {
-		// Also try lookup by name (frontend may send name instead of ID)
+		// Also try lookup by name
 		nodes, err := h.Repo.ListNodes()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify node"})
 			return
 		}
-		found = false
+		
+		// Search for the node, prioritizing the one that is running if there are duplicates
+		var candidates []models.Node
 		for _, n := range nodes {
-			if n.Name == nodeName {
-				node = n
-				found = true
-				break
+			if n.Name == nodeName || n.ID == nodeName {
+				candidates = append(candidates, n)
+			}
+		}
+
+		if len(candidates) > 0 {
+			found = true
+			node = candidates[0]
+			// If we have multiple, try to find the one with a container_id
+			for _, candidate := range candidates {
+				h.hydrateNode(&candidate)
+				if candidate.ContainerID != "" {
+					node = candidate
+					break
+				}
 			}
 		}
 	}
+
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
+
 	h.hydrateNode(&node)
 	if node.ContainerID == "" {
+		h.Logger.Warn("terminal request for stopped node", "name", node.Name, "id", node.ID)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
 		return
 	}
-
-	// Use the validated container ID instead of raw user input
-	containerID := node.ContainerID
 
 	// 1. Upgrade HTTP to WebSocket
 	ws, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
@@ -84,7 +96,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 	}
 	defer ws.Close()
 
-	// 2. Prepare command (bash for now, could detect router for vtysh)
+	// 2. Prepare command (standard bash for all nodes)
 	shell := "bash"
 
 	execConfig := container.ExecOptions{
@@ -97,7 +109,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 
 	// 3. Create exec instance in container
 	ctx := c.Request.Context()
-	execID, err := h.Manager.GetDockerClient().ContainerExecCreate(ctx, containerID, execConfig)
+	execID, err := h.Manager.GetDockerClient().ContainerExecCreate(ctx, node.ContainerID, execConfig)
 	if err != nil {
 		h.Logger.Error("failed to create exec", "node", node.Name, "error", err)
 		return

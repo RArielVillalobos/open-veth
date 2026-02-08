@@ -1,7 +1,9 @@
-import { Component, ElementRef, ViewChildren, QueryList, AfterViewInit, OnDestroy, input, output, effect } from '@angular/core';
+import { Component, ElementRef, ViewChildren, QueryList, AfterViewInit, OnDestroy, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
+import { UIStore } from '../../../state/ui.store';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-terminal-panel',
@@ -11,13 +13,7 @@ import { FitAddon } from 'xterm-addon-fit';
   styleUrl: './terminal-panel.component.scss'
 })
 export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
-  // Inputs: Lista de nodos que tienen terminal abierta
-  activeNodes = input.required<string[]>();
-  // Input: Cuál es la pestaña activa
-  activeTab = input.required<string | null>();
-
-  closeTerminal = output<string>();
-  selectTab = output<string>();
+  readonly ui = inject(UIStore);
 
   @ViewChildren('termContainer') termContainers!: QueryList<ElementRef>;
 
@@ -26,18 +22,18 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
   constructor() {
     // Reaccionar a cambios en la lista de nodos activos
     effect(() => {
-      const nodes = this.activeNodes();
+      const terminalConfigs = this.ui.activeTerminals();
       // Esperar a que el DOM se actualice para inicializar nuevas terminales
-      setTimeout(() => this.syncTerminals(nodes), 0);
+      setTimeout(() => this.syncTerminals(terminalConfigs), 0);
     });
 
     // Reaccionar a cambio de pestaña para ajustar tamaño (fit)
     effect(() => {
-        const currentTab = this.activeTab();
-        if (currentTab && this.terminals.has(currentTab)) {
+        const currentTabId = this.ui.activeTabId();
+        if (currentTabId && this.terminals.has(currentTabId)) {
             setTimeout(() => {
-                this.terminals.get(currentTab)?.fit.fit();
-                this.terminals.get(currentTab)?.term.focus();
+                this.terminals.get(currentTabId)?.fit.fit();
+                this.terminals.get(currentTabId)?.term.focus();
             }, 50);
         }
     });
@@ -45,7 +41,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     // Inicialización inicial si ya hay nodos
-    this.syncTerminals(this.activeNodes());
+    this.syncTerminals(this.ui.activeTerminals());
   }
 
   ngOnDestroy() {
@@ -56,27 +52,33 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     this.terminals.clear();
   }
 
-  setActiveTab(nodeName: string) {
-    this.selectTab.emit(nodeName);
+  setActiveTab(nodeId: string) {
+    this.ui.setActiveTab(nodeId);
+  }
+
+  closeTerminal(nodeId: string) {
+    this.ui.closeTerminal(nodeId);
   }
 
   clearActiveTerminal() {
-    const active = this.activeTab();
-    if (active && this.terminals.has(active)) {
-      const { term } = this.terminals.get(active)!;
+    const activeId = this.ui.activeTabId();
+    if (activeId && this.terminals.has(activeId)) {
+      const { term } = this.terminals.get(activeId)!;
       term.clear();          // Borra el buffer de scrollback
       term.reset();          // Resetea el estado de la terminal
       term.focus();
     }
   }
 
-  private syncTerminals(nodes: string[]) {
+  private syncTerminals(terminalConfigs: {nodeId: string, nodeName: string}[]) {
+    const activeIds = terminalConfigs.map(t => t.nodeId);
+
     // 1. Eliminar terminales cerradas
-    for (const [name, instance] of this.terminals) {
-      if (!nodes.includes(name)) {
+    for (const [id, instance] of this.terminals) {
+      if (!activeIds.includes(id)) {
         instance.socket.close();
         instance.term.dispose();
-        this.terminals.delete(name);
+        this.terminals.delete(id);
       }
     }
 
@@ -84,14 +86,17 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     if (!this.termContainers) return;
 
     this.termContainers.forEach((el) => {
-      const nodeName = el.nativeElement.getAttribute('data-node');
-      if (nodes.includes(nodeName) && !this.terminals.has(nodeName)) {
-        this.createTerminal(nodeName, el.nativeElement);
+      const nodeId = el.nativeElement.getAttribute('data-node-id');
+      if (activeIds.includes(nodeId) && !this.terminals.has(nodeId)) {
+        const config = terminalConfigs.find(t => t.nodeId === nodeId);
+        if (config) {
+          this.createTerminal(config.nodeId, config.nodeName, el.nativeElement);
+        }
       }
     });
   }
 
-  private createTerminal(nodeName: string, container: HTMLElement) {
+  private createTerminal(nodeId: string, nodeName: string, container: HTMLElement) {
     const term = new Terminal({
       cursorBlink: true,
       theme: {
@@ -107,11 +112,25 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-    term.open(container);
-    fitAddon.fit();
+    
+    // Safety: only open and fit if container is available and has size
+    setTimeout(() => {
+        if (container.clientWidth > 0) {
+            term.open(container);
+            fitAddon.fit();
+        } else {
+            // Fallback: wait a bit more if still zero (e.g. during animations)
+            setTimeout(() => {
+                term.open(container);
+                if (container.clientWidth > 0) fitAddon.fit();
+            }, 100);
+        }
+    }, 0);
 
     // WebSocket Connection
-    const wsUrl = `ws://localhost:8080/api/v1/terminal?node=${nodeName}`;
+    // Calculate WebSocket URL from API URL (handling http->ws and https->wss)
+    const baseWsUrl = environment.apiUrl.replace(/^http/, 'ws');
+    const wsUrl = `${baseWsUrl}/terminal?node=${nodeId}`;
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
@@ -135,6 +154,6 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
     socket.onclose = () => term.writeln('\r\n\x1b[31m✖ Connection closed.\x1b[0m');
 
-    this.terminals.set(nodeName, { term, fit: fitAddon, socket });
+    this.terminals.set(nodeId, { term, fit: fitAddon, socket });
   }
 }

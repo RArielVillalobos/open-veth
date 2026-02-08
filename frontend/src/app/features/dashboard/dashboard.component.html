@@ -64,11 +64,11 @@
             <app-topology-canvas
                 [nodes]="store.topology().nodes"
                 [links]="store.topology().links"
-                [terminalNode]="activeTab()"
-                (edgeCreated)="store.addLink($event)"
+                [terminalNode]="ui.activeTabId()"
+                (linkRequest)="onLinkRequest($event)"
                 (nodeMoved)="store.updateNodePosition($event.id, $event.x, $event.y)"
                 (openTerminalRequest)="openTerminal($event)"
-                (openSniffRequest)="store.openCapture($event.nodeId, $event.nodeName, $event.iface)"
+                (openSniffRequest)="ui.openCapture($event.nodeId, $event.nodeName, $event.iface)"
                 (nodeSelected)="onNodeSelected($event)"
                 (linkSelected)="onLinkSelected($event)"
                 (nodeDelete)="onDeleteNode($event)"
@@ -77,14 +77,9 @@
           </div>
           
           <!-- Integrated Terminal (Only takes space from center) -->
-          <div *ngIf="activeTerminals().length > 0" 
+          <div *ngIf="ui.isTerminalPanelOpen()" 
                class="h-64 border-t border-slate-700 bg-slate-900 shrink-0 z-10 overflow-hidden">
-            <app-terminal-panel 
-              [activeNodes]="activeTerminals()" 
-              [activeTab]="activeTab()"
-              (closeTerminal)="closeTerminal($event)"
-              (selectTab)="setActiveTab($event)">
-            </app-terminal-panel>
+            <app-terminal-panel></app-terminal-panel>
           </div>
       </div>
 
@@ -92,7 +87,7 @@
       <app-properties-panel *ngIf="selectedNode() || selectedLink()" class="shrink-0"
           [selectedNode]="selectedNode()"
           [selectedLink]="selectedLink()"
-          (openTerminal)="openTerminal($event)"
+          (openTerminal)="selectedNode() && openTerminal(selectedNode()!.id)"
           (openCapture)="onOpenCapture($any($event))"
           (deleteNode)="onDeleteNode($event)"
           (deleteLink)="onDeleteLink($event)"
@@ -101,31 +96,20 @@
   </div>
 
   <!-- Floating Windows Layer (Captures) -->
-  <div class="fixed inset-0 pointer-events-none z-50 p-8">
-    @for (cap of store.activeCaptures(); track cap.nodeId + cap.interfaceName) {
-      <div class="absolute bottom-8 right-8 pointer-events-auto">
-        <app-packet-capture-window 
-          [nodeId]="cap.nodeId"
-          [nodeName]="cap.nodeName"
-          [interfaceName]="cap.interfaceName"
-          (onClose)="store.closeCapture(cap.nodeId, cap.interfaceName)">
-        </app-packet-capture-window>
-      </div>
-    }
-  </div>
+  <app-capture-container></app-capture-container>
 
   <!-- Global Toasts -->
   <app-toast></app-toast>
 
   <!-- Lab Manager Modal -->
-  <app-lab-manager *ngIf="showLabManager()" (close)="showLabManager.set(false)"></app-lab-manager>
+  <app-lab-manager *ngIf="ui.isLabManagerOpen()" (close)="ui.toggleLabManager(false)"></app-lab-manager>
 
   <!-- Welcome / Start Screen -->
   <app-welcome-modal
     *ngIf="showWelcomeModal()"
-    (createLab)="userHasInteracted.set(true)"
+    (createLab)="ui.markInteraction()"
     (importLab)="fileInput.click()"
-    (openLabManager)="showLabManager.set(true)"
-    (close)="userHasInteracted.set(true)">
+    (openLabManager)="ui.toggleLabManager(true)"
+    (close)="ui.markInteraction()">
   </app-welcome-modal>
 </div>
