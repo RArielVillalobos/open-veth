@@ -16,7 +16,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   nodes = input.required<TopologyNode[]>();
   links = input.required<Link[]>();
   terminalNode = input<string | null>(null);
-  edgeCreated = output<Link>();
+  linkRequest = output<{source: string, target: string}>();
   openTerminalRequest = output<string>();
   openSniffRequest = output<{nodeId: string, nodeName: string, iface: string}>();
   nodeMoved = output<{id: string, x: number, y: number}>();
@@ -51,12 +51,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     });
 
     effect(() => {
-      const name = this.terminalNode();
+      const nodeId = this.terminalNode();
       if (!this.cy) return;
       this.cy.nodes().removeClass('terminal-active');
-      if (name) {
-        const match = this.cy.nodes().filter(n => n.data('name') === name);
-        match.addClass('terminal-active');
+      if (nodeId) {
+        const match = this.cy.getElementById(nodeId);
+        if (!match.empty()) match.addClass('terminal-active');
       }
     });
   }
@@ -84,7 +84,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
   onContextMenuAction(action: 'terminal' | 'delete' | 'properties') {
     if (action === 'terminal') {
-      this.openTerminalRequest.emit(this.contextMenu.elementName);
+      this.openTerminalRequest.emit(this.contextMenu.elementId);
     } else if (action === 'properties') {
       if (this.contextMenu.elementType === 'edge') {
         this.linkSelected.emit(this.contextMenu.elementId);
@@ -218,38 +218,10 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       } else {
         // Mode: End Link
         if (this.sourceNodeId !== clickedId) {
-          
-          // Calculate robust dynamic interface names
-          const getNextInterface = (nodeId: string) => {
-             const usedNames = this.links()
-               .filter(l => l.source === nodeId || l.target === nodeId)
-               .map(l => l.source === nodeId ? l.source_int : l.target_int);
-             
-             const usedNumbers = usedNames
-               .map(name => parseInt(name.replace('eth', ''), 10))
-               .filter(n => !isNaN(n))
-               .sort((a, b) => a - b);
-
-             let nextNum = 1;
-             for (const num of usedNumbers) {
-               if (num === nextNum) {
-                 nextNum++;
-               } else if (num > nextNum) {
-                 break;
-               }
-             }
-             return `eth${nextNum}`;
-          };
-
-          const newLink: Link = {
-            id: 'link-' + Math.random().toString(36).substring(2, 7),
+          this.linkRequest.emit({
             source: this.sourceNodeId,
-            target: clickedId,
-            source_int: getNextInterface(this.sourceNodeId),
-            target_int: getNextInterface(clickedId)
-          };
-          
-          this.edgeCreated.emit(newLink);
+            target: clickedId
+          });
           this.cancelLinking();
         }
       }
