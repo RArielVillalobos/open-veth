@@ -88,6 +88,10 @@ func (h *Handler) CreateNode(c *gin.Context) {
 	node.PID = pid
 
 	h.Logger.Info("node created", "name", node.Name, "container_id", containerID[:12])
+
+	// Broadcast node creation event
+	h.BroadcastNodeCreated(node.ID, node.LabID, string(node.Type))
+
 	c.JSON(http.StatusCreated, node)
 }
 

@@ -11,23 +11,25 @@ import (
 
 // Handler contains shared dependencies for all handlers
 type Handler struct {
-	Manager *orchestrator.Manager
-	Network *orchestrator.NetworkManager
-	Repo    storage.Repository
-	Runtime *RuntimeStore
-	Logger  *slog.Logger
-	Config  *config.Config
+	Manager  *orchestrator.Manager
+	Network  *orchestrator.NetworkManager
+	Repo     storage.Repository
+	Runtime  *RuntimeStore
+	Logger   *slog.Logger
+	Config   *config.Config
+	EventHub *NetworkEventHub
 }
 
 // NewHandler creates a new handler with all dependencies
 func NewHandler(mgr *orchestrator.Manager, repo storage.Repository, logger *slog.Logger, cfg *config.Config) *Handler {
 	return &Handler{
-		Manager: mgr,
-		Network: orchestrator.NewNetworkManager(),
-		Repo:    repo,
-		Runtime: NewRuntimeStore(),
-		Logger:  logger,
-		Config:  cfg,
+		Manager:  mgr,
+		Network:  orchestrator.NewNetworkManager(),
+		Repo:     repo,
+		Runtime:  NewRuntimeStore(),
+		Logger:   logger,
+		Config:   cfg,
+		EventHub: NewNetworkEventHub(),
 	}
 }
 

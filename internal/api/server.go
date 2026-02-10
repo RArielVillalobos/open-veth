@@ -71,6 +71,7 @@ func (s *Server) setupRoutes() {
 		// WebSocket endpoints
 		api.GET("/terminal", s.handler.HandleTerminal)
 		api.GET("/sniff", s.handler.HandleSniff)
+		api.GET("/events", s.handler.HandleNetworkEvents)
 
 		// Nodes
 		api.GET("/nodes", s.handler.ListNodes)
@@ -153,6 +154,21 @@ func (s *Server) StartAutoSave(interval time.Duration) {
 func (s *Server) StopAutoSave() {
 	if s.autoSaveStop != nil {
 		close(s.autoSaveStop)
+	}
+}
+
+// StartEventHub starts the network events hub in a background goroutine
+func (s *Server) StartEventHub() {
+	if s.handler.EventHub != nil {
+		s.logger.Info("starting network events hub")
+		go s.handler.EventHub.Run()
+	}
+}
+
+// StopEventHub signals the network events hub to shut down
+func (s *Server) StopEventHub() {
+	if s.handler.EventHub != nil {
+		s.handler.EventHub.Stop()
 	}
 }
 

@@ -118,6 +118,10 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		return
 	}
 	h.Logger.Info("link created", "id", link.ID)
+
+	// Broadcast link creation event
+	h.BroadcastLinkCreated(link.ID, link.LabID, link.SourceID, link.TargetID)
+
 	c.JSON(http.StatusCreated, link)
 }
 

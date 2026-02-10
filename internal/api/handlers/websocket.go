@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"open-veth/internal/models"
@@ -53,7 +54,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify node"})
 			return
 		}
-		
+
 		// Search for the node, prioritizing the one that is running if there are duplicates
 		var candidates []models.Node
 		for _, n := range nodes {
@@ -129,6 +130,9 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 
 	// 5. Bidirectional data bridge
 
+	// Buffer to accumulate terminal input
+	var inputBuffer strings.Builder
+
 	// Output: Docker -> WebSocket
 	go func() {
 		buf := make([]byte, 1024)
@@ -151,12 +155,89 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		if err != nil {
 			break
 		}
+
+		cmd := string(msg)
+
+		// Handle special keys and control characters
+		if len(cmd) == 1 {
+			switch cmd[0] {
+			case '\r', '\n':
+				// Enter pressed - process the accumulated command
+				fullCmd := strings.TrimSpace(inputBuffer.String())
+				inputBuffer.Reset()
+
+				if fullCmd != "" {
+					h.Logger.Debug("terminal command executed", "node", node.Name, "cmd", fullCmd)
+
+					if isNetworkConfigCommand(fullCmd) {
+						h.Logger.Debug("network config command detected", "node", node.Name, "cmd", fullCmd)
+						go func(nodeID, labID string) {
+							// Wait for command to execute, then broadcast interface change
+							time.Sleep(1 * time.Second)
+							h.BroadcastInterfaceChanged(nodeID, labID)
+						}(node.ID, node.LabID)
+					}
+				}
+
+			case '\b', 0x7F:
+				// Backspace - remove last character
+				current := inputBuffer.String()
+				if len(current) > 0 {
+					inputBuffer.Reset()
+					inputBuffer.WriteString(current[:len(current)-1])
+				}
+
+			case 0x03, 0x04:
+				// Ctrl+C or Ctrl+D - clear buffer
+				inputBuffer.Reset()
+
+			default:
+				// Only accept printable ASCII characters (32-126)
+				if cmd[0] >= 32 && cmd[0] <= 126 {
+					inputBuffer.WriteString(cmd)
+				}
+			}
+		} else if len(cmd) > 1 {
+			// Multi-character input - likely escape sequences (arrow keys, etc.)
+			// Ignore escape sequences but accept printable characters
+			for _, ch := range cmd {
+				if ch >= 32 && ch <= 126 {
+					inputBuffer.WriteRune(ch)
+				}
+			}
+		}
+
 		if _, err := resp.Conn.Write(msg); err != nil {
 			break
 		}
 	}
 
 	h.Logger.Info("terminal session ended", "node", node.Name)
+}
+
+// isNetworkConfigCommand checks if the input is a network configuration command
+// that may change interface state (IP assignment, link up/down, etc.)
+func isNetworkConfigCommand(input string) bool {
+	input = strings.ToLower(strings.TrimSpace(input))
+	if input == "" {
+		return false
+	}
+
+	networkCommands := []string{
+		"ip addr",
+		"ip address",
+		"ifconfig",
+		"vtysh",
+		"ip link",
+	}
+
+	for _, cmd := range networkCommands {
+		if strings.HasPrefix(input, cmd) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // HandleSniff starts a live capture session over WebSockets

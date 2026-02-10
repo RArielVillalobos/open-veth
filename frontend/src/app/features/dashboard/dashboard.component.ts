@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed, effect } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../state/topology.store';
 import { UIStore } from '../../state/ui.store';
@@ -7,6 +7,7 @@ import { CaptureStore } from '../../state/capture.store';
 import { TopologyService } from '../../core/services/topology.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { ToastService } from '../../core/services/toast.service';
+import { NetworkEventsService } from '../../core/services/network-events.service';
 import { NodePaletteComponent } from './components/node-palette/node-palette.component';
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel.component';
 import { CaptureContainerComponent } from './components/capture-container/capture-container.component';
@@ -35,7 +36,7 @@ import { FileService } from '../../core/services/file.service';
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   readonly store = inject(TopologyStore);
   readonly ui = inject(UIStore);
   readonly terminalStore = inject(TerminalStore);
@@ -44,6 +45,7 @@ export class DashboardComponent implements OnInit {
   private layoutService = inject(LayoutService);
   private toast = inject(ToastService);
   private fileService = inject(FileService);
+  private networkEvents = inject(NetworkEventsService);
 
   // Mostrar modal solo cuando la carga terminó, la topología está vacía y el usuario no ha interactuado
   showWelcomeModal = computed(() =>
@@ -79,6 +81,13 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() {
     this.store.loadTopology();
+    // Connect to real-time network events
+    this.networkEvents.connect();
+  }
+
+  ngOnDestroy() {
+    // Automatic cleanup via DestroyRef, but explicit disconnect is also fine
+    this.networkEvents.disconnect();
   }
 
   onNodeSelected(id: string | null) {
