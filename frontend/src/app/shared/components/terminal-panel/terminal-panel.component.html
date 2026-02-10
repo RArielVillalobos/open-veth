@@ -3,9 +3,9 @@
   <div class="terminal-panel__header">
     <div class="tabs-container">
       <div 
-        *ngFor="let t of ui.activeTerminals()" 
+        *ngFor="let t of terminalStore.sessions()" 
         class="tab" 
-        [class.tab--active]="t.nodeId === ui.activeTabId()"
+        [class.tab--active]="t.nodeId === terminalStore.activeNodeId()"
         (click)="setActiveTab(t.nodeId)">
         <span class="icon">💻</span>
         <span class="label">{{ t.nodeName }}</span>
@@ -24,11 +24,11 @@
   <!-- Terminal Content (Mantener todos en DOM pero ocultar los inactivos para no perder sesión) -->
   <div class="terminal-panel__body">
     <div 
-      *ngFor="let t of ui.activeTerminals()" 
+      *ngFor="let t of terminalStore.sessions()" 
       #termContainer
       [attr.data-node-id]="t.nodeId"
       class="xterm-wrapper"
-      [class.tab--inactive]="t.nodeId !== ui.activeTabId()">
+      [class.tab--inactive]="t.nodeId !== terminalStore.activeNodeId()">
     </div>
   </div>
 </div>

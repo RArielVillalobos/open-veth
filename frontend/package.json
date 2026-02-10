@@ -6,7 +6,10 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test --no-watch",
+    "test:watch": "ng test",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "prettier": {
     "printWidth": 100,
@@ -43,12 +46,14 @@
     "@angular/build": "^21.1.2",
     "@angular/cli": "^21.1.2",
     "@angular/compiler-cli": "^21.1.0",
+    "@playwright/test": "^1.58.2",
     "@types/cytoscape": "^3.21.9",
     "autoprefixer": "^10.4.23",
     "jsdom": "^27.1.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.1",
     "typescript": "~5.9.2",
+    "vite": "^7.3.1",
     "vitest": "^4.0.8"
   }
 }

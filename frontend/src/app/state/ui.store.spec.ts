@@ -14,9 +14,9 @@ describe('UIStore', () => {
 
   it('should have initial state', () => {
     expect(store.selectedNodeId()).toBeNull();
-    expect(store.activeTerminals()).toEqual([]);
-    expect(store.activeTabId()).toBeNull();
-    expect(store.isTerminalPanelOpen()).toBe(false);
+    expect(store.selectedLinkId()).toBeNull();
+    expect(store.isLabManagerOpen()).toBe(false);
+    expect(store.hasUserInteracted()).toBe(false);
   });
 
   describe('Selection Logic', () => {
@@ -40,66 +40,21 @@ describe('UIStore', () => {
     });
   });
 
-  describe('Terminal Tab Logic', () => {
-    it('should add a terminal and set it as active tab', () => {
-      store.openTerminal('node-1', 'Router-1');
-      expect(store.activeTerminals()).toContainEqual({ nodeId: 'node-1', nodeName: 'Router-1' });
-      expect(store.activeTabId()).toBe('node-1');
-    });
-
-    it('should not add duplicate terminals but update active tab', () => {
-      store.openTerminal('node-1', 'Router-1');
-      store.openTerminal('node-2', 'Host-1');
-      store.setActiveTab('node-1');
-      
-      store.openTerminal('node-1', 'Router-1'); // Re-opening
-      expect(store.activeTerminals().length).toBe(2);
-      expect(store.activeTabId()).toBe('node-1');
-    });
-
-    it('should switch to last tab when closing current active tab', () => {
-      store.openTerminal('node-a', 'Node-A');
-      store.openTerminal('node-b', 'Node-B');
-      store.openTerminal('node-c', 'Node-C'); // Active tab is node-c
-      
-      store.closeTerminal('node-c');
-      
-      expect(store.activeTerminals().find(t => t.nodeId === 'node-c')).toBeUndefined();
-      expect(store.activeTabId()).toBe('node-b'); // Switched to last remaining
-    });
-
-    it('should set active tab to null when closing the last terminal', () => {
-      store.openTerminal('node-a', 'Node-A');
-      store.closeTerminal('node-a');
-      
-      expect(store.activeTerminals()).toEqual([]);
-      expect(store.activeTabId()).toBeNull();
-    });
-
-    it('should keep current tab if closing a non-active terminal', () => {
-      store.openTerminal('node-a', 'Node-A');
-      store.openTerminal('node-b', 'Node-B');
-      store.setActiveTab('node-b');
-      
-      store.closeTerminal('node-a');
-      
-      expect(store.activeTabId()).toBe('node-b');
-    });
-  });
-
   it('should mark user interaction', () => {
     expect(store.hasUserInteracted()).toBe(false);
     store.markInteraction();
     expect(store.hasUserInteracted()).toBe(true);
   });
 
+  it('should toggle lab manager', () => {
+    store.toggleLabManager(true);
+    expect(store.isLabManagerOpen()).toBe(true);
+    expect(store.hasUserInteracted()).toBe(true);
+  });
+
   it('should reset session state', () => {
     store.selectNode('node-1');
-    store.openTerminal('node-a', 'Node-A');
-    
     store.resetSession();
-    
     expect(store.selectedNodeId()).toBeNull();
-    expect(store.activeTerminals()).toEqual([]);
   });
 });

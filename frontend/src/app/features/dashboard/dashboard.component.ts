@@ -2,6 +2,8 @@ import { Component, inject, signal, OnInit, computed, effect } from '@angular/co
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../state/topology.store';
 import { UIStore } from '../../state/ui.store';
+import { TerminalStore } from '../../state/terminal.store';
+import { CaptureStore } from '../../state/capture.store';
 import { TopologyService } from '../../core/services/topology.service';
 import { LayoutService } from '../../core/services/layout.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -14,6 +16,7 @@ import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { LabManagerComponent } from './components/lab-manager/lab-manager.component';
 import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
 import { firstValueFrom } from 'rxjs';
+import { FileService } from '../../core/services/file.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -35,9 +38,12 @@ import { firstValueFrom } from 'rxjs';
 export class DashboardComponent implements OnInit {
   readonly store = inject(TopologyStore);
   readonly ui = inject(UIStore);
+  readonly terminalStore = inject(TerminalStore);
+  readonly captureStore = inject(CaptureStore);
   private service = inject(TopologyService);
   private layoutService = inject(LayoutService);
   private toast = inject(ToastService);
+  private fileService = inject(FileService);
 
   // Mostrar modal solo cuando la carga terminó, la topología está vacía y el usuario no ha interactuado
   showWelcomeModal = computed(() =>
@@ -53,7 +59,7 @@ export class DashboardComponent implements OnInit {
   );
 
   activeTerminalNodeName = computed(() => {
-    const activeTabId = this.ui.activeTabId();
+    const activeTabId = this.terminalStore.activeNodeId();
     return this.store.topology().nodes.find(n => n.id === activeTabId)?.name || null;
   });
 
@@ -64,6 +70,8 @@ export class DashboardComponent implements OnInit {
       const currentId = this.store.topology().id;
       if (this.lastLabId !== null && this.lastLabId !== currentId) {
         this.ui.resetSession();
+        this.terminalStore.closeAll();
+        this.captureStore.closeAll();
       }
       this.lastLabId = currentId;
     });
@@ -111,6 +119,7 @@ export class DashboardComponent implements OnInit {
   onDeleteNode(id: string) {
     this.store.removeNode(id);
     this.ui.clearSelection();
+    this.terminalStore.closeTerminal(id);
   }
 
   onDeleteLink(id: string) {
@@ -125,14 +134,10 @@ export class DashboardComponent implements OnInit {
   async onExport() {
     try {
       const blob = await firstValueFrom(this.service.exportTopology());
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `topology-${new Date().getTime()}.yaml`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      this.fileService.downloadBlob(blob, `topology-${new Date().getTime()}.yaml`);
     } catch (err) {
       console.error('Failed to export topology', err);
+      this.toast.error('Export failed');
     }
   }
 
@@ -141,34 +146,30 @@ export class DashboardComponent implements OnInit {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e: any) => {
-      const content = e.target.result;
-      try {
-        await firstValueFrom(this.service.importTopology(content));
-        this.toast.success('Topology imported successfully');
-        this.store.loadTopology();
-      } catch (err: any) {
-        console.error('Failed to import topology', err);
-        this.toast.error('Import failed: ' + (err.error?.error || err.message));
-      }
-    };
-    reader.readAsText(file);
-
-    event.target.value = '';
+    try {
+      const content = await this.fileService.readAsText(file);
+      await firstValueFrom(this.service.importTopology(content));
+      this.toast.success('Topology imported successfully');
+      this.store.loadTopology();
+    } catch (err: any) {
+      console.error('Failed to import topology', err);
+      this.toast.error('Import failed: ' + (err.error?.error || err.message));
+    } finally {
+      event.target.value = '';
+    }
   }
 
   openTerminal(nodeId: string) {
     const node = this.store.topology().nodes.find(n => n.id === nodeId);
     if (node) {
-      this.ui.openTerminal(nodeId, node.name);
+      this.terminalStore.openTerminal(nodeId, node.name);
     }
   }
 
   onOpenCapture(iface: string) {
     const node = this.selectedNode();
     if (node) {
-      this.ui.openCapture(node.id, node.name, iface);
+      this.captureStore.openCapture(node.id, node.name, iface);
     }
   }
 
@@ -177,6 +178,8 @@ export class DashboardComponent implements OnInit {
     if (confirm(`Are you sure you want to delete all nodes and links in "${labName}"? This cannot be undone.`)) {
       this.store.cleanupCurrentLab();
       this.ui.resetSession();
+      this.terminalStore.closeAll();
+      this.captureStore.closeAll();
     }
   }
 

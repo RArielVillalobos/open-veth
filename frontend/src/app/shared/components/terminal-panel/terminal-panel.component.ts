@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { UIStore } from '../../../state/ui.store';
+import { TerminalStore } from '../../../state/terminal.store';
 import { environment } from '../../../../environments/environment';
+import { TerminalSession } from '../../../models/terminal.model';
 
 @Component({
   selector: 'app-terminal-panel',
@@ -14,6 +16,7 @@ import { environment } from '../../../../environments/environment';
 })
 export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
   readonly ui = inject(UIStore);
+  readonly terminalStore = inject(TerminalStore);
 
   @ViewChildren('termContainer') termContainers!: QueryList<ElementRef>;
 
@@ -22,14 +25,14 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
   constructor() {
     // Reaccionar a cambios en la lista de nodos activos
     effect(() => {
-      const terminalConfigs = this.ui.activeTerminals();
+      const sessions = this.terminalStore.sessions();
       // Esperar a que el DOM se actualice para inicializar nuevas terminales
-      setTimeout(() => this.syncTerminals(terminalConfigs), 0);
+      setTimeout(() => this.syncTerminals(sessions), 0);
     });
 
     // Reaccionar a cambio de pestaña para ajustar tamaño (fit)
     effect(() => {
-        const currentTabId = this.ui.activeTabId();
+        const currentTabId = this.terminalStore.activeNodeId();
         if (currentTabId && this.terminals.has(currentTabId)) {
             setTimeout(() => {
                 this.terminals.get(currentTabId)?.fit.fit();
@@ -41,7 +44,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     // Inicialización inicial si ya hay nodos
-    this.syncTerminals(this.ui.activeTerminals());
+    this.syncTerminals(this.terminalStore.sessions());
   }
 
   ngOnDestroy() {
@@ -53,15 +56,15 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
   }
 
   setActiveTab(nodeId: string) {
-    this.ui.setActiveTab(nodeId);
+    this.terminalStore.setActive(nodeId);
   }
 
   closeTerminal(nodeId: string) {
-    this.ui.closeTerminal(nodeId);
+    this.terminalStore.closeTerminal(nodeId);
   }
 
   clearActiveTerminal() {
-    const activeId = this.ui.activeTabId();
+    const activeId = this.terminalStore.activeNodeId();
     if (activeId && this.terminals.has(activeId)) {
       const { term } = this.terminals.get(activeId)!;
       term.clear();          // Borra el buffer de scrollback
@@ -70,8 +73,8 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private syncTerminals(terminalConfigs: {nodeId: string, nodeName: string}[]) {
-    const activeIds = terminalConfigs.map(t => t.nodeId);
+  private syncTerminals(sessions: TerminalSession[]) {
+    const activeIds = sessions.map(s => s.nodeId);
 
     // 1. Eliminar terminales cerradas
     for (const [id, instance] of this.terminals) {
@@ -88,9 +91,9 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     this.termContainers.forEach((el) => {
       const nodeId = el.nativeElement.getAttribute('data-node-id');
       if (activeIds.includes(nodeId) && !this.terminals.has(nodeId)) {
-        const config = terminalConfigs.find(t => t.nodeId === nodeId);
-        if (config) {
-          this.createTerminal(config.nodeId, config.nodeName, el.nativeElement);
+        const session = sessions.find(s => s.nodeId === nodeId);
+        if (session) {
+          this.createTerminal(session.nodeId, session.nodeName, el.nativeElement);
         }
       }
     });

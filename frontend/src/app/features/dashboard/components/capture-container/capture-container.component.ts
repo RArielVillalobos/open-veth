@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { UIStore } from '../../../../state/ui.store';
+import { CaptureStore } from '../../../../state/capture.store';
 import { PacketCaptureWindowComponent } from '../../../../shared/components/packet-capture-window/packet-capture-window.component';
 
 @Component({
@@ -9,13 +9,13 @@ import { PacketCaptureWindowComponent } from '../../../../shared/components/pack
   imports: [CommonModule, PacketCaptureWindowComponent],
   template: `
     <div class="fixed inset-0 pointer-events-none z-50 p-8">
-      @for (cap of ui.activeCaptures(); track cap.nodeId + cap.interfaceName) {
+      @for (cap of captureStore.sessions(); track cap.nodeId + cap.interfaceName) {
         <div class="absolute bottom-8 right-8 pointer-events-auto">
           <app-packet-capture-window 
             [nodeId]="cap.nodeId"
             [nodeName]="cap.nodeName"
             [interfaceName]="cap.interfaceName"
-            (onClose)="ui.closeCapture(cap.nodeId, cap.interfaceName)">
+            (onClose)="captureStore.closeCapture(cap.nodeId, cap.interfaceName)">
           </app-packet-capture-window>
         </div>
       }
@@ -26,5 +26,5 @@ import { PacketCaptureWindowComponent } from '../../../../shared/components/pack
   `]
 })
 export class CaptureContainerComponent {
-  readonly ui = inject(UIStore);
+  readonly captureStore = inject(CaptureStore);
 }

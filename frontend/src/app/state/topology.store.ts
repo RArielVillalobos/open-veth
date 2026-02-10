@@ -16,6 +16,14 @@ export interface TopologyState {
 
 const LAB_ID_KEY = 'openveth_current_lab_id';
 
+const getInitialLabId = () => {
+  try {
+    return (typeof localStorage !== 'undefined' && localStorage.getItem(LAB_ID_KEY)) || 'lab-1';
+  } catch {
+    return 'lab-1';
+  }
+};
+
 const initialState: TopologyState = {
   topology: {
     id: 'lab-1',
@@ -24,7 +32,7 @@ const initialState: TopologyState = {
     links: []
   },
   laboratories: [],
-  currentLabId: localStorage.getItem(LAB_ID_KEY) || 'lab-1',
+  currentLabId: getInitialLabId(),
   isLoading: false,
   error: null
 };

@@ -64,11 +64,11 @@
             <app-topology-canvas
                 [nodes]="store.topology().nodes"
                 [links]="store.topology().links"
-                [terminalNode]="ui.activeTabId()"
+                [terminalNode]="terminalStore.activeNodeId()"
                 (linkRequest)="onLinkRequest($event)"
                 (nodeMoved)="store.updateNodePosition($event.id, $event.x, $event.y)"
                 (openTerminalRequest)="openTerminal($event)"
-                (openSniffRequest)="ui.openCapture($event.nodeId, $event.nodeName, $event.iface)"
+                (openSniffRequest)="captureStore.openCapture($event.nodeId, $event.nodeName, $event.iface)"
                 (nodeSelected)="onNodeSelected($event)"
                 (linkSelected)="onLinkSelected($event)"
                 (nodeDelete)="onDeleteNode($event)"
@@ -77,7 +77,7 @@
           </div>
           
           <!-- Integrated Terminal (Only takes space from center) -->
-          <div *ngIf="ui.isTerminalPanelOpen()" 
+          <div *ngIf="terminalStore.isOpen()" 
                class="h-64 border-t border-slate-700 bg-slate-900 shrink-0 z-10 overflow-hidden">
             <app-terminal-panel></app-terminal-panel>
           </div>
