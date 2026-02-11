@@ -3,7 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Node } from '../../../../models/topology.model';
 
-type NodeType = 'router' | 'host' | 'switch';
+type NodeType = 'router' | 'host' | 'switch' | 'hub';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -29,6 +29,7 @@ export class NodePaletteComponent {
   readonly nodeTypeConfigs: { id: NodeType; label: string; subtitle: string; icon: string; placeholder: string; accentBorder: string; hoverBorder: string }[] = [
     { id: 'router', label: 'Router', subtitle: 'Layer 3', icon: 'router.svg', placeholder: 'e.g. R1', accentBorder: 'border-blue-500', hoverBorder: 'hover:border-blue-500/50' },
     { id: 'switch', label: 'Switch', subtitle: 'Layer 2', icon: 'switch.svg', placeholder: 'e.g. SW1', accentBorder: 'border-amber-500', hoverBorder: 'hover:border-amber-500/50' },
+    { id: 'hub', label: 'Hub', subtitle: 'Layer 1 - Broadcast', icon: 'hub.svg', placeholder: 'e.g. HUB1', accentBorder: 'border-violet-500', hoverBorder: 'hover:border-violet-500/50' },
     { id: 'host', label: 'Host', subtitle: 'End device', icon: 'host.svg', placeholder: 'e.g. PC1', accentBorder: 'border-emerald-500', hoverBorder: 'hover:border-emerald-500/50' },
   ];
 
@@ -89,6 +90,7 @@ export class NodePaletteComponent {
     const key = event.key.toUpperCase();
     if (key === 'R') this.startNaming('router');
     if (key === 'S') this.startNaming('switch');
+    if (key === 'U') this.startNaming('hub');
     if (key === 'H') this.startNaming('host');
   }
 }

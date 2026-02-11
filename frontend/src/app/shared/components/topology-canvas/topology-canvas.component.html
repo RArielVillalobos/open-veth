@@ -10,36 +10,64 @@
      class="context-menu"
      [style.top.px]="contextMenu.y" 
      [style.left.px]="contextMenu.x">
+  
+  <!-- Header -->
   <div class="context-menu__header">{{ contextMenu.elementName }}</div>
   
-  <!-- Solo para Nodos -->
-  <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'edge'" 
-          class="context-menu__item" (click)="onContextMenuAction('terminal')">
-    <span class="icon">💻</span> Open Terminal
-  </button>
-  
-  <button *ngIf="contextMenu.elementType !== 'edge'" 
-          class="context-menu__item" (click)="onContextMenuAction('properties')">
-    <span class="icon">ℹ️</span> Properties
-  </button>
-
-  <div *ngIf="contextMenu.elementType !== 'edge'" class="context-menu__separator"></div>
-
-  <!-- Común para todos -->
-    @if (contextMenu.elementType === 'edge') {
-      <div class="context-menu__header">Packet Capture</div>
-      <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.sourceNode)">
-        <span class="icon">🔍</span> Sniff on {{ contextMenu.sourceNode.nodeName }} ({{ contextMenu.sourceNode.iface }})
-      </button>
-      <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.targetNode)">
-        <span class="icon">🔍</span> Sniff on {{ contextMenu.targetNode.nodeName }} ({{ contextMenu.targetNode.iface }})
-      </button>
-      <div class="context-menu__separator"></div>
-    }
-
-    <button class="context-menu__item text-red-600" (click)="onContextMenuAction('delete')">
-      <span class="icon">🗑️</span> Delete {{ contextMenu.elementType === 'edge' ? 'Link' : 'Node' }}
+  <!-- NODE MENU -->
+  <ng-container *ngIf="contextMenu.elementType !== 'edge'">
+    
+    <!-- Primary Actions -->
+    <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'hub'" 
+            class="context-menu__item context-menu__item--primary" 
+            (click)="onContextMenuAction('terminal')">
+      <span class="context-menu__icon mono text-xs">>_</span>
+      <span class="context-menu__label">Open Terminal</span>
     </button>
+    
+    <!-- Capture (if available) -->
+    <button class="context-menu__item" (click)="onContextMenuAction('properties')">
+      <span class="context-menu__icon">⚡</span>
+      <span class="context-menu__label">Properties</span>
+    </button>
+    
+    <div class="context-menu__separator"></div>
+    
+    <!-- Danger Zone -->
+    <button class="context-menu__item context-menu__item--danger" 
+            (click)="onContextMenuAction('delete')">
+      <span class="context-menu__icon">🗑</span>
+      <span class="context-menu__label">Delete Node</span>
+    </button>
+    
+  </ng-container>
+  
+  <!-- EDGE/LINK MENU -->
+  <ng-container *ngIf="contextMenu.elementType === 'edge'">
+    
+    <div class="context-menu__section-header">Packet Capture</div>
+    
+    <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.sourceNode)">
+      <span class="context-menu__icon">📡</span>
+      <span class="context-menu__label">Sniff {{ contextMenu.sourceNode.nodeName }}</span>
+      <span class="context-menu__meta">{{ contextMenu.sourceNode.iface }}</span>
+    </button>
+    
+    <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.targetNode)">
+      <span class="context-menu__icon">📡</span>
+      <span class="context-menu__label">Sniff {{ contextMenu.targetNode.nodeName }}</span>
+      <span class="context-menu__meta">{{ contextMenu.targetNode.iface }}</span>
+    </button>
+    
+    <div class="context-menu__separator"></div>
+    
+    <button class="context-menu__item context-menu__item--danger" 
+            (click)="onContextMenuAction('delete')">
+      <span class="context-menu__icon">🗑</span>
+      <span class="context-menu__label">Delete Link</span>
+    </button>
+    
+  </ng-container>
 
 </div>
 

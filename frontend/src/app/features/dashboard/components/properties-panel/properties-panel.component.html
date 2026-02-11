@@ -13,48 +13,69 @@
       
       <!-- Icon & Title -->
       <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded flex items-center justify-center text-xl font-bold"
+        <div class="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden shadow-lg"
              [ngClass]="{
-               'bg-blue-500/20 text-blue-400': selectedNode()?.type === 'router',
-               'bg-green-500/20 text-green-400': selectedNode()?.type === 'host',
-               'bg-amber-500/20 text-amber-400': selectedNode()?.type === 'switch'
+               'bg-blue-500/10 ring-1 ring-blue-500/30': selectedNode()?.type === 'router',
+               'bg-green-500/10 ring-1 ring-green-500/30': selectedNode()?.type === 'host',
+               'bg-amber-500/10 ring-1 ring-amber-500/30': selectedNode()?.type === 'switch',
+               'bg-violet-500/10 ring-1 ring-violet-500/30': selectedNode()?.type === 'hub'
              }">
-          {{ selectedNode()?.type?.[0]?.toUpperCase() }}
+          <img [src]="'assets/icons/' + selectedNode()?.type + '.svg'" 
+               class="w-8 h-8"
+               [alt]="selectedNode()?.type">
         </div>
         <div>
-          <h3 class="font-bold text-slate-100">{{ selectedNode()?.name }}</h3>
-          <p class="text-xs text-slate-500 font-mono">{{ selectedNode()?.id }}</p>
+          <h3 class="font-bold text-slate-100 text-lg">{{ selectedNode()?.name }}</h3>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium capitalize">
+              {{ selectedNode()?.type }}
+            </span>
+            <span class="text-[10px] text-slate-600 font-mono" [title]="selectedNode()?.id">
+              ID: {{ selectedNode()?.id?.substring(0, 8) }}...
+            </span>
+          </div>
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-2 gap-3">
         <button (click)="openTerminal.emit(selectedNode()?.name!)"
-                class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 px-3 rounded border border-slate-700 transition-colors">
-          Terminal
+                class="group flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm py-2.5 px-4 rounded-lg border border-slate-700 transition-all hover:border-slate-600">
+          <span class="mono text-sm group-hover:text-blue-400 transition-colors">>_</span>
+          <span>Terminal</span>
         </button>
         <button (click)="deleteNode.emit(selectedNode()?.id!)"
-                class="bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs py-2 px-3 rounded border border-red-900/30 transition-colors">
-          Delete
+                class="group flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 text-sm py-2.5 px-4 rounded-lg border border-red-900/30 transition-all hover:border-red-900/50">
+          <span class="text-base">🗑</span>
+          <span>Delete</span>
         </button>
       </div>
 
       <!-- Network Interfaces -->
-      <div class="space-y-2">
-        <label class="text-xs text-slate-500 font-bold uppercase tracking-tighter">Network Interfaces</label>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Network Interfaces</label>
+          @if (activeInterfaceCount() > 0) {
+            <span class="text-[10px] text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">
+              {{ activeInterfaceCount() }} active
+            </span>
+          }
+        </div>
         
         @if (hasInterfaces()) {
-          <div class="bg-slate-950 rounded border border-slate-700 overflow-hidden">
-            <table class="w-full text-xs text-left">
-              <tbody class="divide-y divide-slate-800">
+          <div class="bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
+            <table class="w-full text-sm text-left">
+              <tbody class="divide-y divide-slate-800/50">
                 @for (iface of selectedNode()?.interfaces; track iface.ifname) {
                   @if (iface.ifname !== 'lo' && iface.ifname !== 'mgmt0') {
-                    <tr class="hover:bg-slate-900">
-                      <td class="p-2 font-mono text-slate-400 border-r border-slate-800 w-16">{{ iface.ifname }}</td>
-                      <td class="p-2">
-                        <div class="text-slate-200">{{ getIPv4(iface.addr_info) }}</div>
+                    <tr class="hover:bg-slate-900/50 transition-colors">
+                      <td class="p-3 font-mono text-slate-400 border-r border-slate-800/50 w-20">
+                        <span class="px-2 py-1 rounded bg-slate-800/50 text-xs">{{ iface.ifname }}</span>
+                      </td>
+                      <td class="p-3">
+                        <div class="text-slate-200 font-medium">{{ getIPv4(iface.addr_info) }}</div>
                         @if (getNetwork(iface.addr_info); as net) {
-                          <div class="text-[9px] text-slate-500">net {{ net }}</div>
+                          <div class="text-[10px] text-slate-500 mt-0.5">{{ net }}</div>
                         }
                       </td>
                     </tr>
@@ -64,46 +85,58 @@
             </table>
           </div>
         } @else {
-          <div class="text-xs text-slate-600 italic">Interfaces hidden or not active</div>
+          <div class="p-4 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed">
+            <div class="text-xs text-slate-500 text-center">
+              <span class="block text-lg mb-1">🔌</span>
+              No active interfaces
+            </div>
+          </div>
         }
       </div>
 
       <!-- Routing Table (Only for L3 nodes) -->
       @if (selectedNode()?.type !== 'switch') {
-        <div class="space-y-2">
+        <div class="space-y-3">
           <div class="flex justify-between items-center">
-            <label class="text-xs text-slate-500 font-bold uppercase tracking-tighter">Routing Table</label>
-            <button (click)="loadRoutes()" class="text-[10px] text-blue-400 hover:underline" [disabled]="loadingRoutes()">
+            <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Routing Table</label>
+            <button (click)="loadRoutes()" 
+                    class="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50" 
+                    [disabled]="loadingRoutes()">
+              <span class="text-sm">↻</span>
               {{ loadingRoutes() ? 'Loading...' : 'Refresh' }}
             </button>
           </div>
 
           @if (routes().length > 0) {
-            <div class="bg-slate-950 rounded border border-slate-700 overflow-hidden">
+            <div class="bg-slate-950 rounded-lg border border-slate-700">
               <table class="w-full text-[10px] text-left">
-                <thead class="bg-slate-900 text-slate-500">
+                <thead class="bg-slate-900/80 text-slate-500">
                   <tr>
-                    <th class="p-1 px-2 font-normal">Dest</th>
-                    <th class="p-1 px-2 font-normal">Via</th>
-                    <th class="p-1 px-2 font-normal">Dev</th>
-                    <th class="p-1 px-2 font-normal w-6"></th>
+                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider">Destination</th>
+                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider">Via <span class="text-[8px] normal-case text-slate-600">(Gateway)</span></th>
+                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider text-center w-10">Dev</th>
+                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider text-center w-8"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800">
+                <tbody class="divide-y divide-slate-800/50">
                   @for (r of routes(); track r.dst + r.dev) {
-                    <tr class="hover:bg-slate-900">
-                      <td class="p-1 px-2 text-slate-300 font-mono">{{ r.dst === 'default' ? '0.0.0.0/0' : r.dst }}</td>
-                      <td class="p-1 px-2 text-slate-400 truncate max-w-[80px]" [title]="r.gateway || 'Direct'">
-                        {{ r.gateway || 'Direct' }}
+                    <tr class="hover:bg-slate-900/50 transition-colors">
+                      <td class="p-1.5 px-2 text-slate-300 font-mono" [title]="r.dst">
+                        {{ r.dst === 'default' ? '0.0.0.0/0' : (r.dst.length > 14 ? r.dst.substring(0, 12) + '..' : r.dst) }}
                       </td>
-                      <td class="p-1 px-2 text-blue-400 font-mono">{{ r.dev }}</td>
-                      <td class="p-1 px-2 text-center">
+                      <td class="p-1.5 px-2 text-slate-400 truncate" [title]="r.gateway || 'Direct'">
+                        {{ (r.gateway || 'Direct').length > 10 ? (r.gateway || 'Direct').substring(0, 8) + '..' : (r.gateway || 'Direct') }}
+                      </td>
+                      <td class="p-1.5 px-2 text-center">
+                        <span class="text-blue-400 font-mono">{{ r.dev }}</span>
+                      </td>
+                      <td class="p-1.5 px-2 text-center">
                         @if (r.protocol === 'kernel') {
-                          <span class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-400"
-                                title="Connected — auto-generated from IP assignment">C</span>
+                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-700 text-slate-400 font-medium"
+                                title="Connected">C</span>
                         } @else {
-                          <span class="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400"
-                                title="Static — persisted across restarts">S</span>
+                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium"
+                                title="Static">S</span>
                         }
                       </td>
                     </tr>
@@ -111,83 +144,93 @@
                 </tbody>
               </table>
             </div>
-            <div class="flex gap-3 text-[9px] text-slate-600 mt-1">
-              <span><span class="px-1 rounded bg-emerald-900/50 text-emerald-400">S</span> Static</span>
-              <span><span class="px-1 rounded bg-slate-700 text-slate-400">C</span> Connected</span>
+            <div class="flex gap-3 text-[9px] text-slate-500 mt-1.5">
+              <span class="flex items-center gap-1">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 font-medium text-[8px]">S</span>
+                Static
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-700 text-slate-400 font-medium text-[8px]">C</span>
+                Connected
+              </span>
             </div>
           } @else if (!loadingRoutes()) {
-            <div class="text-xs text-slate-600 italic">No routes found</div>
+            <div class="p-4 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed">
+              <div class="text-xs text-slate-500 text-center">
+                <span class="block text-lg mb-1">🛣️</span>
+                No routes configured
+              </div>
+            </div>
           }
         </div>
       }
 
       <!-- LAB GUIDE (Cheat Sheet) -->
-      <div class="mt-auto border-t border-slate-800 p-4 bg-slate-900/50">
+      <div class="mt-auto border-t border-slate-800/50">
         <button (click)="showHelp.set(!showHelp())" 
-                class="flex items-center justify-between w-full text-xs font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors">
-          <span>📖 Lab Guide</span>
-          <span>{{ showHelp() ? '▼' : '▶' }}</span>
+                class="w-full flex items-center justify-between p-4 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-slate-800/30 transition-all">
+          <span class="flex items-center gap-2">
+            <span class="text-base">📖</span>
+            <span>Quick Commands</span>
+          </span>
+          <span class="text-slate-500 transition-transform" [class.rotate-90]="showHelp()">▶</span>
         </button>
 
         @if (showHelp()) {
-          <div class="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div class="px-4 pb-4 space-y-3">
             
             @if (selectedNode()?.type === 'router') {
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">Set up DHCP Server:</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-blue-300 overflow-x-auto border border-slate-800">
+              <div class="space-y-3">
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">DHCP Server</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Setup</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">
 echo "interface=eth1" > /etc/dnsmasq.conf
 echo "dhcp-range=192.168.1.50,192.168.1.100,12h" >> /etc/dnsmasq.conf
 dnsmasq --no-daemon</pre>
-              </div>
+                </div>
 
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">Enable NAT (Internet):</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-green-300 overflow-x-auto border border-slate-800">
-iptables -t nat -A POSTROUTING -o mgmt0 -j MASQUERADE</pre>
-              </div>
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">NAT / Internet</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Routing</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">iptables -t nat -A POSTROUTING -o mgmt0 -j MASQUERADE</pre>
+                </div>
 
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">Remote Access (SSH):</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-purple-300 overflow-x-auto border border-slate-800">
-# From a Host, connect to this Router:
-ssh root@&lt;ROUTER_IP&gt;
-# Password: openveth</pre>
-              </div>
-
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">DNS Resolver (Static Names):</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-amber-300 overflow-x-auto border border-slate-800">
-# Add name to hosts file:
-echo "192.168.1.100 web.lab" >> /etc/hosts
-# Start service:
-dnsmasq --no-daemon --log-queries</pre>
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">SSH Access</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">Remote</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">ssh root@&lt;ROUTER_IP&gt;</pre>
+                </div>
               </div>
             }
 
             @if (selectedNode()?.type === 'host') {
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">Request IP via DHCP:</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-blue-300 overflow-x-auto border border-slate-800">
-udhcpc -i eth1</pre>
-              </div>
+              <div class="space-y-3">
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">DHCP Client</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Network</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">udhcpc -i eth1</pre>
+                </div>
 
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">Configure DNS Client:</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-amber-300 overflow-x-auto border border-slate-800">
-echo "nameserver &lt;ROUTER_IP&gt;" > /etc/resolv.conf
-ping web.lab</pre>
-              </div>
-
-              <div class="space-y-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase">Generate SSH Keys:</p>
-                <pre class="p-2 bg-slate-950 rounded text-[9px] text-purple-300 overflow-x-auto border border-slate-800">
-ssh-keygen -t rsa
-ssh-copy-id root@&lt;TARGET_IP&gt;</pre>
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">DNS Config</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Resolver</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">echo "nameserver &lt;ROUTER_IP&gt;" > /etc/resolv.conf</pre>
+                </div>
               </div>
             }
 
-            <p class="text-[9px] text-slate-500 italic">Copy these commands into the node terminal to configure services manually.</p>
+            <p class="text-[9px] text-slate-500 text-center pt-2">Click to copy • Paste in terminal</p>
           </div>
         }
       </div>
@@ -198,30 +241,64 @@ ssh-copy-id root@&lt;TARGET_IP&gt;</pre>
   <!-- LINK DETAILS -->
   @else if (selectedLink()) {
     <div class="p-4 flex flex-col gap-6">
-        <h3 class="font-bold text-slate-100">Virtual Link</h3>
-        <p class="text-xs text-slate-500 font-mono">{{ selectedLink()?.id }}</p>
-        <div class="space-y-4 text-xs text-slate-400">
-            <div class="p-2 bg-slate-950 rounded border border-slate-800">
-                <div class="text-blue-400 font-mono mb-1">{{ selectedLink()?.source_int }}</div>
-                <div class="text-slate-200">{{ selectedLink()?.source }}</div>
-            </div>
-            <div class="p-2 bg-slate-950 rounded border border-slate-800">
-                <div class="text-blue-400 font-mono mb-1">{{ selectedLink()?.target_int }}</div>
-                <div class="text-slate-200">{{ selectedLink()?.target }}</div>
-            </div>
+      
+      <!-- Header -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+          <span class="text-lg">🔗</span>
         </div>
+        <div>
+          <h3 class="font-bold text-slate-100">Virtual Link</h3>
+          <span class="text-[10px] text-slate-600 font-mono">{{ selectedLink()?.id?.substring(0, 12) }}...</span>
+        </div>
+      </div>
+
+      <!-- Connection Details -->
+      <div class="space-y-3">
+        <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Connected Interfaces</label>
+        
+        <div class="space-y-2">
+          <div class="p-3 bg-slate-950 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider">Source</span>
+              <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px]">{{ selectedLink()?.source_int }}</span>
+            </div>
+            <div class="text-sm text-slate-200">{{ selectedLink()?.source }}</div>
+          </div>
+          
+          <div class="flex justify-center">
+            <span class="text-slate-600">↓</span>
+          </div>
+          
+          <div class="p-3 bg-slate-950 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider">Target</span>
+              <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px]">{{ selectedLink()?.target_int }}</span>
+            </div>
+            <div class="text-sm text-slate-200">{{ selectedLink()?.target }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="pt-4 border-t border-slate-800">
         <button (click)="deleteLink.emit(selectedLink()?.id!)" 
-                class="bg-red-900/20 text-red-400 py-2 rounded border border-red-900/30 transition-colors">
-          Delete Link
+                class="w-full flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 py-2.5 px-4 rounded-lg border border-red-900/30 transition-all">
+          <span>🗑</span>
+          <span>Delete Link</span>
         </button>
+      </div>
     </div>
   }
 
   <!-- Empty State -->
   @if (!selectedNode() && !selectedLink()) {
     <div class="flex-1 flex flex-col items-center justify-center text-slate-600 p-8 text-center">
-      <div class="text-4xl mb-2 opacity-20">🖱️</div>
-      <p class="text-sm">Select a node or link to view properties</p>
+      <div class="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mb-4">
+        <span class="text-2xl">🖱️</span>
+      </div>
+      <p class="text-sm font-medium text-slate-500 mb-1">No selection</p>
+      <p class="text-xs text-slate-600">Click a node or link to view properties</p>
     </div>
   }
 </div>

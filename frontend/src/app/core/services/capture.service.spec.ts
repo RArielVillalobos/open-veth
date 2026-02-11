@@ -4,12 +4,12 @@ import { ToastService } from './toast.service';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 class MockWebSocket {
+  onopen: ((event: any) => void) | null = null;
   onmessage: ((event: any) => void) | null = null;
   onerror: ((event: any) => void) | null = null;
   onclose: ((event: any) => void) | null = null;
   close = vi.fn();
   constructor(public url: string) {
-    // Store instance for test access
     MockWebSocket.lastInstance = this;
   }
   static lastInstance: MockWebSocket | null = null;
@@ -91,12 +91,26 @@ describe('CaptureService', () => {
     expect(consoleSpy).toHaveBeenCalled();
   });
 
-  it('should call toast.error on socket error', () => {
+  it('should log error on socket error', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     service.startCapture('node-1', 'eth1');
     const ws = MockWebSocket.lastInstance!;
     ws.onerror!(new Event('error'));
 
-    expect(toastService.error).toHaveBeenCalledWith('Capture connection failed');
+    expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it('connected$ should emit true on open and false on close', () => {
+    const states: boolean[] = [];
+    service.connected$.subscribe(s => states.push(s));
+
+    service.startCapture('node-1', 'eth1');
+    const ws = MockWebSocket.lastInstance!;
+
+    ws.onopen!(new Event('open'));
+    ws.onclose!({ code: 1000, reason: '' });
+
+    expect(states).toEqual([false, true, false]);
   });
 
   it('stopCapture() should close socket', () => {

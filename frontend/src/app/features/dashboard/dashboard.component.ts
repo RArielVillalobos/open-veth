@@ -112,7 +112,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  onAddNode(event: { type: 'router' | 'host' | 'switch'; name: string }) {
+  onAddNode(event: { type: 'router' | 'host' | 'switch' | 'hub'; name: string }) {
     this.ui.markInteraction();
     const { nodes, links } = this.store.topology();
     const { x, y } = this.layoutService.getNextNodePosition(nodes, links);

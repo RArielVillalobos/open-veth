@@ -35,6 +35,13 @@ export class PropertiesPanelComponent {
     return !!(n && n.interfaces && n.interfaces.length > 0);
   });
 
+  // Count active interfaces (excluding lo and mgmt0)
+  activeInterfaceCount = computed(() => {
+    const n = this.selectedNode();
+    if (!n || !n.interfaces) return 0;
+    return n.interfaces.filter(i => i.ifname !== 'lo' && i.ifname !== 'mgmt0').length;
+  });
+
   constructor() {
     // Automatically load routes when a node is selected
     effect(() => {

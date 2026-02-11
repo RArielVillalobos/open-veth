@@ -1,19 +1,22 @@
 <div class="capture-container flex flex-col h-full bg-slate-900 text-slate-200 border border-slate-700 rounded-lg shadow-2xl overflow-hidden" cdkDrag>
   <!-- Header -->
-  <div class="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700 drag-handle cursor-move" cdkDragHandle>
+  <div class="flex items-center justify-between px-4 py-2.5 bg-slate-800 border-b border-slate-700 drag-handle cursor-move" cdkDragHandle>
     <div class="flex items-center gap-2">
-      <span class="text-blue-400 font-mono text-xs">●</span>
-      <h3 class="text-sm font-semibold tracking-wide">{{ nodeName }} ({{ interfaceName }})</h3>
+      <span class="text-blue-400 font-mono text-sm">📡</span>
+      <div>
+        <h3 class="text-sm font-semibold tracking-wide">{{ nodeName }}</h3>
+        <span class="text-[10px] text-slate-500 font-mono">{{ interfaceName }}</span>
+      </div>
     </div>
     
     <!-- Toolbar -->
     <div class="flex items-center gap-2">
-      <!-- Chips -->
-      <div class="flex bg-slate-900 rounded p-0.5 border border-slate-700 mr-2">
-        <button *ngFor="let p of ['ALL','ICMP','TCP','UDP','ARP','IPv6']"
+      <!-- Protocol Filter Chips with Colors -->
+      <div class="flex bg-slate-900/80 rounded-lg p-0.5 border border-slate-700/50">
+        <button *ngFor="let p of ['ALL','TCP','UDP','ICMP','ARP','IPv6']"
                 (click)="setProtocolFilter(p)"
-                class="px-2 py-0.5 text-[10px] font-bold rounded transition-colors"
-                [ngClass]="activeProtocolFilter === p ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'">
+                class="px-2.5 py-1 text-[10px] font-bold rounded-md transition-all"
+                [ngClass]="getProtocolFilterClass(p)">
           {{ p }}
         </button>
       </div>
@@ -21,25 +24,36 @@
       <input type="text" 
              [value]="filterTerm"
              (input)="filterTerm = $any($event.target).value"
-             placeholder="Filter..." 
-             class="bg-slate-900 border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-200 w-32 focus:outline-none focus:border-blue-500 transition-colors">
+             placeholder="Search IP, port..." 
+             class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-1 text-xs text-slate-200 w-36 focus:outline-none focus:border-blue-500 transition-colors">
       
       <button (click)="togglePause()" 
-              class="p-1 rounded transition-colors text-slate-400"
-              [ngClass]="{'text-yellow-400 hover:bg-yellow-900/20': isPaused, 'hover:bg-slate-700': !isPaused}"
-              title="Pause/Resume">
-         <span *ngIf="!isPaused">⏸</span>
-         <span *ngIf="isPaused">▶</span>
+              class="p-1.5 rounded-lg transition-colors"
+              [ngClass]="isPaused ? 'text-yellow-400 bg-yellow-900/20 hover:bg-yellow-900/30' : 'text-slate-400 hover:bg-slate-700'"
+              [title]="isPaused ? 'Resume Capture' : 'Pause Capture'">
+         <span class="text-sm">{{ isPaused ? '▶' : '⏸' }}</span>
       </button>
 
-      <div class="h-4 w-[1px] bg-slate-700 mx-1"></div>
+      <div class="h-5 w-[1px] bg-slate-700 mx-1"></div>
 
-      <button (click)="clearPackets()" class="p-1 hover:bg-slate-700 rounded text-slate-400" title="Clear All">
+      <!-- Export to PCAP (coming soon) -->
+      <button (click)="exportToPcap()" 
+              class="p-1.5 hover:bg-blue-900/20 hover:text-blue-400 rounded-lg transition-colors text-slate-400" 
+              title="Export to PCAP (Wireshark)">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+      </button>
+
+      <button (click)="clearPackets()" 
+              class="p-1.5 hover:bg-red-900/20 hover:text-red-400 rounded-lg transition-colors text-slate-400" 
+              title="Clear All Packets">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
       </button>
-      <button (click)="onClose.emit()" class="p-1 hover:bg-red-900/50 hover:text-red-400 rounded transition-colors text-slate-400">
+      <button (click)="onClose.emit()" 
+              class="p-1.5 hover:bg-red-900/50 hover:text-red-400 rounded-lg transition-colors text-slate-400">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -47,46 +61,148 @@
     </div>
   </div>
 
-  <!-- Packet Table -->
-  <div class="flex-grow overflow-auto p-0 font-mono text-[11px]">
-    <table class="w-full border-collapse">
-      <thead class="bg-slate-800 sticky top-0 z-10 text-slate-400 border-b border-slate-700">
-        <tr>
-          <th class="px-2 py-1 text-left w-24">Time</th>
-          <th class="px-2 py-1 text-left w-44">Source</th>
-          <th class="px-2 py-1 text-left w-44">Destination</th>
-          <th class="px-2 py-1 text-left w-16">Proto</th>
-          <th class="px-2 py-1 text-left w-12">Len</th>
-          <th class="px-2 py-1 text-left w-12">TTL</th>
-          <th class="px-2 py-1 text-left">Info</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let p of filteredPackets; trackBy: trackByPacket" [ngClass]="getRowClass(p)" class="border-b border-slate-800/50">
-          <td class="px-2 py-0.5 opacity-70 font-mono text-[10px]">{{ p.timestamp | date:'HH:mm:ss.SSS' }}</td>
-          <td class="px-2 py-0.5">{{ p.source || '-' }}</td>
-          <td class="px-2 py-0.5">{{ p.destination || '-' }}</td>
-          <td class="px-2 py-0.5"><span class="px-1 rounded bg-slate-900/50 border border-slate-700/50 text-[10px]">{{ p.protocol }}</span></td>
-          <td class="px-2 py-0.5 opacity-80">{{ p.length }}</td>
-          <td class="px-2 py-0.5 opacity-80">{{ p.ttl || '-' }}</td>
-          <td class="px-2 py-0.5 truncate font-medium" [title]="p.info">{{ p.info }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div *ngIf="packets.length === 0" class="flex flex-col items-center justify-center py-10 text-slate-500 italic">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-      Waiting for packets...
+  <!-- Split View: Table and Detail -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Packet Table -->
+    <div class="flex-1 overflow-auto font-mono text-[11px]" [class.w-1/2]="selectedPacket">
+      <table class="w-full border-collapse">
+        <thead class="bg-slate-800 sticky top-0 z-10 text-slate-400 border-b border-slate-700">
+          <tr>
+            <th class="px-2 py-1.5 text-left w-20">Time</th>
+            <th class="px-2 py-1.5 text-left w-32">Source</th>
+            <th class="px-2 py-1.5 text-left w-32">Destination</th>
+            <th class="px-2 py-1.5 text-left w-16">Proto</th>
+            <th class="px-2 py-1.5 text-left w-10">Len</th>
+            <th class="px-2 py-1.5 text-left">Info</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of filteredPackets; trackBy: trackByPacket" 
+              [ngClass]="getRowClass(p)" 
+              (click)="selectPacket(p)"
+              class="cursor-pointer transition-colors border-b border-slate-800/30">
+            <td class="px-2 py-1 opacity-70 font-mono text-[10px]">{{ p.timestamp | date:'HH:mm:ss.SSS' }}</td>
+            <td class="px-2 py-1 truncate">{{ p.source || '-' }}</td>
+            <td class="px-2 py-1 truncate">{{ p.destination || '-' }}</td>
+            <td class="px-2 py-1">
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold" [ngClass]="getProtocolBadgeClass(p.protocol)">
+                {{ p.protocol }}
+              </span>
+            </td>
+            <td class="px-2 py-1 opacity-80">{{ p.length }}</td>
+            <td class="px-2 py-1 truncate" [title]="p.info">{{ p.info }}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <!-- Empty State - No Packets At All -->
+      <div *ngIf="packets.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div class="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mb-3">
+          <span class="text-3xl opacity-30">📡</span>
+        </div>
+        <p class="text-sm font-medium text-slate-400">Waiting for packets...</p>
+        <p class="text-xs text-slate-600 mt-1">Traffic will appear here when detected</p>
+      </div>
+
+      <!-- Empty State - Filters Active But No Matches -->
+      <div *ngIf="packets.length > 0 && filteredPackets.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div class="w-16 h-16 rounded-full bg-amber-900/20 flex items-center justify-center mb-3">
+          <span class="text-3xl">🔍</span>
+        </div>
+        <p class="text-sm font-medium text-amber-400">No matching packets</p>
+        <p class="text-xs text-slate-600 mt-1">{{ packets.length }} packets captured but none match current filters</p>
+        <button (click)="clearFilters()" class="mt-3 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition-colors">
+          Clear Filters
+        </button>
+      </div>
+    </div>
+
+    <!-- Packet Detail View -->
+    <div *ngIf="selectedPacket" class="w-1/2 border-l border-slate-700 bg-slate-900 overflow-y-auto">
+      <div class="sticky top-0 bg-slate-800 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
+        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Packet Details</span>
+        <button (click)="selectedPacket = null" class="text-slate-500 hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4">
+        <!-- General Info -->
+        <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+          <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">General</h4>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div><span class="text-slate-500">Timestamp:</span> <span class="font-mono">{{ selectedPacket.timestamp | date:'HH:mm:ss.SSS' }}</span></div>
+            <div><span class="text-slate-500">Protocol:</span> <span class="font-mono">{{ selectedPacket.protocol }}</span></div>
+            <div><span class="text-slate-500">Length:</span> <span class="font-mono">{{ selectedPacket.length }} bytes</span></div>
+            <div><span class="text-slate-500">TTL:</span> <span class="font-mono">{{ selectedPacket.ttl || '-' }}</span></div>
+          </div>
+        </div>
+
+        <!-- Addresses -->
+        <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+          <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Addresses</h4>
+          <div class="space-y-1.5 text-xs">
+            <div class="flex justify-between">
+              <span class="text-slate-500">Source:</span>
+              <span class="font-mono text-slate-300">{{ selectedPacket.source || 'N/A' }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Destination:</span>
+              <span class="font-mono text-slate-300">{{ selectedPacket.destination || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info -->
+        <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+          <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Info</h4>
+          <p class="text-xs font-mono text-slate-300 break-all">{{ selectedPacket.info }}</p>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Footer / Status -->
-  <div class="px-3 py-1 bg-slate-800 border-t border-slate-700 flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-tighter">
-    <span>Total: {{ packets.length }} packets</span>
-    <span class="flex items-center gap-1">
-      <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-      Live Capturing
+  <!-- Connection Lost Warning -->
+  <div *ngIf="!isConnected" class="px-4 py-1.5 bg-red-900/30 border-t border-red-900/50 text-[10px] text-red-400 flex items-center justify-between">
+    <span class="flex items-center gap-1.5">
+      <span>🔌</span>
+      <span>Connection lost. Reconnecting...</span>
     </span>
+  </div>
+
+  <!-- Filter Warning -->
+  <div *ngIf="hasActiveFilters" class="px-4 py-1.5 bg-amber-900/20 border-t border-amber-900/30 text-[10px] text-amber-400 flex items-center justify-between">
+    <span class="flex items-center gap-1.5">
+      <span>⚠️</span>
+      <span>Filters active: showing {{ visiblePacketCount }} of {{ packets.length }} packets</span>
+    </span>
+    <button (click)="clearFilters()" class="text-amber-300 hover:text-amber-200 underline">Clear filters</button>
+  </div>
+
+  <!-- Footer / Status -->
+  <div class="px-4 py-2 bg-slate-800 border-t border-slate-700 flex justify-between items-center text-[10px] text-slate-500">
+    <div class="flex items-center gap-3">
+      <!-- Connection Status -->
+      <span class="flex items-center gap-1.5" *ngIf="isConnected">
+        <span class="w-1.5 h-1.5 rounded-full" [ngClass]="isPaused ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'"></span>
+        <span [ngClass]="isPaused ? 'text-yellow-400 font-medium' : ''">{{ isPaused ? '⏸ PAUSED' : '● LIVE' }}</span>
+      </span>
+      
+      <!-- Disconnected Status -->
+      <span class="flex items-center gap-1.5" *ngIf="!isConnected">
+        <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+        <span class="text-red-400 font-medium">● DISCONNECTED</span>
+      </span>
+      
+      <span class="text-slate-600">|</span>
+      <span>{{ packets.length }} packets</span>
+    </div>
+    
+    <!-- Packet Count -->
+    <div class="text-[10px] text-slate-400">
+      <span class="font-mono">{{ packets.length }}</span> captured
+    </div>
   </div>
 </div>
