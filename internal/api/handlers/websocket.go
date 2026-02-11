@@ -198,10 +198,28 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 				}
 			}
 		} else if len(cmd) > 1 {
-			// Multi-character input - likely escape sequences (arrow keys, etc.)
-			// Ignore escape sequences but accept printable characters
-			for _, ch := range cmd {
-				if ch >= 32 && ch <= 126 {
+			// Multi-character input (paste, escape sequences, etc.)
+			// Strip ANSI escape sequences (e.g. bracketed paste markers)
+			cleaned := stripEscapeSequences(cmd)
+			for _, ch := range cleaned {
+				switch {
+				case ch == '\r' || ch == '\n':
+					// Enter found in pasted text - process accumulated command
+					fullCmd := strings.TrimSpace(inputBuffer.String())
+					inputBuffer.Reset()
+
+					if fullCmd != "" {
+						h.Logger.Debug("terminal command executed (paste)", "node", node.Name, "cmd", fullCmd)
+
+						if isNetworkConfigCommand(fullCmd) {
+							h.Logger.Debug("network config command detected", "node", node.Name, "cmd", fullCmd)
+							go func(nodeID, labID string) {
+								time.Sleep(1 * time.Second)
+								h.BroadcastInterfaceChanged(nodeID, labID)
+							}(node.ID, node.LabID)
+						}
+					}
+				case ch >= 32 && ch <= 126:
 					inputBuffer.WriteRune(ch)
 				}
 			}
@@ -213,6 +231,29 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 	}
 
 	h.Logger.Info("terminal session ended", "node", node.Name)
+}
+
+// stripEscapeSequences removes ANSI escape sequences (CSI) from input.
+// This handles bracketed paste markers (\x1b[200~ / \x1b[201~) and other
+// terminal escape sequences that contaminate the input buffer.
+func stripEscapeSequences(input string) string {
+	var result strings.Builder
+	for i := 0; i < len(input); i++ {
+		if input[i] == 0x1b {
+			i++ // skip ESC
+			if i < len(input) && input[i] == '[' {
+				// CSI sequence: skip until final byte (0x40-0x7E)
+				for i++; i < len(input); i++ {
+					if input[i] >= 0x40 && input[i] <= 0x7E {
+						break
+					}
+				}
+			}
+			continue
+		}
+		result.WriteByte(input[i])
+	}
+	return result.String()
 }
 
 // isNetworkConfigCommand checks if the input is a network configuration command

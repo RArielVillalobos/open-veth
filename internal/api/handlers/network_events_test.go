@@ -159,6 +159,43 @@ func TestIsNetworkConfigCommand(t *testing.T) {
 	}
 }
 
+func TestStripEscapeSequences(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"plain text", "ip addr add 10.0.0.1/24 dev eth0", "ip addr add 10.0.0.1/24 dev eth0"},
+		{"bracketed paste", "\x1b[200~ip addr add 10.0.0.1/24 dev eth0\x1b[201~", "ip addr add 10.0.0.1/24 dev eth0"},
+		{"bracketed paste with newline", "\x1b[200~ip addr add 10.0.0.1/24 dev eth0\r\x1b[201~", "ip addr add 10.0.0.1/24 dev eth0\r"},
+		{"arrow key escape", "\x1b[A", ""},
+		{"multiple escapes", "\x1b[200~hello\x1b[201~\x1b[A\x1b[B", "hello"},
+		{"empty string", "", ""},
+		{"only ESC", "\x1b", ""},
+		{"ESC without CSI", "\x1bO", ""},
+		{"mixed text and escapes", "abc\x1b[1mdef\x1b[0mghi", "abcdefghi"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripEscapeSequences(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestStripEscapeSequences_WithNetworkCommand(t *testing.T) {
+	// Simulate a real paste of a network command with bracketed paste markers
+	pasted := "\x1b[200~ip addr add 10.0.0.1/24 dev eth0\x1b[201~"
+	cleaned := stripEscapeSequences(pasted)
+	assert.True(t, isNetworkConfigCommand(cleaned))
+
+	// Paste of a non-network command
+	pasted = "\x1b[200~ls -la\x1b[201~"
+	cleaned = stripEscapeSequences(pasted)
+	assert.False(t, isNetworkConfigCommand(cleaned))
+}
+
 func TestNetworkEventHub_BufferFull(t *testing.T) {
 	hub := NewNetworkEventHub()
 	go hub.Run()
