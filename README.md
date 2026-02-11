@@ -11,7 +11,7 @@
 ---
 
 <p align="center">
-  <img src="https://i.imgur.com/9WxmuFo.gif" alt="OpenVeth Demo - Creating network topologies in real-time" width="800">
+  <img src="https://i.imgur.com/0ayLURS.gif" alt="OpenVeth Demo - Creating network topologies in real-time" width="800">
 </p>
 
 <p align="center">
