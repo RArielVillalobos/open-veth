@@ -38,12 +38,14 @@
       </div>
 
       <!-- Actions -->
-      <div class="grid grid-cols-2 gap-3">
-        <button (click)="openTerminal.emit(selectedNode()?.name!)"
-                class="group flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm py-2.5 px-4 rounded-lg border border-slate-700 transition-all hover:border-slate-600">
-          <span class="mono text-sm group-hover:text-blue-400 transition-colors">>_</span>
-          <span>Terminal</span>
-        </button>
+      <div class="grid gap-3" [ngClass]="selectedNode()?.type === 'switch' || selectedNode()?.type === 'hub' ? 'grid-cols-1' : 'grid-cols-2'">
+        @if (selectedNode()?.type !== 'switch' && selectedNode()?.type !== 'hub') {
+          <button (click)="openTerminal.emit(selectedNode()?.name!)"
+                  class="group flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm py-2.5 px-4 rounded-lg border border-slate-700 transition-all hover:border-slate-600">
+            <span class="mono text-sm group-hover:text-blue-400 transition-colors">>_</span>
+            <span>Terminal</span>
+          </button>
+        }
         <button (click)="deleteNode.emit(selectedNode()?.id!)"
                 class="group flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 text-sm py-2.5 px-4 rounded-lg border border-red-900/30 transition-all hover:border-red-900/50">
           <span class="text-base">🗑</span>
@@ -51,31 +53,37 @@
         </button>
       </div>
 
-      <!-- Network Interfaces -->
+      <!-- Network Interfaces / Ports -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Network Interfaces</label>
+          <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">
+            {{ isBridgeNode() ? 'Connected Ports' : 'Network Interfaces' }}
+          </label>
           @if (activeInterfaceCount() > 0) {
             <span class="text-[10px] text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">
-              {{ activeInterfaceCount() }} active
+              {{ activeInterfaceCount() }} {{ isBridgeNode() ? 'ports' : 'active' }}
             </span>
           }
         </div>
-        
+
         @if (hasInterfaces()) {
           <div class="bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
             <table class="w-full text-sm text-left">
               <tbody class="divide-y divide-slate-800/50">
                 @for (iface of selectedNode()?.interfaces; track iface.ifname) {
-                  @if (iface.ifname !== 'lo' && iface.ifname !== 'mgmt0') {
+                  @if (iface.ifname !== 'lo' && iface.ifname !== 'mgmt0' && !(isBridgeNode() && iface.ifname === 'br0')) {
                     <tr class="hover:bg-slate-900/50 transition-colors">
                       <td class="p-3 font-mono text-slate-400 border-r border-slate-800/50 w-20">
                         <span class="px-2 py-1 rounded bg-slate-800/50 text-xs">{{ iface.ifname }}</span>
                       </td>
                       <td class="p-3">
-                        <div class="text-slate-200 font-medium">{{ getIPv4(iface.addr_info) }}</div>
-                        @if (getNetwork(iface.addr_info); as net) {
-                          <div class="text-[10px] text-slate-500 mt-0.5">{{ net }}</div>
+                        @if (isBridgeNode()) {
+                          <div class="text-slate-400 text-xs">Connected</div>
+                        } @else {
+                          <div class="text-slate-200 font-medium">{{ getIPv4(iface.addr_info) }}</div>
+                          @if (getNetwork(iface.addr_info); as net) {
+                            <div class="text-[10px] text-slate-500 mt-0.5">{{ net }}</div>
+                          }
                         }
                       </td>
                     </tr>
@@ -88,14 +96,14 @@
           <div class="p-4 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed">
             <div class="text-xs text-slate-500 text-center">
               <span class="block text-lg mb-1">🔌</span>
-              No active interfaces
+              {{ isBridgeNode() ? 'No connected ports' : 'No active interfaces' }}
             </div>
           </div>
         }
       </div>
 
       <!-- Routing Table (Only for L3 nodes) -->
-      @if (selectedNode()?.type !== 'switch') {
+      @if (selectedNode()?.type !== 'switch' && selectedNode()?.type !== 'hub') {
         <div class="space-y-3">
           <div class="flex justify-between items-center">
             <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Routing Table</label>

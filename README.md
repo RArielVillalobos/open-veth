@@ -43,6 +43,7 @@
 | **HOST** | Alpine Linux | End devices, servers, clients |
 | **ROUTER** | FRRouting | Dynamic routing, NAT, firewalls |
 | **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
+| **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 

@@ -10,6 +10,7 @@ func TestGetImageForType(t *testing.T) {
 		{ROUTER, ImgRouter},
 		{HOST, ImgHost},
 		{SWITCH, ImgHost},
+		{HUB, ImgHost},                 // Hub uses host image
 		{NodeType("unknown"), ImgHost}, // default fallback
 	}
 

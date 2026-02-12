@@ -167,12 +167,12 @@ func (h *Handler) HandleImport(c *gin.Context) {
 				h.Logger.Warn("import link failed", "link", l.ID, "error", err)
 				errors = append(errors, msg)
 			} else {
-				// Attach to Bridge if Switch
-				if source.Type == models.SWITCH {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt)
+				// Attach to bridge if node type requires it
+				if models.NeedsBridge(source.Type) {
+					_ = h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt, source.Type)
 				}
-				if target.Type == models.SWITCH {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt)
+				if models.NeedsBridge(target.Type) {
+					_ = h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt, target.Type)
 				}
 				if err := h.Repo.SaveLink(linkModel); err != nil {
 					h.Logger.Error("import link save failed", "link", l.ID, "error", err)

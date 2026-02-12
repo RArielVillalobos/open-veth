@@ -249,11 +249,11 @@ func (h *Handler) restoreLinks(ctx context.Context, nodeMap map[string]models.No
 		}
 		restored++
 
-		if src.Type == models.SWITCH {
-			_ = h.Manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt)
+		if models.NeedsBridge(src.Type) {
+			_ = h.Manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt, src.Type)
 		}
-		if tgt.Type == models.SWITCH {
-			_ = h.Manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt)
+		if models.NeedsBridge(tgt.Type) {
+			_ = h.Manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt, tgt.Type)
 		}
 	}
 	return

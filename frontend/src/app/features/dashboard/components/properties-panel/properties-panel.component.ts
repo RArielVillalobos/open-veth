@@ -29,17 +29,25 @@ export class PropertiesPanelComponent {
   loadingRoutes = signal(false);
   showHelp = signal(false);
 
+  // Whether the selected node is a bridge-based node (switch/hub)
+  isBridgeNode = computed(() => {
+    const t = this.selectedNode()?.type;
+    return t === 'switch' || t === 'hub';
+  });
+
   // Safe check for interfaces to use in template
   hasInterfaces = computed(() => {
     const n = this.selectedNode();
     return !!(n && n.interfaces && n.interfaces.length > 0);
   });
 
-  // Count active interfaces (excluding lo and mgmt0)
+  // Count active interfaces (excluding lo, mgmt0, and br0 for bridge nodes)
   activeInterfaceCount = computed(() => {
     const n = this.selectedNode();
     if (!n || !n.interfaces) return 0;
-    return n.interfaces.filter(i => i.ifname !== 'lo' && i.ifname !== 'mgmt0').length;
+    return n.interfaces.filter(i =>
+      i.ifname !== 'lo' && i.ifname !== 'mgmt0' && !(this.isBridgeNode() && i.ifname === 'br0')
+    ).length;
   });
 
   constructor() {
@@ -49,7 +57,7 @@ export class PropertiesPanelComponent {
       // Reset state immediately
       this.routes.set([]);
       
-      if (node && node.type !== 'switch') {
+      if (node && node.type !== 'switch' && node.type !== 'hub') {
         // Use setTimeout to ensure we don't trigger change detection during render
         setTimeout(() => this.loadRoutes(node.id), 0);
       }

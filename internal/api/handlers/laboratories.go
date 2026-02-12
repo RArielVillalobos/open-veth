@@ -323,11 +323,11 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 				h.Logger.Error("failed to revive link", "link", l.ID, "error", err)
 			} else {
 				// Re-attach bridges if needed
-				if srcNode.Type == models.SWITCH {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt)
+				if models.NeedsBridge(srcNode.Type) {
+					_ = h.Manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt, srcNode.Type)
 				}
-				if tgtNode.Type == models.SWITCH {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt)
+				if models.NeedsBridge(tgtNode.Type) {
+					_ = h.Manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt, tgtNode.Type)
 				}
 			}
 		}

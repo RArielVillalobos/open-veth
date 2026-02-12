@@ -245,9 +245,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.logger.Warn("container not ready after start", "name", node.Name, "error", err)
 			}
 
-			// Ensure Switch Bridge exists (it might be lost on restart)
-			if node.Type == models.SWITCH {
-				m.setupSwitchBridge(ctx, inspect.ID, node.Name)
+			// Ensure bridge exists (it might be lost on restart)
+			if models.NeedsBridge(node.Type) {
+				m.setupBridge(ctx, inspect.ID, node.Name, node.Type)
 			}
 
 			// Ensure Management Interface is renamed (idempotent check)
@@ -277,10 +277,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	// 6. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
 	m.renameMgmtInterface(ctx, resp.ID, node.Name)
 
-	// 7. If node is SWITCH, initialize bridge 'br0'
-
-	if node.Type == models.SWITCH {
-		m.setupSwitchBridge(ctx, resp.ID, node.Name)
+	// 7. If node needs a bridge, initialize 'br0'
+	if models.NeedsBridge(node.Type) {
+		m.setupBridge(ctx, resp.ID, node.Name, node.Type)
 	}
 
 	m.logger.Info("node created and started", "name", node.Name, "id", resp.ID[:12])
@@ -330,32 +329,35 @@ func (m *Manager) renameMgmtInterface(ctx context.Context, containerID, nodeName
 	}
 }
 
-// setupSwitchBridge initializes the bridge interface inside a switch container
-func (m *Manager) setupSwitchBridge(ctx context.Context, containerID, nodeName string) {
-	// Use specific shell command to ensure bridge creation
-	// We use ; instead of && to be safer with simple shells, though && is standard
-	setupCmd := []string{"sh", "-c", "ip link add name br0 type bridge; ip link set dev br0 up"}
-
-	execConfigSwitch := container.ExecOptions{
-		Cmd:          setupCmd,
-		AttachStdout: true,
-		AttachStderr: true,
-		Privileged:   true, // Ensure privileges for netlink ops
+// setupBridge initializes the bridge interface (br0) inside a switch or hub container.
+// For HUB nodes, ageing_time is set to 0 to disable MAC learning (L1 flood behavior).
+func (m *Manager) setupBridge(ctx context.Context, containerID, nodeName string, nodeType models.NodeType) {
+	setupCmd := "ip link add name br0 type bridge; ip link set dev br0 up"
+	if nodeType == models.HUB {
+		setupCmd = "ip link add name br0 type bridge; ip link set dev br0 type bridge ageing_time 0 forward_delay 0; ip link set dev br0 up"
 	}
 
-	m.logger.Info("initializing bridge for switch", "name", nodeName)
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"sh", "-c", setupCmd},
+		AttachStdout: true,
+		AttachStderr: true,
+		Privileged:   true,
+	}
 
-	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfigSwitch); err == nil {
+	m.logger.Info("initializing bridge", "name", nodeName, "type", nodeType)
+
+	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
 		if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
-			m.logger.Error("failed to start switch setup", "name", nodeName, "error", errStart)
+			m.logger.Error("failed to start bridge setup", "name", nodeName, "error", errStart)
 		}
 	} else {
-		m.logger.Error("failed to create switch setup exec", "name", nodeName, "error", err)
+		m.logger.Error("failed to create bridge setup exec", "name", nodeName, "error", err)
 	}
 }
 
-// AttachInterfaceToBridge connects a network interface to the main bridge (br0) inside a container
-func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID string, ifaceName string) error {
+// AttachInterfaceToBridge connects a network interface to the main bridge (br0) inside a container.
+// For HUB nodes, MAC learning is disabled on the interface to simulate L1 flood behavior.
+func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID string, ifaceName string, nodeType models.NodeType) error {
 	if err := models.ValidateInterfaceName(ifaceName); err != nil {
 		return fmt.Errorf("bridge attach rejected: %v", err)
 	}
@@ -376,7 +378,26 @@ func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID strin
 		return fmt.Errorf("failed to start exec for bridge attach: %v", err)
 	}
 
-	// Step 2: Bring interface up
+	// Step 2: Configure hub interface: disable MAC learning, explicitly enable flood
+	if nodeType == models.HUB {
+		execConfigHub := container.ExecOptions{
+			Cmd:          []string{"bridge", "link", "set", "dev", ifaceName, "learning", "off", "flood", "on"},
+			AttachStdout: true,
+			AttachStderr: true,
+			Privileged:   true,
+		}
+
+		execIDHub, err := m.cli.ContainerExecCreate(ctx, containerID, execConfigHub)
+		if err != nil {
+			m.logger.Warn("failed to configure hub interface", "iface", ifaceName, "error", err)
+		} else {
+			if err := m.cli.ContainerExecStart(ctx, execIDHub.ID, container.ExecStartOptions{}); err != nil {
+				m.logger.Warn("failed to start hub interface config", "iface", ifaceName, "error", err)
+			}
+		}
+	}
+
+	// Step 3: Bring interface up
 	execConfig2 := container.ExecOptions{
 		Cmd:          []string{"ip", "link", "set", "dev", ifaceName, "up"},
 		AttachStdout: true,

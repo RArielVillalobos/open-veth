@@ -98,17 +98,17 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		return
 	}
 
-	// Attach interfaces to bridge if nodes are Switches
-	if source.Type == models.SWITCH {
-		if err := h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, link.SourceInt); err != nil {
-			h.Logger.Warn("failed to attach interface to switch",
-				"interface", link.SourceInt, "switch", source.Name, "error", err)
+	// Attach interfaces to bridge if nodes need one (switch/hub)
+	if models.NeedsBridge(source.Type) {
+		if err := h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, link.SourceInt, source.Type); err != nil {
+			h.Logger.Warn("failed to attach interface to bridge",
+				"interface", link.SourceInt, "node", source.Name, "type", source.Type, "error", err)
 		}
 	}
-	if target.Type == models.SWITCH {
-		if err := h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, link.TargetInt); err != nil {
-			h.Logger.Warn("failed to attach interface to switch",
-				"interface", link.TargetInt, "switch", target.Name, "error", err)
+	if models.NeedsBridge(target.Type) {
+		if err := h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, link.TargetInt, target.Type); err != nil {
+			h.Logger.Warn("failed to attach interface to bridge",
+				"interface", link.TargetInt, "node", target.Name, "type", target.Type, "error", err)
 		}
 	}
 

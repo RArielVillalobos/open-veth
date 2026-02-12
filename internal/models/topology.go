@@ -6,10 +6,16 @@ import "fmt"
 type NodeType string
 
 const (
-	ROUTER NodeType = "router" // Usa imagen FRR/Quagga
-	SWITCH NodeType = "switch" // Usa Linux Bridge (nativo)
-	HOST   NodeType = "host"   // Usa imagen Alpine/Ubuntu
+	ROUTER NodeType = "router" // Uses FRR/Quagga image
+	SWITCH NodeType = "switch" // Uses Linux Bridge (native)
+	HUB    NodeType = "hub"    // Uses Linux Bridge without MAC learning (L1 repeater)
+	HOST   NodeType = "host"   // Uses Alpine/Ubuntu image
 )
+
+// NeedsBridge returns true for node types that use an internal bridge (br0)
+func NeedsBridge(t NodeType) bool {
+	return t == SWITCH || t == HUB
+}
 
 // Official Images
 const (
@@ -26,6 +32,8 @@ func GetImageForType(t NodeType) string {
 		return ImgHost
 	case SWITCH:
 		return ImgHost // Switch uses the host image to run the bridge
+	case HUB:
+		return ImgHost // Hub uses the host image to run the bridge without MAC learning
 	default:
 		return ImgHost
 	}
