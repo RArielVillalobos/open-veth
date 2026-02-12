@@ -20,18 +20,92 @@ export class NodePaletteComponent {
   addNode = output<{ type: NodeType; name: string }>();
 
   pendingType = signal<NodeType | null>(null);
+  expandedDescription = signal<NodeType | null>(null);
   nameCtrl = new FormControl('', { nonNullable: true });
 
   private nameValue = toSignal(this.nameCtrl.valueChanges, { initialValue: '' });
 
   nameInputEl = viewChild<ElementRef<HTMLInputElement>>('nameInputEl');
 
-  readonly nodeTypeConfigs: { id: NodeType; label: string; subtitle: string; icon: string; placeholder: string; accentBorder: string; hoverBorder: string }[] = [
-    { id: 'router', label: 'Router', subtitle: 'Layer 3', icon: 'router.svg', placeholder: 'e.g. R1', accentBorder: 'border-blue-500', hoverBorder: 'hover:border-blue-500/50' },
-    { id: 'switch', label: 'Switch', subtitle: 'Layer 2', icon: 'switch.svg', placeholder: 'e.g. SW1', accentBorder: 'border-amber-500', hoverBorder: 'hover:border-amber-500/50' },
-    { id: 'hub', label: 'Hub', subtitle: 'Layer 1 - Broadcast', icon: 'hub.svg', placeholder: 'e.g. HUB1', accentBorder: 'border-violet-500', hoverBorder: 'hover:border-violet-500/50' },
-    { id: 'host', label: 'Host', subtitle: 'End device', icon: 'host.svg', placeholder: 'e.g. PC1', accentBorder: 'border-emerald-500', hoverBorder: 'hover:border-emerald-500/50' },
+  readonly nodeTypeConfigs: { 
+    id: NodeType; 
+    label: string; 
+    subtitle: string; 
+    icon: string; 
+    placeholder: string; 
+    accentBorder: string; 
+    hoverBorder: string;
+    category: 'network' | 'end';
+    shortcut: string;
+    description: string;
+  }[] = [
+    { 
+      id: 'router', 
+      label: 'Router', 
+      subtitle: 'Layer 3', 
+      icon: 'router.svg', 
+      placeholder: 'e.g. R1', 
+      accentBorder: 'border-blue-500', 
+      hoverBorder: 'hover:border-blue-500/50',
+      category: 'network',
+      shortcut: 'R',
+      description: 'Layer 3 device with FRRouting support. Supports OSPF, BGP, IS-IS.'
+    },
+    { 
+      id: 'switch', 
+      label: 'Switch', 
+      subtitle: 'Layer 2', 
+      icon: 'switch.svg', 
+      placeholder: 'e.g. SW1', 
+      accentBorder: 'border-amber-500', 
+      hoverBorder: 'hover:border-amber-500/50',
+      category: 'network',
+      shortcut: 'S',
+      description: 'Layer 2 switch with MAC learning and broadcast domain support.'
+    },
+    { 
+      id: 'hub', 
+      label: 'Hub', 
+      subtitle: 'Layer 1', 
+      icon: 'hub.svg', 
+      placeholder: 'e.g. HUB1', 
+      accentBorder: 'border-violet-500', 
+      hoverBorder: 'hover:border-violet-500/50',
+      category: 'network',
+      shortcut: 'U',
+      description: 'Layer 1 repeater. Floods all traffic to all ports (no MAC learning).'
+    },
+    { 
+      id: 'host', 
+      label: 'Host', 
+      subtitle: 'End device', 
+      icon: 'host.svg', 
+      placeholder: 'e.g. PC1', 
+      accentBorder: 'border-emerald-500', 
+      hoverBorder: 'hover:border-emerald-500/50',
+      category: 'end',
+      shortcut: 'H',
+      description: 'End device (PC/Server) with Alpine Linux and networking tools.'
+    },
   ];
+
+  // Computed count of nodes by type
+  nodeCounts = computed(() => {
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0 };
+    this.nodes().forEach(node => {
+      if (counts[node.type as NodeType] !== undefined) {
+        counts[node.type as NodeType]++;
+      }
+    });
+    return counts;
+  });
+
+  // Filtered node types by category
+  networkDevices = computed(() => this.nodeTypeConfigs.filter(nt => nt.category === 'network'));
+  endDevices = computed(() => this.nodeTypeConfigs.filter(nt => nt.category === 'end'));
+  
+  // Keyboard shortcuts for footer
+  shortcuts = computed(() => this.nodeTypeConfigs.map(nt => ({ key: nt.shortcut, label: nt.label })));
 
   nameError = computed(() => {
     const name = this.nameValue().trim();
@@ -79,6 +153,10 @@ export class NodePaletteComponent {
   cancelNaming() {
     this.pendingType.set(null);
     this.nameCtrl.reset();
+  }
+
+  toggleDescription(type: NodeType) {
+    this.expandedDescription.update(current => current === type ? null : type);
   }
 
   @HostListener('document:keydown', ['$event'])

@@ -6,12 +6,12 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
     style: {
       'label': 'data(label)',
       'color': '#1e293b',
-      'font-size': '11px',
+      'font-size': '12px',
       'font-weight': 'bold',
       'text-valign': 'bottom',
       'text-wrap': 'wrap',
       'text-max-width': '150px',
-      'text-margin-y': 6,
+      'text-margin-y': -2,
       'width': 56,
       'height': 48,
       'shape': 'rectangle',
@@ -90,12 +90,13 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'target-label': 'data(target_int)',
       'source-text-offset': 32,
       'target-text-offset': 32,
-      'font-size': '9px',
-      'color': '#6366f1',
+      'font-size': '10px',
+      'font-family': 'JetBrains Mono, monospace',
+      'color': '#475569',
       'text-wrap': 'wrap',
       'text-background-opacity': 1,
-      'text-background-color': '#eef2ff',
-      'text-background-padding': '2px',
+      'text-background-color': '#f1f5f9',
+      'text-background-padding': '3px',
       'text-background-shape': 'roundrectangle'
     }
   }

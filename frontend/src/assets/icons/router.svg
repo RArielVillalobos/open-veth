@@ -10,21 +10,21 @@
   </defs>
   
   <!-- Outer circle with gradient -->
-  <circle cx="32" cy="32" r="28" fill="url(#routerGrad)" filter="url(#routerShadow)"/>
+  <circle cx="32" cy="32" r="26" fill="url(#routerGrad)" filter="url(#routerShadow)"/>
   
   <!-- Inner highlight -->
-  <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <circle cx="32" cy="32" r="22" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
   
   <!-- Central routing symbol -->
   <g fill="white" opacity="0.9">
     <!-- Cross -->
-    <rect x="30" y="14" width="4" height="36" rx="1"/>
-    <rect x="14" y="30" width="36" height="4" rx="1"/>
+    <rect x="30" y="16" width="4" height="32" rx="1"/>
+    <rect x="16" y="30" width="32" height="4" rx="1"/>
     
     <!-- Arrow heads -->
-    <path d="M32 8 L36 14 H28 Z"/>
-    <path d="M32 56 L28 50 H36 Z"/>
-    <path d="M8 32 L14 28 V36 Z"/>
-    <path d="M56 32 L50 36 V28 Z"/>
+    <path d="M32 12 L36 16 H28 Z"/>
+    <path d="M32 52 L28 48 H36 Z"/>
+    <path d="M12 32 L16 28 V36 Z"/>
+    <path d="M52 32 L48 36 V28 Z"/>
   </g>
 </svg>

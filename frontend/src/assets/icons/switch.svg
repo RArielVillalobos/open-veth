@@ -10,24 +10,24 @@
   </defs>
   
   <!-- Main body with gradient -->
-  <rect x="6" y="18" width="52" height="28" rx="6" fill="url(#switchGrad)" filter="url(#switchShadow)"/>
+  <rect x="4" y="8" width="56" height="48" rx="8" fill="url(#switchGrad)" filter="url(#switchShadow)"/>
   
   <!-- Inner highlight line -->
-  <rect x="10" y="22" width="44" height="20" rx="4" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <rect x="8" y="12" width="48" height="40" rx="6" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
   
   <!-- Switch ports/lights -->
   <g fill="white" opacity="0.9">
-    <circle cx="18" cy="32" r="3"/>
-    <circle cx="28" cy="32" r="3"/>
-    <circle cx="36" cy="32" r="3"/>
-    <circle cx="46" cy="32" r="3"/>
+    <circle cx="18" cy="32" r="4"/>
+    <circle cx="28" cy="32" r="4"/>
+    <circle cx="36" cy="32" r="4"/>
+    <circle cx="46" cy="32" r="4"/>
   </g>
   
   <!-- Bidirectional arrows -->
   <g fill="white" opacity="0.6">
-    <path d="M8 26 L12 24 V28 Z"/>
-    <path d="M56 26 L52 24 V28 Z"/>
-    <path d="M8 38 L12 36 V40 Z"/>
-    <path d="M56 38 L52 36 V40 Z"/>
+    <path d="M6 22 L12 19 V25 Z"/>
+    <path d="M58 22 L52 19 V25 Z"/>
+    <path d="M6 42 L12 39 V45 Z"/>
+    <path d="M58 42 L52 39 V45 Z"/>
   </g>
 </svg>

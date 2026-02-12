@@ -13,3 +13,22 @@
     }
   }
 }
+
+// Animation for input expansion
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 120px;
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.2s ease-out forwards;
+  overflow: hidden;
+}

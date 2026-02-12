@@ -1,52 +1,202 @@
-<div class="h-full bg-slate-900 border-r border-slate-700 flex flex-col p-3 w-52">
-  <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Nodes</h2>
+<div class="h-full bg-slate-900 border-r border-slate-700 flex flex-col w-56 overflow-hidden">
+  <!-- Header -->
+  <div class="p-3 border-b border-slate-800">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Components</h2>
+      <span class="text-[10px] text-slate-500">{{ nodes().length }} total</span>
+    </div>
+  </div>
 
-  <div class="flex flex-col gap-1.5">
-    @for (nt of nodeTypeConfigs; track nt.id) {
-      <button (click)="startNaming(nt.id)"
-              [class]="'flex items-center gap-2.5 px-2.5 py-2 rounded-md bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 group ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
-        <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
-        <div class="flex flex-col items-start">
-          <span class="text-xs font-medium text-slate-200 group-hover:text-white">{{ nt.label }}</span>
-          <span class="text-[10px] text-slate-500">{{ nt.subtitle }}</span>
-        </div>
-      </button>
+  <!-- Network Devices Group -->
+  <div class="p-3 pb-1">
+    <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+      </svg>
+      Network Devices
+    </h3>
+    <div class="flex flex-col gap-1.5">
+      @for (nt of networkDevices(); track nt.id) {
+        <div class="relative group">
+          <button (click)="startNaming(nt.id)"
+                  [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
+            <div class="relative">
+              <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
+              @if (nodeCounts()[nt.id] > 0) {
+                <span class="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-slate-600">
+                  {{ nodeCounts()[nt.id] }}
+                </span>
+              }
+            </div>
+            <div class="flex flex-col items-start flex-1 min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-medium text-slate-200 group-hover:text-white">{{ nt.label }}</span>
+                <kbd class="hidden group-hover:inline-flex px-1 py-0 text-[9px] bg-slate-700 text-slate-400 rounded">{{ nt.shortcut }}</kbd>
+              </div>
+              <span class="text-[10px] text-slate-500 truncate">{{ nt.subtitle }}</span>
+            </div>
+            <!-- Info button -->
+            <button type="button" 
+                    (click)="toggleDescription(nt.id); $event.stopPropagation()"
+                    class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+                    title="Show details">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </button>
 
-      @if (pendingType() === nt.id) {
-        <div class="px-2 pb-1">
-          <input #nameInputEl type="text"
-                 [formControl]="nameCtrl"
-                 (keydown.enter)="confirmName()"
-                 (keydown.escape)="cancelNaming()"
-                 [maxLength]="20"
-                 [placeholder]="nt.placeholder"
-                 [class]="inputClasses()">
-          <div class="flex items-center gap-1 mt-1.5">
-            <button type="button" (click)="confirmName()"
-                    [disabled]="!canConfirm()"
-                    [class]="'flex-1 text-[11px] px-2 py-1 rounded font-medium transition-colors ' + (canConfirm()
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                      : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
-              Add
-            </button>
-            <button type="button" (click)="cancelNaming()"
-                    class="px-2 py-1 text-[11px] rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors">
-              Cancel
-            </button>
-          </div>
-          @if (nameError()) {
-            <p class="text-[10px] text-red-400 mt-1">{{ nameError() }}</p>
+          <!-- Description panel -->
+          @if (expandedDescription() === nt.id) {
+            <div class="px-2 py-2 mt-1 bg-slate-800/80 border border-slate-700 rounded-lg animate-slide-down">
+              <p class="text-[11px] text-slate-300 leading-relaxed">{{ nt.description }}</p>
+            </div>
+          }
+
+          @if (pendingType() === nt.id) {
+            <div class="px-2 pb-1 mt-1 animate-slide-down">
+              <input #nameInputEl type="text"
+                     [formControl]="nameCtrl"
+                     (keydown.enter)="confirmName()"
+                     (keydown.escape)="cancelNaming()"
+                     [maxLength]="20"
+                     [placeholder]="nt.placeholder"
+                     [class]="inputClasses()">
+              <div class="flex items-center gap-1 mt-1.5">
+                <button type="button" (click)="confirmName()"
+                        [disabled]="!canConfirm()"
+                        [class]="'flex-1 text-[11px] px-2 py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ' + (canConfirm()
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                          : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
+                  @if (canConfirm()) {
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  }
+                  Add {{ nt.label }}
+                </button>
+                <button type="button" (click)="cancelNaming()"
+                        class="px-2 py-1.5 text-[11px] rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              @if (nameError()) {
+                <p class="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  {{ nameError() }}
+                </p>
+              }
+            </div>
           }
         </div>
       }
-    }
+    </div>
   </div>
 
-  <div class="mt-auto pt-4">
-    <p class="text-[10px] text-slate-600 text-center">
-      Press <kbd class="px-1 py-0.5 bg-slate-800 rounded text-slate-500">R</kbd>
-      <kbd class="px-1 py-0.5 bg-slate-800 rounded text-slate-500 mx-0.5">S</kbd>
-      <kbd class="px-1 py-0.5 bg-slate-800 rounded text-slate-500">H</kbd>
-    </p>
+  <!-- End Devices Group -->
+  <div class="p-3 pt-1">
+    <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+      </svg>
+      End Devices
+    </h3>
+    <div class="flex flex-col gap-1.5">
+      @for (nt of endDevices(); track nt.id) {
+        <div class="relative group">
+          <button (click)="startNaming(nt.id)"
+                  [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
+            <div class="relative">
+              <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
+              @if (nodeCounts()[nt.id] > 0) {
+                <span class="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-slate-600">
+                  {{ nodeCounts()[nt.id] }}
+                </span>
+              }
+            </div>
+            <div class="flex flex-col items-start flex-1 min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-medium text-slate-200 group-hover:text-white">{{ nt.label }}</span>
+                <kbd class="hidden group-hover:inline-flex px-1 py-0 text-[9px] bg-slate-700 text-slate-400 rounded">{{ nt.shortcut }}</kbd>
+              </div>
+              <span class="text-[10px] text-slate-500 truncate">{{ nt.subtitle }}</span>
+            </div>
+            <!-- Info button -->
+            <button type="button" 
+                    (click)="toggleDescription(nt.id); $event.stopPropagation()"
+                    class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+                    title="Show details">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </button>
+
+          <!-- Description panel -->
+          @if (expandedDescription() === nt.id) {
+            <div class="px-2 py-2 mt-1 bg-slate-800/80 border border-slate-700 rounded-lg animate-slide-down">
+              <p class="text-[11px] text-slate-300 leading-relaxed">{{ nt.description }}</p>
+            </div>
+          }
+
+          @if (pendingType() === nt.id) {
+            <div class="px-2 pb-1 mt-1 animate-slide-down">
+              <input #nameInputEl type="text"
+                     [formControl]="nameCtrl"
+                     (keydown.enter)="confirmName()"
+                     (keydown.escape)="cancelNaming()"
+                     [maxLength]="20"
+                     [placeholder]="nt.placeholder"
+                     [class]="inputClasses()">
+              <div class="flex items-center gap-1 mt-1.5">
+                <button type="button" (click)="confirmName()"
+                        [disabled]="!canConfirm()"
+                        [class]="'flex-1 text-[11px] px-2 py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ' + (canConfirm()
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                          : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
+                  @if (canConfirm()) {
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  }
+                  Add {{ nt.label }}
+                </button>
+                <button type="button" (click)="cancelNaming()"
+                        class="px-2 py-1.5 text-[11px] rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              @if (nameError()) {
+                <p class="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  {{ nameError() }}
+                </p>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Footer with Keyboard Shortcuts -->
+  <div class="mt-auto py-2 px-3 border-t border-slate-800">
+    <div class="flex items-center justify-between">
+      <span class="text-[10px] text-slate-500">Quick add:</span>
+      <div class="flex items-center gap-1">
+        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">R</kbd>
+        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">S</kbd>
+        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">U</kbd>
+        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">H</kbd>
+      </div>
+    </div>
   </div>
 </div>
