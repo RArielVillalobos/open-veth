@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -92,7 +93,6 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 	labID := c.Param("id")
 	ctx := c.Request.Context()
 
-	// Verify Lab Exists
 	lab, ok := h.Repo.GetLaboratory(labID)
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "laboratory not found"})
@@ -101,7 +101,9 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 
 	h.Logger.Info("saving lab state", "id", labID, "name", lab.Name)
 
-	// Get all nodes for this lab
+	h.labOpMu.Lock()
+	defer h.labOpMu.Unlock()
+
 	nodes, err := h.Repo.ListNodesByLab(labID)
 	if err != nil {
 		h.Logger.Error("failed to list nodes for save state", "lab", labID, "error", err)
@@ -110,69 +112,12 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 	}
 	h.hydrateNodes(nodes)
 
-	// Collect interface configs from all nodes
-	var configs []models.InterfaceConfig
-	for _, node := range nodes {
-		if node.ContainerID == "" {
-			continue
-		}
-
-		ifaces, err := h.Manager.GetNodeInterfaces(ctx, node.ContainerID)
-		if err != nil {
-			h.Logger.Warn("failed to get interfaces for node", "node", node.Name, "error", err)
-			continue
-		}
-
-		for _, iface := range ifaces {
-			// Skip loopback and management interfaces
-			if iface.Name == "lo" || iface.Name == "mgmt0" {
-				continue
-			}
-
-			for _, addr := range iface.IPAddresses {
-				// Skip link-local addresses
-				if len(addr.Address) > 4 && addr.Address[:4] == "fe80" {
-					continue
-				}
-				configs = append(configs, models.InterfaceConfig{
-					LabID:     labID,
-					NodeID:    node.ID,
-					Interface: iface.Name,
-					Address:   fmt.Sprintf("%s/%d", addr.Address, addr.Prefix),
-				})
-			}
-		}
+	configs, routeConfigs, hasRunning := h.captureLabState(ctx, labID, nodes)
+	if !hasRunning {
+		c.JSON(http.StatusConflict, gin.H{"error": "laboratory has no running containers; activate it first"})
+		return
 	}
 
-	// Collect route configs from all nodes
-	var routeConfigs []models.RouteConfig
-	for _, node := range nodes {
-		if node.ContainerID == "" {
-			continue
-		}
-
-		routes, err := h.Manager.GetNodeRoutes(ctx, node.ContainerID)
-		if err != nil {
-			h.Logger.Warn("failed to get routes for node", "node", node.Name, "error", err)
-			continue
-		}
-
-		for _, r := range routes {
-			// Skip kernel-generated connected routes (they come back automatically with the IP)
-			if r.Protocol == "kernel" {
-				continue
-			}
-			routeConfigs = append(routeConfigs, models.RouteConfig{
-				LabID:   labID,
-				NodeID:  node.ID,
-				Dst:     r.Dst,
-				Gateway: r.Gateway,
-				Dev:     r.Dev,
-			})
-		}
-	}
-
-	// Save to DB
 	if err := h.Repo.SaveInterfaceConfigs(labID, configs); err != nil {
 		h.Logger.Error("failed to save interface configs", "lab", labID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -190,6 +135,63 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 		"ips_saved":    len(configs),
 		"routes_saved": len(routeConfigs),
 	})
+}
+
+// captureLabState reads live IP and route configuration from running containers.
+// Nodes must be hydrated before calling. Returns hasRunning=false if no containers
+// are running, allowing the caller to skip the save and preserve existing DB state.
+func (h *Handler) captureLabState(ctx context.Context, labID string, nodes []models.Node) (
+	configs []models.InterfaceConfig, routeConfigs []models.RouteConfig, hasRunning bool,
+) {
+	for _, node := range nodes {
+		if node.ContainerID == "" {
+			continue
+		}
+		hasRunning = true
+
+		ifaces, err := h.Manager.GetNodeInterfaces(ctx, node.ContainerID)
+		if err != nil {
+			h.Logger.Warn("failed to get interfaces for node", "node", node.Name, "error", err)
+			continue
+		}
+
+		for _, iface := range ifaces {
+			if iface.Name == "lo" || iface.Name == "mgmt0" {
+				continue
+			}
+			for _, addr := range iface.IPAddresses {
+				if len(addr.Address) > 4 && addr.Address[:4] == "fe80" {
+					continue
+				}
+				configs = append(configs, models.InterfaceConfig{
+					LabID:     labID,
+					NodeID:    node.ID,
+					Interface: iface.Name,
+					Address:   fmt.Sprintf("%s/%d", addr.Address, addr.Prefix),
+				})
+			}
+		}
+
+		routes, err := h.Manager.GetNodeRoutes(ctx, node.ContainerID)
+		if err != nil {
+			h.Logger.Warn("failed to get routes for node", "node", node.Name, "error", err)
+			continue
+		}
+
+		for _, r := range routes {
+			if r.Protocol == "kernel" {
+				continue
+			}
+			routeConfigs = append(routeConfigs, models.RouteConfig{
+				LabID:   labID,
+				NodeID:  node.ID,
+				Dst:     r.Dst,
+				Gateway: r.Gateway,
+				Dev:     r.Dev,
+			})
+		}
+	}
+	return
 }
 
 // CleanupLaboratory removes all nodes and links from a specific laboratory
@@ -258,7 +260,16 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 
 	h.Logger.Info("activating laboratory", "id", labID)
 
-	// 2. NUKE: Delete ALL running containers to free resources
+	// 2. Acquire lock for the entire save-nuke-rebuild sequence
+	h.labOpMu.Lock()
+	defer h.labOpMu.Unlock()
+
+	// 3. Save current active lab state before destroying containers
+	if err := h.saveAllLabsStateLocked(ctx); err != nil {
+		h.Logger.Warn("failed to save state before lab switch", "error", err)
+	}
+
+	// 4. NUKE: Delete ALL running containers to free resources (state already saved in step 3)
 	h.Runtime.Clear()
 	containers, err := h.Manager.GetOpenVethContainers(ctx)
 	if err == nil {
@@ -270,7 +281,7 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	// 3. Rebuild Nodes
+	// 5. Rebuild Nodes
 	nodes, err := h.Repo.ListNodesByLab(labID)
 	if err != nil {
 		h.Logger.Error("failed to fetch nodes for lab", "lab", labID, "error", err)
@@ -296,7 +307,7 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		nodes[i].PID = pid
 	}
 
-	// 4. Rebuild Links
+	// 6. Rebuild Links
 	links, err := h.Repo.ListLinksByLab(labID)
 	if err != nil {
 		h.Logger.Warn("failed to fetch links for lab", "lab", labID, "error", err)
@@ -333,7 +344,7 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	// 5. Restore saved IP configurations
+	// 7. Restore saved IP configurations
 	savedConfigs, err := h.Repo.GetInterfaceConfigsByLab(labID)
 	if err != nil {
 		h.Logger.Warn("failed to fetch saved configs", "lab", labID, "error", err)
@@ -357,7 +368,7 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	// 6. Restore saved route configurations (must happen after IPs are restored)
+	// 8. Restore saved route configurations (must happen after IPs are restored)
 	savedRoutes, err := h.Repo.GetRouteConfigsByLab(labID)
 	if err != nil {
 		h.Logger.Warn("failed to fetch saved routes", "lab", labID, "error", err)

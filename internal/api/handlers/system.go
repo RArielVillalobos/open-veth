@@ -301,9 +301,17 @@ func (h *Handler) restoreIPsAndRoutes(ctx context.Context, nodeMap map[string]mo
 	return
 }
 
-// SaveAllLabsState captures and persists IP and route configuration for all laboratories.
-// Called during graceful shutdown to preserve state without manual user action.
+// SaveAllLabsState captures and persists IP and route configuration for all active laboratories.
+// Acquires labOpMu to prevent racing with ActivateLaboratory or SaveLabState.
 func (h *Handler) SaveAllLabsState(ctx context.Context) error {
+	h.labOpMu.Lock()
+	defer h.labOpMu.Unlock()
+	return h.saveAllLabsStateLocked(ctx)
+}
+
+// saveAllLabsStateLocked is the internal version of SaveAllLabsState.
+// The caller MUST hold h.labOpMu before calling this.
+func (h *Handler) saveAllLabsStateLocked(ctx context.Context) error {
 	labs, err := h.Repo.ListLaboratories()
 	if err != nil {
 		return fmt.Errorf("failed to list laboratories: %w", err)
@@ -318,57 +326,9 @@ func (h *Handler) SaveAllLabsState(ctx context.Context) error {
 		}
 		h.hydrateNodes(nodes)
 
-		var configs []models.InterfaceConfig
-		var routeConfigs []models.RouteConfig
-		for _, node := range nodes {
-			if node.ContainerID == "" {
-				continue
-			}
-
-			// Capture IPs
-			ifaces, err := h.Manager.GetNodeInterfaces(ctx, node.ContainerID)
-			if err != nil {
-				h.Logger.Warn("failed to get interfaces for node", "node", node.Name, "error", err)
-				continue
-			}
-
-			for _, iface := range ifaces {
-				if iface.Name == "lo" || iface.Name == "mgmt0" {
-					continue
-				}
-
-				for _, addr := range iface.IPAddresses {
-					if len(addr.Address) > 4 && addr.Address[:4] == "fe80" {
-						continue
-					}
-					configs = append(configs, models.InterfaceConfig{
-						LabID:     lab.ID,
-						NodeID:    node.ID,
-						Interface: iface.Name,
-						Address:   fmt.Sprintf("%s/%d", addr.Address, addr.Prefix),
-					})
-				}
-			}
-
-			// Capture routes
-			routes, err := h.Manager.GetNodeRoutes(ctx, node.ContainerID)
-			if err != nil {
-				h.Logger.Warn("failed to get routes for node", "node", node.Name, "error", err)
-				continue
-			}
-
-			for _, r := range routes {
-				if r.Protocol == "kernel" {
-					continue
-				}
-				routeConfigs = append(routeConfigs, models.RouteConfig{
-					LabID:   lab.ID,
-					NodeID:  node.ID,
-					Dst:     r.Dst,
-					Gateway: r.Gateway,
-					Dev:     r.Dev,
-				})
-			}
+		configs, routeConfigs, hasRunning := h.captureLabState(ctx, lab.ID, nodes)
+		if !hasRunning {
+			continue
 		}
 
 		if err := h.Repo.SaveInterfaceConfigs(lab.ID, configs); err != nil {

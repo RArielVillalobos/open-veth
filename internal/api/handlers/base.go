@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log/slog"
+	"sync"
 
 	"open-veth/internal/config"
 	"open-veth/internal/models"
@@ -18,6 +19,11 @@ type Handler struct {
 	Logger   *slog.Logger
 	Config   *config.Config
 	EventHub *NetworkEventHub
+
+	// labOpMu serializes operations that save state, destroy containers,
+	// or rebuild labs. Prevents the auto-save goroutine from reading
+	// stale containers while ActivateLaboratory is mid-nuke.
+	labOpMu sync.Mutex
 }
 
 // NewHandler creates a new handler with all dependencies
