@@ -6,54 +6,68 @@ DOCKER_CMD=docker
 COMPOSE_CMD=docker compose
 FRONTEND_DIR=frontend
 
-.PHONY: all images dev-env dev-down run-api run-ui deps-go deps-ui clean help
+.PHONY: all up down images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%%-20s\033[0m %s\n", $$1, $$2}'
 
 all: help
 
-# --- Infrastructure ---
-dev-env: ## Start development environment (Docker Compose)
+# --- Quick Start (Docker) ---
+up: images ## Start OpenVeth (build images + docker compose up)
+	$(COMPOSE_CMD) up -d --build
+	@echo ""
+	@echo "OpenVeth is running at http://localhost"
+	@echo ""
+
+down: ## Stop OpenVeth
+	$(COMPOSE_CMD) down
+
+logs: ## Show logs from all services
+	$(COMPOSE_CMD) logs -f
+
+# --- Development (Docker) ---
+dev-env: ## Start development container (for Linux networking)
 	$(COMPOSE_CMD) -f docker-compose.dev.yml up -d --build
 
-dev-down: ## Stop development environment
+dev-down: ## Stop development container
 	$(COMPOSE_CMD) -f docker-compose.dev.yml down
 
-# --- Node Images ---
-images: ## Build base images (Host and Router)
-	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
-	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
+# --- Development (Native) ---
+run-api: deps-go ## Run API server natively (requires Go + Linux)
+	$(GO_CMD) run cmd/openveth-api/main.go
 
-# --- Backend (Go) ---
+run-ui: ## Run frontend dev server natively (requires Node)
+	cd $(FRONTEND_DIR) && npm start
+
 deps-go: ## Install Go dependencies
 	$(GO_CMD) mod tidy
 
-run-api: deps-go ## Run API server (Backend)
-	$(GO_CMD) run cmd/openveth-api/main.go
+deps-ui: ## Install frontend dependencies
+	cd $(FRONTEND_DIR) && npm install
 
+# --- Node Images ---
+images: ## Build node images (Host and Router)
+	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
+	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
+
+# --- Testing ---
 test-go: ## Run Go tests
 	$(GO_CMD) test ./...
 
-# --- Frontend (Angular) ---
-deps-ui: ## Install Frontend dependencies
-	cd $(FRONTEND_DIR) && npm install
-
-run-ui: ## Run Frontend in development mode
-	cd $(FRONTEND_DIR) && npm start
-
 # --- Utilities ---
-fmt: ## 🎨 Format Go source code
+fmt: ## Format Go source code
 	$(GO_CMD) fmt ./...
 	@echo "Go code formatted."
 
-clean: dev-down ## Clean containers and artifacts
+clean: down dev-down ## Stop everything and clean artifacts
 	cd $(FRONTEND_DIR) && rm -rf node_modules .angular
 	$(GO_CMD) clean
 	@echo "Cleanup completed."
 
-nuke: ## ☢️  NUCLEAR CLEANUP: Stops & removes ALL OpenVeth containers and data
-	@echo "destroying openveth environment..."
+nuke: ## NUCLEAR: Remove ALL OpenVeth containers and database
+	@echo "Destroying openveth environment..."
+	-$(COMPOSE_CMD) down -v
 	-$(DOCKER_CMD) ps -a -q --filter label=openveth=true | xargs -r $(DOCKER_CMD) rm -f
 	-rm -f openveth.db
 	@echo "Environment reset complete."

@@ -58,29 +58,33 @@ All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 | Docker | 20.10+ | Required |
 | Docker Compose | 2.0+ | Required |
 | Linux / WSL2 | - | Netlink operations require Linux kernel |
-| Go | 1.23+ | For backend development |
-| Node.js | 22+ | For frontend development |
 
 ### Installation
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/RArielVillalobos/open-veth.git
 cd open-veth
+make up
+# → Open http://localhost
+```
 
-# 2. Start development environment
+That's it. `make up` builds the node images, compiles the backend, builds the frontend, and starts everything.
+
+### Development Setup
+
+If you want to develop locally (requires Go 1.23+ and Node.js 22+):
+
+```bash
+# Start dev container (provides Linux networking tools)
 make dev-env
 
-# 3. Build node images
-make images
-
-# 4. Run the backend (terminal 1)
+# Run backend natively (terminal 1)
 make run-api
-# → API available at http://localhost:8080
+# → API at http://localhost:8080
 
-# 5. Run the frontend (terminal 2)
+# Run frontend natively (terminal 2)
 make run-ui
-# → UI available at http://localhost:4200
+# → UI at http://localhost:4200
 ```
 
 ---
