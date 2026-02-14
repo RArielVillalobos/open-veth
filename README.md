@@ -57,7 +57,10 @@ All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 |-----------|---------|-------|
 | Docker | 20.10+ | Required |
 | Docker Compose | 2.0+ | Required |
+| Make | - | Required |
 | Linux / WSL2 | - | Netlink operations require Linux kernel |
+
+> **Windows Users**: OpenVeth requires Linux networking. Use WSL2 with Docker Desktop configured for WSL integration.
 
 ### Installation
 
@@ -65,25 +68,48 @@ All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 git clone https://github.com/RArielVillalobos/open-veth.git
 cd open-veth
 make up
-# → Open http://localhost
 ```
 
-That's it. `make up` builds the node images, compiles the backend, builds the frontend, and starts everything.
+That's it! The command will:
+- Build node images (Host, Router)
+- Auto-detect available ports (avoids conflicts with existing services)
+- Start the application and show you the URL
+
+```
+========================================
+  OpenVeth is running!
+  Frontend: http://localhost:8080
+  Backend:  http://localhost:8081
+========================================
+```
+
+### Useful Commands
+
+```bash
+make help         # Show all available commands
+make up           # Start OpenVeth (auto-detects ports)
+make down         # Stop OpenVeth
+make logs         # View container logs
+make status       # Show current ports and container status
+make reset-ports  # Force port re-detection on next start
+```
 
 ### Development Setup
 
-If you want to develop locally (requires Go 1.23+ and Node.js 22+):
+For local development (requires Go 1.23+ and Node.js 22+):
 
 ```bash
 # Start dev container (provides Linux networking tools)
 make dev-env
 
-# Run backend natively (terminal 1)
-make run-api
-# → API at http://localhost:8080
+# In another terminal, enter the container
+docker exec -it openveth-dev bash
 
-# Run frontend natively (terminal 2)
-make run-ui
+# Inside the container, run the API
+go run ./cmd/openveth-api
+
+# Run frontend natively (terminal 2, on your host)
+cd frontend && npm install && npm start
 # → UI at http://localhost:4200
 ```
 

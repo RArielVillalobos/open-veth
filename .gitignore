@@ -17,6 +17,9 @@ tmp/
 .docker/
 *.log
 
+# Environment (auto-generated ports)
+.env
+
 # IDEs y Editores
 .vscode/
 .idea/

@@ -5,26 +5,39 @@ GO_CMD=go
 DOCKER_CMD=docker
 COMPOSE_CMD=docker compose
 FRONTEND_DIR=frontend
+SCRIPTS_DIR=scripts
 
 .PHONY: all up down images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke help
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 all: help
 
 # --- Quick Start (Docker) ---
-up: images ## Start OpenVeth (build images + docker compose up)
-	$(COMPOSE_CMD) up -d --build
+up: images ## Start OpenVeth (auto-detects available ports)
+	@$(SCRIPTS_DIR)/find-ports.sh
 	@echo ""
-	@echo "OpenVeth is running at http://localhost"
+	@$(COMPOSE_CMD) up -d --build
 	@echo ""
+	@echo "========================================"
+	@echo "  OpenVeth is running!"
+	@echo "  Frontend: http://localhost:$$(grep FRONTEND_PORT .env | cut -d= -f2)"
+	@echo "  Backend:  http://localhost:$$(grep BACKEND_PORT .env | cut -d= -f2)"
+	@echo "========================================"
 
 down: ## Stop OpenVeth
 	$(COMPOSE_CMD) down
 
 logs: ## Show logs from all services
 	$(COMPOSE_CMD) logs -f
+
+status: ## Show container status and ports
+	@echo "Current configuration (.env):"
+	@cat .env 2>/dev/null || echo "No .env file found"
+	@echo ""
+	@echo "Container status:"
+	@docker ps --filter "name=openveth" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 # --- Development (Docker) ---
 dev-env: ## Start development container (for Linux networking)
@@ -65,9 +78,13 @@ clean: down dev-down ## Stop everything and clean artifacts
 	$(GO_CMD) clean
 	@echo "Cleanup completed."
 
+reset-ports: ## Delete .env to detect new ports on next 'make up'
+	rm -f .env
+	@echo "Port configuration cleared. Run 'make up' to detect new ports."
+
 nuke: ## NUCLEAR: Remove ALL OpenVeth containers and database
 	@echo "Destroying openveth environment..."
 	-$(COMPOSE_CMD) down -v
 	-$(DOCKER_CMD) ps -a -q --filter label=openveth=true | xargs -r $(DOCKER_CMD) rm -f
-	-rm -f openveth.db
+	-rm -f openveth.db .env
 	@echo "Environment reset complete."

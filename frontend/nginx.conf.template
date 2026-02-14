@@ -19,9 +19,9 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy API requests to backend
-    location /api/ {
-        proxy_pass http://backend:8080/api/;
+    # WebSocket endpoints (terminal, sniff, events) - need long timeouts
+    location ~ ^/api/v1/(terminal|sniff|events) {
+        proxy_pass http://backend:${BACKEND_PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -29,16 +29,22 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Long timeouts for persistent connections
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        proxy_connect_timeout 60s;
     }
 
-    # Proxy WebSocket requests to backend
-    location /ws {
-        proxy_pass http://backend:8080/ws;
+    # Proxy API requests to backend
+    location /api/ {
+        proxy_pass http://backend:${BACKEND_PORT}/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_read_timeout 86400;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }

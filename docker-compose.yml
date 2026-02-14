@@ -10,7 +10,7 @@ services:
       - data:/app/data
     network_mode: bridge
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     pid: host
     environment:
       - SERVER_ADDRESS=:8080
@@ -25,7 +25,11 @@ services:
       dockerfile: Dockerfile
     container_name: openveth-frontend
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-80}:80"
+    extra_hosts:
+      - "backend:host-gateway"
+    environment:
+      - BACKEND_PORT=${BACKEND_PORT:-8080}
     depends_on:
       - backend
     restart: unless-stopped
