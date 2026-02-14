@@ -10,11 +10,18 @@ const (
 	SWITCH NodeType = "switch" // Uses Linux Bridge (native)
 	HUB    NodeType = "hub"    // Uses Linux Bridge without MAC learning (L1 repeater)
 	HOST   NodeType = "host"   // Uses Alpine/Ubuntu image
+	CLOUD  NodeType = "cloud"  // Internet gateway - keeps eth0 connected to Docker bridge
 )
 
 // NeedsBridge returns true for node types that use an internal bridge (br0)
 func NeedsBridge(t NodeType) bool {
 	return t == SWITCH || t == HUB
+}
+
+// KeepEth0 returns true for node types that should NOT rename eth0 to mgmt0.
+// CLOUD nodes keep eth0 to maintain connectivity to Docker bridge (internet access).
+func KeepEth0(t NodeType) bool {
+	return t == CLOUD
 }
 
 // Official Images
@@ -34,6 +41,8 @@ func GetImageForType(t NodeType) string {
 		return ImgHost // Switch uses the host image to run the bridge
 	case HUB:
 		return ImgHost // Hub uses the host image to run the bridge without MAC learning
+	case CLOUD:
+		return ImgHost // Cloud uses host image, keeps eth0 for internet access
 	default:
 		return ImgHost
 	}

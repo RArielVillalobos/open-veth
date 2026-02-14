@@ -63,6 +63,16 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
     }
   },
   {
+    selector: 'node[type="cloud"]',
+    style: {
+      'background-image': 'assets/icons/cloud.svg',
+      'background-fit': 'contain',
+      'background-clip': 'none',
+      'width': 56,
+      'height': 48
+    }
+  },
+  {
     selector: '.terminal-active',
     style: {
       'border-width': 2,

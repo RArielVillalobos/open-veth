@@ -3,7 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Node } from '../../../../models/topology.model';
 
-type NodeType = 'router' | 'host' | 'switch' | 'hub';
+type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -75,23 +75,35 @@ export class NodePaletteComponent {
       shortcut: 'U',
       description: 'Layer 1 repeater. Floods all traffic to all ports (no MAC learning).'
     },
-    { 
-      id: 'host', 
-      label: 'Host', 
-      subtitle: 'End device', 
-      icon: 'host.svg', 
-      placeholder: 'e.g. PC1', 
-      accentBorder: 'border-emerald-500', 
+    {
+      id: 'host',
+      label: 'Host',
+      subtitle: 'End device',
+      icon: 'host.svg',
+      placeholder: 'e.g. PC1',
+      accentBorder: 'border-emerald-500',
       hoverBorder: 'hover:border-emerald-500/50',
       category: 'end',
       shortcut: 'H',
       description: 'End device (PC/Server) with Alpine Linux and networking tools.'
     },
+    {
+      id: 'cloud',
+      label: 'Cloud',
+      subtitle: 'Internet',
+      icon: 'cloud.svg',
+      placeholder: 'e.g. INET',
+      accentBorder: 'border-sky-500',
+      hoverBorder: 'hover:border-sky-500/50',
+      category: 'network',
+      shortcut: 'I',
+      description: 'Internet gateway. Provides real internet access via Docker bridge.'
+    },
   ];
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;
@@ -170,5 +182,6 @@ export class NodePaletteComponent {
     if (key === 'S') this.startNaming('switch');
     if (key === 'U') this.startNaming('hub');
     if (key === 'H') this.startNaming('host');
+    if (key === 'I') this.startNaming('cloud');
   }
 }

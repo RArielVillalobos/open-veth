@@ -251,7 +251,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			}
 
 			// Ensure Management Interface is renamed (idempotent check)
-			m.renameMgmtInterface(ctx, inspect.ID, node.Name)
+			// CLOUD nodes keep eth0 to maintain Docker bridge connectivity
+			if !models.KeepEth0(node.Type) {
+				m.renameMgmtInterface(ctx, inspect.ID, node.Name)
+				m.deleteDefaultRoute(ctx, inspect.ID)
+			}
 
 			return inspect.ID, nil
 
@@ -275,7 +279,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	// 6. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
-	m.renameMgmtInterface(ctx, resp.ID, node.Name)
+	// CLOUD nodes keep eth0 to maintain Docker bridge connectivity (internet access)
+	if !models.KeepEth0(node.Type) {
+		m.renameMgmtInterface(ctx, resp.ID, node.Name)
+		m.deleteDefaultRoute(ctx, resp.ID)
+	}
 
 	// 7. If node needs a bridge, initialize 'br0'
 	if models.NeedsBridge(node.Type) {
@@ -327,6 +335,21 @@ func (m *Manager) renameMgmtInterface(ctx context.Context, containerID, nodeName
 		// This might fail if eth0 doesn't exist (already renamed), which is fine.
 		// fmt.Printf("Debug: Renaming eth0->mgmt0 attempt on %s: %v\n", nodeName, err)
 	}
+}
+
+// deleteDefaultRoute removes the default route from a container.
+// This forces students to configure routing manually in lab exercises.
+func (m *Manager) deleteDefaultRoute(ctx context.Context, containerID string) {
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"ip", "route", "del", "default"},
+		AttachStdout: false,
+		AttachStderr: false,
+	}
+
+	if execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
+		_ = m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
+	}
+	// Ignore errors - route might not exist
 }
 
 // setupBridge initializes the bridge interface (br0) inside a switch or hub container.

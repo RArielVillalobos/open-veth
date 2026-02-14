@@ -13,7 +13,7 @@ test.describe('Lab Management', () => {
 
   test('clicking lab name opens Lab Manager modal', async ({ page }) => {
     // Click the lab name button in the header
-    await page.locator('button[title="Manage Laboratories"]').click();
+    await page.locator('button[title*="Manage Laboratories"]').click();
 
     // Lab Manager modal should be visible
     await expect(page.locator('text=My Laboratories')).toBeVisible();
@@ -21,7 +21,7 @@ test.describe('Lab Management', () => {
   });
 
   test('create a new laboratory', async ({ page }) => {
-    await page.locator('button[title="Manage Laboratories"]').click();
+    await page.locator('button[title*="Manage Laboratories"]').click();
     await expect(page.locator('text=My Laboratories')).toBeVisible();
 
     const postPromise = page.waitForRequest((req) =>
@@ -50,7 +50,7 @@ test.describe('Lab Management', () => {
     await page.goto('/');
     await expect(page.locator('text=OpenVeth')).toBeVisible();
 
-    await page.locator('button[title="Manage Laboratories"]').click();
+    await page.locator('button[title*="Manage Laboratories"]').click();
     await expect(page.locator('text=My Laboratories')).toBeVisible();
 
     // The second lab should show "Open Project"
@@ -65,7 +65,7 @@ test.describe('Lab Management', () => {
   });
 
   test('close Lab Manager modal', async ({ page }) => {
-    await page.locator('button[title="Manage Laboratories"]').click();
+    await page.locator('button[title*="Manage Laboratories"]').click();
     await expect(page.locator('text=My Laboratories')).toBeVisible();
 
     // Close via the X button (SVG with close icon)
@@ -77,7 +77,7 @@ test.describe('Lab Management', () => {
   });
 
   test('active lab shows Active badge instead of Open Project', async ({ page }) => {
-    await page.locator('button[title="Manage Laboratories"]').click();
+    await page.locator('button[title*="Manage Laboratories"]').click();
     await expect(page.locator('text=My Laboratories')).toBeVisible();
 
     // The current lab should show "Active" instead of "Open Project"

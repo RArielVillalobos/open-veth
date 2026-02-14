@@ -13,17 +13,19 @@ test.describe('Node CRUD', () => {
     await expect(page.locator('header')).toBeVisible();
     // Lab name should be visible in the header
     await expect(page.locator('text=E2E Test Lab')).toBeVisible();
-    // Node palette should be visible
-    await expect(page.locator('text=Nodes')).toBeVisible();
+    // Node palette should be visible (now called "Components")
+    await expect(page.locator('text=Components')).toBeVisible();
   });
 
-  test('node palette shows Router, Switch, Host options', async ({ page }) => {
+  test('node palette shows Router, Switch, Hub, Host, Cloud options', async ({ page }) => {
     // Dismiss welcome modal if present
     await page.locator('text=New Topology').click({ timeout: 2000 }).catch(() => {});
 
     await expect(page.locator('button:has-text("Router")')).toBeVisible();
     await expect(page.locator('button:has-text("Switch")')).toBeVisible();
+    await expect(page.locator('button:has-text("Hub")')).toBeVisible();
     await expect(page.locator('button:has-text("Host")')).toBeVisible();
+    await expect(page.locator('button:has-text("Cloud")')).toBeVisible();
   });
 
   test('create a router node via palette', async ({ page }) => {
@@ -75,6 +77,46 @@ test.describe('Node CRUD', () => {
     expect(body.type).toBe('host');
   });
 
+  test('create a cloud node via palette', async ({ page }) => {
+    // Dismiss welcome modal if present
+    await page.locator('text=New Topology').click({ timeout: 2000 }).catch(() => {});
+
+    const postPromise = page.waitForRequest((req) =>
+      req.url().includes('/api/v1/nodes') && req.method() === 'POST'
+    );
+
+    await page.locator('button:has-text("Cloud")').click();
+    const nameInput = page.locator('input[placeholder*="INET"]');
+    await expect(nameInput).toBeVisible();
+    await nameInput.fill('INTERNET');
+    await page.locator('button:has-text("Add")').click();
+
+    const postReq = await postPromise;
+    const body = postReq.postDataJSON();
+    expect(body.name).toBe('INTERNET');
+    expect(body.type).toBe('cloud');
+  });
+
+  test('create a hub node via palette', async ({ page }) => {
+    // Dismiss welcome modal if present
+    await page.locator('text=New Topology').click({ timeout: 2000 }).catch(() => {});
+
+    const postPromise = page.waitForRequest((req) =>
+      req.url().includes('/api/v1/nodes') && req.method() === 'POST'
+    );
+
+    await page.locator('button:has-text("Hub")').click();
+    const nameInput = page.locator('input[placeholder*="HUB1"]');
+    await expect(nameInput).toBeVisible();
+    await nameInput.fill('HUB1');
+    await page.locator('button:has-text("Add")').click();
+
+    const postReq = await postPromise;
+    const body = postReq.postDataJSON();
+    expect(body.name).toBe('HUB1');
+    expect(body.type).toBe('hub');
+  });
+
   test('Reset Lab clears nodes after confirm dialog', async ({ page }) => {
     // Dismiss welcome modal if present
     await page.locator('text=New Topology').click({ timeout: 2000 }).catch(() => {});
@@ -86,8 +128,8 @@ test.describe('Node CRUD', () => {
       req.url().includes('/cleanup') && req.method() === 'DELETE'
     );
 
-    // Click Reset Lab
-    await page.locator('button:has-text("Reset Lab")').click();
+    // Click Reset button (title contains "Reset Lab")
+    await page.locator('button[title*="Reset Lab"]').click();
 
     // Verify cleanup API was called
     await cleanupPromise;

@@ -33,6 +33,22 @@ export const MOCK_NODES = [
   },
 ];
 
+export const MOCK_CLOUD_NODE = {
+  id: 'node-inet',
+  name: 'INET',
+  type: 'cloud',
+  x: 100,
+  y: 200,
+  status: 'running',
+  lab_id: 'lab-e2e-1',
+};
+
+export const MOCK_CLOUD_INTERFACES = [
+  { ifname: 'lo', addr_info: [{ local: '127.0.0.1', prefixlen: 8 }] },
+  { ifname: 'eth0', addr_info: [{ local: '172.17.0.8', prefixlen: 16 }] },
+  { ifname: 'eth1', addr_info: [{ local: '10.0.0.254', prefixlen: 24 }] },
+];
+
 export const MOCK_LINKS = [
   {
     id: 'link-1',
