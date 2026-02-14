@@ -11,7 +11,7 @@
 ---
 
 <p align="center">
-  <img src="https://i.imgur.com/0ayLURS.gif" alt="OpenVeth Demo - Creating network topologies in real-time" width="800">
+  <img src="https://i.imgur.com/Lx55pqp.gif" alt="OpenVeth Demo - Creating network topologies in real-time" width="800">
 </p>
 
 <p align="center">
@@ -44,6 +44,7 @@
 | **ROUTER** | FRRouting | Dynamic routing, NAT, firewalls |
 | **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
+| **CLOUD** | Alpine Linux | Internet gateway, provides external connectivity via Docker bridge |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 
@@ -135,6 +136,7 @@ graph TD
         H[HOST - Alpine]
         R[ROUTER - FRR]
         S[SWITCH - Bridge]
+        C[CLOUD - Internet GW]
     end
 
     Veth -.->|connects| Containers
@@ -142,10 +144,11 @@ graph TD
 
 ### How it works
 
-1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH)
+1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH, CLOUD)
 2. **Links** → `veth` pairs connecting container namespaces
 3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching
-4. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
+4. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge, providing internet access to the lab
+5. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
 
 ---
 
