@@ -12,8 +12,8 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'text-wrap': 'wrap',
       'text-max-width': '150px',
       'text-margin-y': -2,
-      'width': 56,
-      'height': 48,
+      'width': 52,
+      'height': 52,
       'shape': 'rectangle',
       'background-color': 'transparent',
       'background-opacity': 0,
@@ -68,8 +68,8 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'background-image': 'assets/icons/cloud.svg',
       'background-fit': 'contain',
       'background-clip': 'none',
-      'width': 56,
-      'height': 48
+      'width': 52,
+      'height': 52
     }
   },
   {

@@ -43,6 +43,14 @@ export const MOCK_CLOUD_NODE = {
   lab_id: 'lab-e2e-1',
 };
 
+export const MOCK_ALL_TYPES_NODES = [
+  { id: 'node-r1', name: 'R1', type: 'router', x: 200, y: 100, status: 'running', lab_id: 'lab-e2e-1' },
+  { id: 'node-sw1', name: 'SW1', type: 'switch', x: 400, y: 100, status: 'running', lab_id: 'lab-e2e-1' },
+  { id: 'node-hub1', name: 'HUB1', type: 'hub', x: 200, y: 300, status: 'running', lab_id: 'lab-e2e-1' },
+  { id: 'node-pc1', name: 'PC1', type: 'host', x: 400, y: 300, status: 'running', lab_id: 'lab-e2e-1' },
+  { id: 'node-inet', name: 'INET', type: 'cloud', x: 300, y: 200, status: 'running', lab_id: 'lab-e2e-1' },
+];
+
 export const MOCK_CLOUD_INTERFACES = [
   { ifname: 'lo', addr_info: [{ local: '127.0.0.1', prefixlen: 8 }] },
   { ifname: 'eth0', addr_info: [{ local: '172.17.0.8', prefixlen: 16 }] },

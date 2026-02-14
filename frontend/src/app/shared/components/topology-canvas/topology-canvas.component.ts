@@ -28,6 +28,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
   private cy!: cytoscape.Core;
   private canvasReady = false;
+  private resizeObserver!: ResizeObserver;
   sourceNodeId: string | null = null;
   
   // Context menu state
@@ -67,6 +68,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.resizeObserver?.disconnect();
     if (this.cy) this.cy.destroy();
   }
 
@@ -110,8 +112,19 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private initCytoscape() {
     this.cy = cytoscape({
       container: this.container.nativeElement,
-      style: CYTOSCAPE_STYLES
+      style: CYTOSCAPE_STYLES,
+      pixelRatio: 'auto',
+      minZoom: 0.3,
+      maxZoom: 1.5,
+      wheelSensitivity: 0.3
     });
+
+    // Expose for e2e testing
+    (this.container.nativeElement as any).__cy = this.cy;
+
+    // Recalculate canvas when container resizes
+    this.resizeObserver = new ResizeObserver(() => this.cy.resize());
+    this.resizeObserver.observe(this.container.nativeElement);
 
     // --- Event Listeners ---
 
@@ -312,6 +325,9 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
     if (!this.canvasReady) {
       this.canvasReady = true;
+      if (this.cy.nodes().length > 0) {
+        this.cy.fit(undefined, 50);
+      }
       return;
     }
 
