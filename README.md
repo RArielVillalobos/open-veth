@@ -33,6 +33,7 @@
 | **Infrastructure as Code** | Export/import topologies as YAML |
 | **Lab Management** | Create, save, and switch between lab projects |
 | **State Persistence** | IP configurations auto-saved every 30s and restored on lab activation |
+| **Cloud Gateway** | Connect lab nodes to the internet via Docker bridge |
 
 ---
 
@@ -72,7 +73,7 @@ make up
 ```
 
 That's it! The command will:
-- Build node images (Host, Router)
+- Build node images (Host, Router — Switch, Hub, and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL
 
@@ -136,10 +137,12 @@ graph TD
         H[HOST - Alpine]
         R[ROUTER - FRR]
         S[SWITCH - Bridge]
-        C[CLOUD - Internet GW]
+        HB[HUB - Repeater]
     end
 
     Veth -.->|connects| Containers
+
+    C[CLOUD - Internet GW] -.->|Docker bridge| Internet((Internet))
 ```
 
 ### How it works
@@ -147,7 +150,8 @@ graph TD
 1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH, CLOUD)
 2. **Links** → `veth` pairs connecting container namespaces
 3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching
-4. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge, providing internet access to the lab
+4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames)
+5. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge, providing internet access to the lab
 5. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
 
 ---
@@ -164,6 +168,8 @@ graph TD
 | FRRouting support | ✅ | ✅ | ✅ | ❌ |
 | Live packet capture | ✅ | ✅ | ✅ | ❌ |
 | SSH between nodes | ✅ | ✅ | ✅ | ❌ |
+| L2 switching / L1 hub | ✅ | ✅ | ✅ | ✅ |
+| Internet connectivity | ✅ | ✅ | ✅ | ❌ |
 
 ---
 
