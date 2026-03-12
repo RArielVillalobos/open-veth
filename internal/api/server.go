@@ -80,6 +80,7 @@ func (s *Server) setupRoutes() {
 		api.DELETE("/nodes/:id", s.handler.DeleteNode)
 		api.GET("/nodes/:id/interfaces", s.handler.GetNodeInterfaces)
 		api.GET("/nodes/:id/routes", s.handler.GetNodeRoutes)
+		api.POST("/nodes/:id/traceroute", s.handler.RunTraceroute)
 
 		// Links
 		api.GET("/links", s.handler.ListLinks)
@@ -94,6 +95,7 @@ func (s *Server) setupRoutes() {
 		api.DELETE("/laboratories/:id/cleanup", s.handler.CleanupLaboratory)
 		api.PATCH("/laboratories/:id", s.handler.UpdateLaboratory)
 		api.DELETE("/laboratories/:id", s.handler.DeleteLaboratory)
+		api.GET("/laboratories/:id/domains", s.handler.GetDomains)
 
 		// Topology Export/Import
 		api.GET("/topology/export", s.handler.HandleExport)

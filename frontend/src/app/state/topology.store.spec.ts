@@ -5,7 +5,7 @@ import { TopologyService } from '../core/services/topology.service';
 import { ToastService } from '../core/services/toast.service';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { createMockNode, createMockLink, createMockLaboratory, createMockInterface } from '../../testing/mock-factories';
+import { createMockNode, createMockLink, createMockLaboratory, createMockInterface, createMockDomainsResponse } from '../../testing/mock-factories';
 
 function createMockTopologyService() {
   return {
@@ -24,6 +24,7 @@ function createMockTopologyService() {
     getNodeInterfaces: vi.fn().mockReturnValue(of([])),
     getNodeRoutes: vi.fn().mockReturnValue(of([])),
     updateNodePosition: vi.fn().mockReturnValue(of(undefined)),
+    getDomains: vi.fn().mockReturnValue(of({ broadcast_domains: [], collision_domains: [] })),
   };
 }
 
@@ -316,5 +317,111 @@ describe('TopologyStore', () => {
 
     expect(store.isLoading()).toBe(false);
     expect(mockToast.error).toHaveBeenCalled();
+  });
+
+  // --- Domains ---
+
+  it('should have null domains in initial state', () => {
+    expect(store.domains()).toBeNull();
+    expect(store.activeDomainOverlay()).toBeNull();
+  });
+
+  it('loadDomains should fetch and store domains', async () => {
+    const mockDomains = createMockDomainsResponse();
+    mockService.getDomains.mockReturnValue(of(mockDomains));
+
+    await store.loadDomains();
+
+    expect(mockService.getDomains).toHaveBeenCalledWith(store.currentLabId());
+    expect(store.domains()).toEqual(mockDomains);
+  });
+
+  it('loadDomains should handle errors silently', async () => {
+    mockService.getDomains.mockReturnValue(throwError(() => new Error('fail')));
+
+    await store.loadDomains();
+
+    expect(store.domains()).toBeNull();
+  });
+
+  it('loadTopology should also load domains', async () => {
+    const mockDomains = createMockDomainsResponse();
+    mockService.getNodes.mockReturnValue(of([]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    mockService.getDomains.mockReturnValue(of(mockDomains));
+
+    await store.loadTopology();
+
+    expect(mockService.getDomains).toHaveBeenCalled();
+  });
+
+  it('addNode should reload domains', async () => {
+    mockService.createNode.mockReturnValue(of(createMockNode()));
+    mockService.getDomains.mockReturnValue(of(createMockDomainsResponse()));
+
+    await store.addNode(createMockNode());
+
+    expect(mockService.getDomains).toHaveBeenCalled();
+  });
+
+  it('addLink should reload domains', async () => {
+    mockService.createLink.mockReturnValue(of(createMockLink()));
+    mockService.getDomains.mockReturnValue(of(createMockDomainsResponse()));
+
+    await store.addLink(createMockLink());
+
+    expect(mockService.getDomains).toHaveBeenCalled();
+  });
+
+  it('setDomainOverlay should toggle overlay mode', () => {
+    store.setDomainOverlay('broadcast');
+    expect(store.activeDomainOverlay()).toBe('broadcast');
+
+    store.setDomainOverlay('broadcast');
+    expect(store.activeDomainOverlay()).toBeNull();
+
+    store.setDomainOverlay('collision');
+    expect(store.activeDomainOverlay()).toBe('collision');
+  });
+
+  it('setDomainOverlay should switch mode directly', () => {
+    store.setDomainOverlay('broadcast');
+    expect(store.activeDomainOverlay()).toBe('broadcast');
+
+    store.setDomainOverlay('collision');
+    expect(store.activeDomainOverlay()).toBe('collision');
+  });
+
+  it('switchLab should clear domains and overlay', async () => {
+    mockService.getDomains.mockReturnValue(of(createMockDomainsResponse()));
+    mockService.getNodes.mockReturnValue(of([]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    store.setDomainOverlay('broadcast');
+    expect(store.activeDomainOverlay()).toBe('broadcast');
+
+    mockService.activateLaboratory.mockReturnValue(of(undefined));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory({ id: 'lab-2' })]));
+    await store.switchLab('lab-2');
+
+    expect(store.activeDomainOverlay()).toBeNull();
+  });
+
+  it('cleanupCurrentLab should clear domains', async () => {
+    mockService.getDomains.mockReturnValue(of(createMockDomainsResponse()));
+    mockService.getNodes.mockReturnValue(of([createMockNode()]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    expect(store.domains()).not.toBeNull();
+
+    mockService.cleanupLaboratory.mockReturnValue(of(undefined));
+    await store.cleanupCurrentLab();
+
+    expect(store.domains()).toBeNull();
   });
 });

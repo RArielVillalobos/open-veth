@@ -56,6 +56,7 @@ func setupRouter(h *Handler) *gin.Engine {
 		api.POST("/laboratories", h.CreateLaboratory)
 		api.PATCH("/laboratories/:id", h.UpdateLaboratory)
 		api.DELETE("/laboratories/:id", h.DeleteLaboratory)
+		api.GET("/laboratories/:id/domains", h.GetDomains)
 
 		api.GET("/topology/export", h.HandleExport)
 		api.POST("/topology/import", h.HandleImport)
@@ -64,6 +65,8 @@ func setupRouter(h *Handler) *gin.Engine {
 		api.GET("/sniff", h.HandleSniff)
 
 		api.DELETE("/laboratories/:id/cleanup", h.CleanupLaboratory)
+
+		api.POST("/nodes/:id/traceroute", h.RunTraceroute)
 	}
 	return r
 }

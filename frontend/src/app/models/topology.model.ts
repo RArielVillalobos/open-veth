@@ -62,3 +62,28 @@ export interface SaveStateResponse {
   routes_saved: number;
 }
 
+export interface Domain {
+  id: number;
+  node_ids: string[];
+  link_ids: string[];
+}
+
+export interface DomainsResponse {
+  broadcast_domains: Domain[];
+  collision_domains: Domain[];
+}
+
+export interface TracerouteHop {
+  hop: number;
+  ip: string;
+  rtt: string;
+  node_id?: string;
+}
+
+export interface TracerouteResponse {
+  hops: TracerouteHop[];
+  node_ids: string[];
+  link_ids: string[];
+  unreachable?: boolean;
+}
+

@@ -1,4 +1,4 @@
-import { Node, Link, Laboratory, InterfaceInfo, RouteInfo } from '../app/models/topology.model';
+import { Node, Link, Laboratory, InterfaceInfo, RouteInfo, DomainsResponse, TracerouteResponse } from '../app/models/topology.model';
 
 export function createMockNode(overrides: Partial<Node> = {}): Node {
   return {
@@ -47,6 +47,32 @@ export function createMockRoute(overrides: Partial<RouteInfo> = {}): RouteInfo {
     dev: 'eth1',
     protocol: 'kernel',
     scope: 'link',
+    ...overrides,
+  };
+}
+
+export function createMockDomainsResponse(overrides: Partial<DomainsResponse> = {}): DomainsResponse {
+  return {
+    broadcast_domains: [
+      { id: 0, node_ids: ['node-1', 'node-2', 'node-3'], link_ids: ['link-1', 'link-2'] },
+    ],
+    collision_domains: [
+      { id: 0, node_ids: ['node-1', 'node-3'], link_ids: ['link-1'] },
+      { id: 1, node_ids: ['node-2', 'node-3'], link_ids: ['link-2'] },
+    ],
+    ...overrides,
+  };
+}
+
+export function createMockTracerouteResponse(overrides: Partial<TracerouteResponse> = {}): TracerouteResponse {
+  return {
+    hops: [
+      { hop: 1, ip: '10.0.1.1', rtt: '0.016 ms', node_id: 'node-2' },
+      { hop: 2, ip: '10.0.2.2', rtt: '0.009 ms', node_id: 'node-3' },
+      { hop: 3, ip: '10.0.3.2', rtt: '0.010 ms', node_id: 'node-4' },
+    ],
+    node_ids: ['node-1', 'node-2', 'node-3', 'node-4'],
+    link_ids: ['link-1', 'link-2', 'link-3'],
     ...overrides,
   };
 }

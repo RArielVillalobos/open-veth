@@ -54,6 +54,34 @@
         </button>
       </div>
 
+      <!-- Domain Overlay Group -->
+      <div class="flex items-center gap-1.5 p-1 bg-slate-900/50 rounded-lg border border-slate-800">
+        <button (click)="store.setDomainOverlay('broadcast')"
+                class="h-8 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all"
+                [class]="store.activeDomainOverlay() === 'broadcast'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                  : 'hover:bg-slate-700 text-slate-300 hover:text-slate-100'"
+                title="Broadcast Domains">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0"></path>
+          </svg>
+          BD
+          <span *ngIf="store.domains()" class="ml-0.5 opacity-70">{{ store.domains()!.broadcast_domains.length }}</span>
+        </button>
+        <button (click)="store.setDomainOverlay('collision')"
+                class="h-8 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all"
+                [class]="store.activeDomainOverlay() === 'collision'
+                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/25'
+                  : 'hover:bg-slate-700 text-slate-300 hover:text-slate-100'"
+                title="Collision Domains">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          CD
+          <span *ngIf="store.domains()" class="ml-0.5 opacity-70">{{ store.domains()!.collision_domains.length }}</span>
+        </button>
+      </div>
+
       <div class="h-6 w-px bg-slate-800"></div>
 
       <!-- Import/Export Group -->
@@ -107,10 +135,15 @@
                 [nodes]="store.topology().nodes"
                 [links]="store.topology().links"
                 [terminalNode]="terminalStore.activeNodeId()"
+                [domains]="store.domains()"
+                [activeDomainOverlay]="store.activeDomainOverlay()"
+                [traceroutePath]="tracerouteResult()"
                 (linkRequest)="onLinkRequest($event)"
                 (nodeMoved)="store.updateNodePosition($event.id, $event.x, $event.y)"
                 (openTerminalRequest)="openTerminal($event)"
                 (openSniffRequest)="captureStore.openCapture($event.nodeId, $event.nodeName, $event.iface)"
+                (tracerouteRequest)="onTraceroute($event)"
+                (tracerouteClose)="clearTraceroute()"
                 (nodeSelected)="onNodeSelected($event)"
                 (linkSelected)="onLinkSelected($event)"
                 (nodeDelete)="onDeleteNode($event)"

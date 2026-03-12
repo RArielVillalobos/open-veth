@@ -1,5 +1,5 @@
 import { signalStore, withState, withMethods, patchState, withHooks } from '@ngrx/signals';
-import { Topology, Node, Link, Laboratory } from '../models/topology.model';
+import { Topology, Node, Link, Laboratory, DomainsResponse } from '../models/topology.model';
 import { inject, effect } from '@angular/core';
 import { firstValueFrom, forkJoin } from 'rxjs';
 import { TopologyService } from '../core/services/topology.service';
@@ -12,6 +12,8 @@ export interface TopologyState {
   currentLabId: string;
   isLoading: boolean;
   error: string | null;
+  domains: DomainsResponse | null;
+  activeDomainOverlay: 'broadcast' | 'collision' | null;
 }
 
 const LAB_ID_KEY = 'openveth_current_lab_id';
@@ -34,7 +36,9 @@ const initialState: TopologyState = {
   laboratories: [],
   currentLabId: getInitialLabId(),
   isLoading: false,
-  error: null
+  error: null,
+  domains: null,
+  activeDomainOverlay: null
 };
 
 export const TopologyStore = signalStore(
@@ -88,6 +92,7 @@ export const TopologyStore = signalStore(
               links: links || []
             }
           }));
+          await this.loadDomains();
         } catch (err: any) {
           const msg = err.message || 'Error loading topology';
           patchState(store, { isLoading: false, error: msg });
@@ -98,7 +103,7 @@ export const TopologyStore = signalStore(
       // --- Lab Management ---
       async switchLab(labId: string) {
         localStorage.setItem(LAB_ID_KEY, labId);
-        patchState(store, { isLoading: true, currentLabId: labId });
+        patchState(store, { isLoading: true, currentLabId: labId, domains: null, activeDomainOverlay: null });
         toast.info(`Activating laboratory: ${labId}...`);
         
         try {
@@ -166,6 +171,7 @@ export const TopologyStore = signalStore(
             }
           }));
           toast.success(`Node ${node.name} created`);
+          this.loadDomains();
         } catch (err: any) {
           const msg = err.error?.error || err.message || 'Error creating node';
           patchState(store, { isLoading: false, error: msg });
@@ -186,6 +192,7 @@ export const TopologyStore = signalStore(
             }
           }));
           toast.success('Node deleted');
+          this.loadDomains();
         } catch (err: any) {
           const msg = err.message || 'Error deleting node';
           patchState(store, { isLoading: false, error: msg });
@@ -245,6 +252,7 @@ export const TopologyStore = signalStore(
             }
           }));
           toast.success('Link created');
+          this.loadDomains();
         } catch (err: any) {
           const msg = err.error?.error || err.message || 'Error creating link';
           patchState(store, { isLoading: false, error: msg });
@@ -264,6 +272,7 @@ export const TopologyStore = signalStore(
             }
           }));
           toast.success('Link deleted');
+          this.loadDomains();
         } catch (err: any) {
           const msg = err.message || 'Error deleting link';
           patchState(store, { isLoading: false, error: msg });
@@ -314,7 +323,8 @@ export const TopologyStore = signalStore(
           await firstValueFrom(service.cleanupLaboratory(labId));
           patchState(store, (state) => ({
             isLoading: false,
-            topology: { ...state.topology, nodes: [], links: [] }
+            topology: { ...state.topology, nodes: [], links: [] },
+            domains: null
           }));
           toast.success(`Lab "${labName}" cleaned successfully`);
         } catch (err: any) {
@@ -322,6 +332,22 @@ export const TopologyStore = signalStore(
           patchState(store, { isLoading: false, error: msg });
           toast.error(msg);
         }
+      },
+
+      // --- Domains ---
+      async loadDomains() {
+        const labId = store.currentLabId();
+        try {
+          const domains = await firstValueFrom(service.getDomains(labId));
+          patchState(store, { domains });
+        } catch {
+          patchState(store, { domains: null });
+        }
+      },
+
+      setDomainOverlay(mode: 'broadcast' | 'collision') {
+        const current = store.activeDomainOverlay();
+        patchState(store, { activeDomainOverlay: current === mode ? null : mode });
       }
     };
   }),

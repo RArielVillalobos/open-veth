@@ -25,7 +25,15 @@
       <span class="context-menu__label">Open Terminal</span>
     </button>
     
-    <!-- Capture (if available) -->
+    <!-- Traceroute -->
+    <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'hub'"
+            class="context-menu__item"
+            (click)="onContextMenuAction('traceroute')">
+      <span class="context-menu__icon mono text-xs">~></span>
+      <span class="context-menu__label">Traceroute</span>
+    </button>
+
+    <!-- Properties -->
     <button class="context-menu__item" (click)="onContextMenuAction('properties')">
       <span class="context-menu__icon">⚡</span>
       <span class="context-menu__label">Properties</span>
@@ -71,4 +79,48 @@
 
 </div>
 
+<!-- Traceroute Dialog -->
+<div *ngIf="showTracerouteDialog" class="traceroute-dialog" cdkDrag>
+  <div class="traceroute-dialog__header" cdkDragHandle>
+    <span>Traceroute from <strong>{{ tracerouteNodeName }}</strong></span>
+    <button class="traceroute-dialog__close" (click)="clearTraceroute()">&times;</button>
+  </div>
+  <div class="traceroute-dialog__body">
+    <div class="traceroute-dialog__input-row">
+      <input type="text"
+             [(ngModel)]="tracerouteDestIP"
+             placeholder="Destination IP (e.g. 10.0.1.2)"
+             class="traceroute-dialog__input"
+             (keydown.enter)="runTraceroute()"
+             [disabled]="tracerouteLoading">
+      <button class="traceroute-dialog__run"
+              (click)="runTraceroute()"
+              [disabled]="!tracerouteDestIP || tracerouteLoading">
+        {{ tracerouteLoading ? 'Running...' : 'Run' }}
+      </button>
+    </div>
+    <div *ngIf="tracerouteResult" class="traceroute-dialog__results">
+      <table class="traceroute-dialog__table">
+        <thead>
+          <tr>
+            <th>Hop</th>
+            <th>IP</th>
+            <th>RTT</th>
+            <th>Node</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let hop of tracerouteResult.hops">
+            <td>{{ hop.hop }}</td>
+            <td class="mono">{{ hop.ip }}</td>
+            <td class="mono">{{ hop.rtt }}</td>
+            <td>{{ hop.node_id ? getNodeName(hop.node_id) : '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<canvas #domainCanvas class="domain-canvas"></canvas>
 <div #cyContainer class="cy-container"></div>

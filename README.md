@@ -20,6 +20,37 @@
 
 ---
 
+### Broadcast & Collision Domain Overlay
+
+Visualize **broadcast** and **collision** domains directly on the topology canvas with a single click.
+
+<p align="center">
+  <img src="https://i.imgur.com/fPzXKFJ.png" alt="Broadcast domains highlighted on the topology" width="800">
+</p>
+<p align="center"><i>Broadcast domains — each colored region is an independent broadcast domain separated by routers.</i></p>
+
+<p align="center">
+  <img src="https://i.imgur.com/yVI4b5O.png" alt="Collision domains highlighted on the topology" width="800">
+</p>
+<p align="center"><i>Collision domains — note how the hub merges all connected ports into a single shared collision domain, while the switch isolates each link.</i></p>
+
+---
+
+### Visual Traceroute
+
+Run traceroute from any node and watch the path light up on the graph in real-time.
+
+<p align="center">
+  <img src="https://i.imgur.com/8sBFlCP.gif" alt="Visual traceroute - path highlighted on topology" width="800">
+</p>
+<p align="center"><i>Each hop is numbered on the canvas. The result table shows IP, RTT, and the resolved node name.</i></p>
+
+<p align="center">
+  <img src="https://i.imgur.com/dKg5Otm.png" alt="Traceroute result dialog" width="800">
+</p>
+
+---
+
 ## Features
 
 | Feature | Description |
@@ -33,6 +64,8 @@
 | **Infrastructure as Code** | Export/import topologies as YAML |
 | **Lab Management** | Create, save, and switch between lab projects |
 | **State Persistence** | IP configurations auto-saved every 30s and restored on lab activation |
+| **Broadcast/Collision Domain Overlay** | Visualize broadcast and collision domains highlighted on the topology canvas |
+| **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
 | **Cloud Gateway** | Connect lab nodes to the internet via Docker bridge |
 
 ---
@@ -170,13 +203,16 @@ graph TD
 | SSH between nodes | ✅ | ✅ | ✅ | ❌ |
 | L2 switching / L1 hub | ✅ | ✅ | ✅ | ✅ |
 | Internet connectivity | ✅ | ✅ | ✅ | ❌ |
+| Broadcast/collision domain overlay | ✅ | ❌ | ❌ | ❌ |
+| Visual traceroute | ✅ | ❌ | ❌ | ❌ |
 
 ---
 
 ## Use Cases
 
 - **Networking Courses**: Hands-on labs for CCNA, Network+, Linux networking
-- **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets
+- **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets with live packet capture
+- **Network Troubleshooting**: Visualize broadcast/collision domains and trace packet paths interactively
 - **Network Administration**: Practice SSH, remote management, and troubleshooting
 - **Infrastructure Design**: Prototype topologies before production deployment
 

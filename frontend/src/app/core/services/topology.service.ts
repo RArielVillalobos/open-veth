@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Topology, Node, Link, InterfaceInfo, RouteInfo, Laboratory, LaboratoryCreate, SaveStateResponse } from '../../models/topology.model';
+import { Topology, Node, Link, InterfaceInfo, RouteInfo, Laboratory, LaboratoryCreate, SaveStateResponse, DomainsResponse, TracerouteResponse } from '../../models/topology.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -87,6 +87,16 @@ export class TopologyService {
   saveLabState(labId: string): Observable<SaveStateResponse> {
     return this.http.post<SaveStateResponse>(
       `${this.apiUrl}/laboratories/${labId}/save-state`, {}
+    );
+  }
+
+  getDomains(labId: string): Observable<DomainsResponse> {
+    return this.http.get<DomainsResponse>(`${this.apiUrl}/laboratories/${labId}/domains`);
+  }
+
+  runTraceroute(nodeId: string, destination: string): Observable<TracerouteResponse> {
+    return this.http.post<TracerouteResponse>(
+      `${this.apiUrl}/nodes/${nodeId}/traceroute`, { destination }
     );
   }
 

@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { TopologyService } from './topology.service';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createMockNode, createMockLink, createMockLaboratory, createMockInterface, createMockRoute } from '../../../testing/mock-factories';
+import { createMockNode, createMockLink, createMockLaboratory, createMockInterface, createMockRoute, createMockDomainsResponse, createMockTracerouteResponse } from '../../../testing/mock-factories';
 import { environment } from '../../../environments/environment';
 
 describe('TopologyService', () => {
@@ -188,6 +188,33 @@ describe('TopologyService', () => {
     expect(req.request.body).toBe(yaml);
     req.flush(null);
   });
+
+  // --- Traceroute ---
+
+  it('runTraceroute() should POST /nodes/:id/traceroute with destination', () => {
+    const mockResponse = createMockTracerouteResponse();
+    service.runTraceroute('node-1', '10.0.3.2').subscribe(res => {
+      expect(res.hops.length).toBe(3);
+      expect(res.node_ids).toEqual(['node-1', 'node-2', 'node-3', 'node-4']);
+      expect(res.link_ids).toEqual(['link-1', 'link-2', 'link-3']);
+    });
+    const req = httpMock.expectOne(`${API}/nodes/node-1/traceroute`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ destination: '10.0.3.2' });
+    req.flush(mockResponse);
+  });
+
+  // --- Domains ---
+
+  it('getDomains() should GET /laboratories/:id/domains', () => {
+    const mockDomains = createMockDomainsResponse();
+    service.getDomains('lab-1').subscribe(res => expect(res).toEqual(mockDomains));
+    const req = httpMock.expectOne(`${API}/laboratories/lab-1/domains`);
+    expect(req.request.method).toBe('GET');
+    req.flush(mockDomains);
+  });
+
+  // --- Legacy ---
 
   it('deploy() should POST /topology/deploy', () => {
     const topology = { id: 'lab-1', name: 'Test', nodes: [], links: [] };

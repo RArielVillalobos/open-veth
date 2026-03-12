@@ -651,6 +651,36 @@ func (m *Manager) RemoveAllOpenVethVolumes(ctx context.Context) int {
 	return removed
 }
 
+// RunTraceroute executes 'traceroute -n -w 2 -m 15 <dest>' inside the container and returns raw output
+func (m *Manager) RunTraceroute(ctx context.Context, containerID string, destination string) (string, error) {
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"traceroute", "-n", "-w", "2", "-m", "15", destination},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("error creating traceroute exec: %v", err)
+	}
+
+	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error attaching to traceroute exec: %v", err)
+	}
+	defer resp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
+		return "", fmt.Errorf("error reading traceroute output: %v", err)
+	}
+
+	return outBuf.String(), nil
+}
+
 // KillProcessByName finds processes matching a name pattern inside a container and kills them
 func (m *Manager) KillProcessByName(ctx context.Context, containerID, pattern string) error {
 	// We use pkill -f to match the full command line

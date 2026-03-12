@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, OnDestroy, computed, effect } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, effect, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../state/topology.store';
 import { UIStore } from '../../state/ui.store';
@@ -18,6 +18,7 @@ import { LabManagerComponent } from './components/lab-manager/lab-manager.compon
 import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
 import { firstValueFrom } from 'rxjs';
 import { FileService } from '../../core/services/file.service';
+import { TracerouteResponse } from '../../models/topology.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -64,6 +65,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const activeTabId = this.terminalStore.activeNodeId();
     return this.store.topology().nodes.find(n => n.id === activeTabId)?.name || null;
   });
+
+  @ViewChild(TopologyCanvasComponent) canvasComponent!: TopologyCanvasComponent;
+
+  tracerouteResult = signal<TracerouteResponse | null>(null);
 
   private lastLabId: string | null = null;
 
@@ -201,6 +206,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
       console.error('Failed to save lab state', err);
       this.toast.error('Save failed: ' + (err.error?.error || err.message));
     }
+  }
+
+  async onTraceroute(event: { nodeId: string; destination: string }) {
+    try {
+      const result = await firstValueFrom(
+        this.service.runTraceroute(event.nodeId, event.destination)
+      );
+      this.tracerouteResult.set(result);
+      this.canvasComponent?.onTracerouteResult(result);
+    } catch (err: any) {
+      console.error('Traceroute failed', err);
+      this.toast.error('Traceroute failed: ' + (err.error?.error || err.message));
+      this.canvasComponent?.onTracerouteError();
+    }
+  }
+
+  clearTraceroute() {
+    this.tracerouteResult.set(null);
   }
 }
 
