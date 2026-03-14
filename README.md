@@ -66,7 +66,8 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **State Persistence** | IP configurations auto-saved every 30s and restored on lab activation |
 | **Broadcast/Collision Domain Overlay** | Visualize broadcast and collision domains highlighted on the topology canvas |
 | **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
-| **Cloud Gateway** | Connect lab nodes to the internet via Docker bridge |
+| **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
+| **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
 
 ---
 
@@ -78,7 +79,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **ROUTER** | FRRouting | Dynamic routing, NAT, firewalls |
 | **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
-| **CLOUD** | Alpine Linux | Internet gateway, provides external connectivity via Docker bridge |
+| **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 
@@ -184,8 +185,50 @@ graph TD
 2. **Links** → `veth` pairs connecting container namespaces
 3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching
 4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames)
-5. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge, providing internet access to the lab
-5. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
+5. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge. On creation, automatically enable IP forwarding and set up `iptables MASQUERADE` so connected lab nodes can reach real internet
+6. **Links** → Can be enabled/disabled at runtime (right-click → Disable/Enable) without deleting them, simulating link failures
+7. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
+
+---
+
+### Cloud Gateway — Internet Access for Lab Nodes
+
+The **CLOUD** node acts as a NAT gateway. When created, it automatically enables IP forwarding and sets up masquerade rules so any connected lab node can reach real internet.
+
+**Example topology:**
+```
+HOST ── ROUTER ── CLOUD ── Internet
+```
+
+**Configuration steps:**
+
+On **CLOUD** (terminal):
+```bash
+ip addr add 10.0.2.2/30 dev eth1
+ip link set eth1 up
+ip route add 10.0.1.0/30 via 10.0.2.1   # return route per lab subnet
+```
+
+On **ROUTER** (terminal):
+```bash
+ip addr add 10.0.1.1/30 dev eth1
+ip addr add 10.0.2.1/30 dev eth2
+ip link set eth1 up && ip link set eth2 up
+ip route add default via 10.0.2.2
+sysctl -w net.ipv4.ip_forward=1
+```
+
+On **HOST** (terminal):
+```bash
+ip addr add 10.0.1.2/30 dev eth1
+ip link set eth1 up
+ip route add default via 10.0.1.1
+ping 8.8.8.8   # should work
+```
+
+### Link Toggle — Simulate Link Failures
+
+Right-click any cable on the canvas and select **Disable Link** to bring the interfaces down without deleting the connection. Re-enable it at any time. Useful for testing routing protocol convergence (OSPF/BGP failover), STP, and redundancy scenarios.
 
 ---
 
@@ -237,7 +280,3 @@ This project is licensed under the **GNU Affero General Public License v3 (AGPLv
 See the [LICENSE](LICENSE) file for details.
 
 ---
-
-<p align="center">
-  Made with ❤️ for the networking community
-</p>
