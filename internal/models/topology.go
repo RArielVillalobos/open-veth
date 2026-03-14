@@ -11,6 +11,7 @@ const (
 	HUB    NodeType = "hub"    // Uses Linux Bridge without MAC learning (L1 repeater)
 	HOST   NodeType = "host"   // Uses Alpine/Ubuntu image
 	CLOUD  NodeType = "cloud"  // Internet gateway - keeps eth0 connected to Docker bridge
+	LINUX  NodeType = "linux"  // Debian-based node for scripting and general use
 )
 
 // NeedsBridge returns true for node types that use an internal bridge (br0)
@@ -28,6 +29,7 @@ func KeepEth0(t NodeType) bool {
 const (
 	ImgRouter = "openveth/router:latest"
 	ImgHost   = "openveth/host:latest"
+	ImgLinux  = "openveth/linux:latest"
 )
 
 // GetImageForType returns the official docker image for a given node type
@@ -43,6 +45,8 @@ func GetImageForType(t NodeType) string {
 		return ImgHost // Hub uses the host image to run the bridge without MAC learning
 	case CLOUD:
 		return ImgHost // Cloud uses host image, keeps eth0 for internet access
+	case LINUX:
+		return ImgLinux
 	default:
 		return ImgHost
 	}

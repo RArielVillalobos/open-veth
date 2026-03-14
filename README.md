@@ -68,6 +68,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
 | **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
 | **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
+| **Linux Node** | Debian-based node with bash, python3, cron and apt — direct internet access for scripting and automation practice |
 
 ---
 
@@ -80,6 +81,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
+| **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, direct internet access |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 

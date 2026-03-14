@@ -262,6 +262,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.setupCloud(ctx, inspect.ID, node.Name)
 			}
 
+			// Re-apply default gateway for LINUX nodes (lost on container restart)
+			if node.Type == models.LINUX {
+				m.setupLinuxGateway(ctx, inspect.ID, node.Name)
+			}
+
 			return inspect.ID, nil
 
 		}
@@ -298,6 +303,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	// 8. If node is CLOUD, enable IP forwarding and NAT masquerade
 	if node.Type == models.CLOUD {
 		m.setupCloud(ctx, resp.ID, node.Name)
+	}
+
+	// 9. If node is LINUX, restore default gateway for direct internet access
+	if node.Type == models.LINUX {
+		m.setupLinuxGateway(ctx, resp.ID, node.Name)
 	}
 
 	m.logger.Info("node created and started", "name", node.Name, "id", resp.ID[:12])
@@ -386,6 +396,50 @@ func (m *Manager) setupCloud(ctx context.Context, containerID, nodeName string) 
 		}
 	} else {
 		m.logger.Warn("failed to create cloud NAT exec", "name", nodeName, "error", err)
+	}
+}
+
+// setupLinuxGateway restores the default gateway on LINUX nodes after eth0→mgmt0 rename.
+// The default route is deleted for all non-CLOUD nodes so students configure routing manually,
+// but LINUX nodes need it back to reach the internet for apt-get, pip, etc.
+func (m *Manager) setupLinuxGateway(ctx context.Context, containerID, nodeName string) {
+	// Docker's default bridge gateway is always the .1 address of the container's subnet.
+	// We detect it by inspecting the container's network settings.
+	inspect, err := m.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		m.logger.Warn("setupLinuxGateway: failed to inspect container", "name", nodeName, "error", err)
+		return
+	}
+
+	gateway := inspect.NetworkSettings.Gateway
+	if gateway == "" {
+		// On custom Docker networks the gateway is inside Networks map, not the top-level field
+		for _, network := range inspect.NetworkSettings.Networks {
+			if network.Gateway != "" {
+				gateway = network.Gateway
+				break
+			}
+		}
+	}
+	if gateway == "" {
+		m.logger.Warn("setupLinuxGateway: no gateway found", "name", nodeName)
+		return
+	}
+
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"ip", "route", "add", "default", "via", gateway, "dev", "mgmt0"},
+		AttachStdout: false,
+		AttachStderr: false,
+	}
+
+	m.logger.Info("restoring default gateway for linux node", "name", nodeName, "gateway", gateway)
+
+	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
+		if err := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); err != nil {
+			m.logger.Warn("setupLinuxGateway: failed to add default route", "name", nodeName, "error", err)
+		}
+	} else {
+		m.logger.Warn("setupLinuxGateway: failed to create exec", "name", nodeName, "error", err)
 	}
 }
 

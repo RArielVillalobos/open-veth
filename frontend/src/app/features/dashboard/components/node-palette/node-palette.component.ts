@@ -3,7 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Node } from '../../../../models/topology.model';
 
-type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud';
+type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -78,14 +78,14 @@ export class NodePaletteComponent {
     {
       id: 'host',
       label: 'Host',
-      subtitle: 'End device',
+      subtitle: 'Alpine Linux',
       icon: 'host.svg',
       placeholder: 'e.g. PC1',
       accentBorder: 'border-emerald-500',
       hoverBorder: 'hover:border-emerald-500/50',
       category: 'end',
       shortcut: 'H',
-      description: 'End device (PC/Server) with Alpine Linux and networking tools.'
+      description: 'Lightweight end device (Alpine Linux) with networking tools. Ideal for network labs.'
     },
     {
       id: 'cloud',
@@ -99,11 +99,23 @@ export class NodePaletteComponent {
       shortcut: 'I',
       description: 'NAT gateway with automatic IP forwarding and masquerade. Connect your lab nodes to reach real internet.'
     },
+    {
+      id: 'linux',
+      label: 'Linux',
+      subtitle: 'Debian',
+      icon: 'linux.svg',
+      placeholder: 'e.g. VM1',
+      accentBorder: 'border-red-500',
+      hoverBorder: 'hover:border-red-500/50',
+      category: 'end',
+      shortcut: 'L',
+      description: 'Debian Linux with bash, python3, cron and apt. Has direct internet access. Ideal for scripting and automation practice.'
+    },
   ];
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;
@@ -183,5 +195,6 @@ export class NodePaletteComponent {
     if (key === 'U') this.startNaming('hub');
     if (key === 'H') this.startNaming('host');
     if (key === 'I') this.startNaming('cloud');
+    if (key === 'L') this.startNaming('linux');
   }
 }

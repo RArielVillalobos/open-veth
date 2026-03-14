@@ -121,6 +121,16 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
     }
   },
   {
+    selector: 'node[type="linux"]',
+    style: {
+      'background-image': 'assets/icons/linux.svg',
+      'background-fit': 'contain',
+      'background-clip': 'none',
+      'width': 52,
+      'height': 52
+    }
+  },
+  {
     selector: '.terminal-active',
     style: {
       'border-width': 2,

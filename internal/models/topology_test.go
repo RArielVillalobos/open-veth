@@ -11,6 +11,8 @@ func TestGetImageForType(t *testing.T) {
 		{HOST, ImgHost},
 		{SWITCH, ImgHost},
 		{HUB, ImgHost},                 // Hub uses host image
+		{CLOUD, ImgHost},               // Cloud uses host image
+		{LINUX, ImgLinux},              // Linux uses its own debian image
 		{NodeType("unknown"), ImgHost}, // default fallback
 	}
 

@@ -190,6 +190,69 @@ func TestCreateCloudNode(t *testing.T) {
 	t.Log("✅ iptables MASQUERADE rule confirmed")
 }
 
+// TestCreateLinuxNode verifies that a LINUX node starts with Debian and has bash + python3 available.
+func TestCreateLinuxNode(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	manager, err := NewManager(logger)
+	if err != nil {
+		t.Fatalf("Error initializing manager: %v", err)
+	}
+
+	if err := manager.TestConnection(ctx); err != nil {
+		t.Skip("Docker is not available, skipping integration test")
+	}
+
+	testNode := models.Node{
+		ID:    "test-linux-id",
+		Name:  "test-unit-linux",
+		Type:  models.LINUX,
+		Image: models.GetImageForType(models.LINUX),
+	}
+
+	defer func() {
+		if err := manager.DeleteNode(ctx, testNode.Name); err != nil {
+			t.Logf("Cleanup error: %v", err)
+		}
+	}()
+
+	containerID, err := manager.CreateNode(ctx, testNode)
+	if err != nil {
+		t.Fatalf("CreateNode failed for LINUX: %v", err)
+	}
+	if containerID == "" {
+		t.Fatal("Expected a container ID, received empty")
+	}
+	t.Logf("✅ LINUX container created with ID %s", containerID)
+
+	// Verify bash is available
+	out, err := execAndCapture(ctx, manager, containerID, []string{"bash", "--version"})
+	if err != nil {
+		t.Fatalf("Failed to check bash: %v", err)
+	}
+	if !strings.Contains(out, "GNU bash") {
+		t.Errorf("Expected GNU bash, got: %q", out)
+	}
+	t.Log("✅ bash confirmed")
+
+	// Verify python3 is available (python3 --version prints to stderr, use -c instead)
+	out, err = execAndCapture(ctx, manager, containerID, []string{"python3", "-c", "import sys; print(sys.version)"})
+	if err != nil {
+		t.Fatalf("Failed to check python3: %v", err)
+	}
+	if !strings.Contains(out, "3.") {
+		t.Errorf("Expected Python 3.x, got: %q", out)
+	}
+	t.Log("✅ python3 confirmed")
+
+	// Verify no bridge (br0) exists — LINUX is not a bridge node
+	out, err = execAndCapture(ctx, manager, containerID, []string{"ip", "link", "show", "br0"})
+	if err == nil && strings.Contains(out, "br0") {
+		t.Errorf("LINUX node should not have a br0 bridge, but found one")
+	}
+	t.Log("✅ no br0 bridge confirmed")
+}
+
 // TestCreateSwitchNode verifies that a SWITCH node can be created with a normal bridge
 func TestCreateSwitchNode(t *testing.T) {
 	// 1. Setup

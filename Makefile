@@ -60,9 +60,10 @@ deps-ui: ## Install frontend dependencies
 	cd $(FRONTEND_DIR) && npm install
 
 # --- Node Images ---
-images: ## Build node images (Host and Router)
+images: ## Build node images (Host, Router and Linux)
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
+	$(DOCKER_CMD) build -t openveth/linux:latest ./images/linux-node
 
 # --- Testing ---
 test-go: ## Run Go tests
