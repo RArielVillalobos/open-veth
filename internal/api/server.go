@@ -85,6 +85,7 @@ func (s *Server) setupRoutes() {
 		// Links
 		api.GET("/links", s.handler.ListLinks)
 		api.POST("/links", s.handler.CreateLink)
+		api.PATCH("/links/:id/toggle", s.handler.ToggleLink)
 		api.DELETE("/links/:id", s.handler.DeleteLink)
 
 		// Laboratories

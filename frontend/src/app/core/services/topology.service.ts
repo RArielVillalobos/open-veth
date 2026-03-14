@@ -53,6 +53,10 @@ export class TopologyService {
     return this.http.post<Link>(`${this.apiUrl}/links`, link);
   }
 
+  toggleLink(id: string, enabled: boolean): Observable<Link> {
+    return this.http.patch<Link>(`${this.apiUrl}/links/${id}/toggle`, { enabled });
+  }
+
   deleteLink(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/links/${id}`);
   }

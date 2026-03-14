@@ -16,6 +16,7 @@ function createMockTopologyService() {
     deleteNode: vi.fn(),
     createLink: vi.fn(),
     deleteLink: vi.fn(),
+    toggleLink: vi.fn(),
     createLaboratory: vi.fn(),
     activateLaboratory: vi.fn().mockReturnValue(of(undefined)),
     updateLaboratory: vi.fn(),
@@ -218,6 +219,63 @@ describe('TopologyStore', () => {
     await store.removeLink('l1');
 
     expect(store.topology().links.find(l => l.id === 'l1')).toBeUndefined();
+  });
+
+  // --- toggleLink ---
+
+  it('toggleLink should disable an enabled link and update state', async () => {
+    const link = createMockLink({ id: 'l1', enabled: true });
+    mockService.getNodes.mockReturnValue(of([]));
+    mockService.getLinks.mockReturnValue(of([link]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    const disabled = { ...link, enabled: false };
+    mockService.toggleLink.mockReturnValue(of(disabled));
+
+    await store.toggleLink('l1');
+
+    expect(mockService.toggleLink).toHaveBeenCalledWith('l1', false);
+    expect(store.topology().links.find(l => l.id === 'l1')?.enabled).toBe(false);
+    expect(mockToast.success).toHaveBeenCalledWith('Link disabled');
+  });
+
+  it('toggleLink should enable a disabled link and update state', async () => {
+    const link = createMockLink({ id: 'l1', enabled: false });
+    mockService.getNodes.mockReturnValue(of([]));
+    mockService.getLinks.mockReturnValue(of([link]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    const enabled = { ...link, enabled: true };
+    mockService.toggleLink.mockReturnValue(of(enabled));
+
+    await store.toggleLink('l1');
+
+    expect(mockService.toggleLink).toHaveBeenCalledWith('l1', true);
+    expect(store.topology().links.find(l => l.id === 'l1')?.enabled).toBe(true);
+    expect(mockToast.success).toHaveBeenCalledWith('Link enabled');
+  });
+
+  it('toggleLink should do nothing if link does not exist', async () => {
+    await store.toggleLink('nonexistent');
+    expect(mockService.toggleLink).not.toHaveBeenCalled();
+  });
+
+  it('toggleLink should handle errors', async () => {
+    const link = createMockLink({ id: 'l1', enabled: true });
+    mockService.getNodes.mockReturnValue(of([]));
+    mockService.getLinks.mockReturnValue(of([link]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    mockService.toggleLink.mockReturnValue(throwError(() => ({ message: 'Network error' })));
+
+    await store.toggleLink('l1');
+
+    expect(mockToast.error).toHaveBeenCalled();
+    // State must not change on error
+    expect(store.topology().links.find(l => l.id === 'l1')?.enabled).toBe(true);
   });
 
   // --- Lab Management ---

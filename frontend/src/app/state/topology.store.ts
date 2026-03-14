@@ -260,6 +260,26 @@ export const TopologyStore = signalStore(
         }
       },
 
+      async toggleLink(id: string) {
+        const link = store.topology().links.find(l => l.id === id);
+        if (!link) return;
+        const newEnabled = !(link.enabled ?? true);
+        try {
+          const updated = await firstValueFrom(service.toggleLink(id, newEnabled));
+          patchState(store, (state) => ({
+            topology: {
+              ...state.topology,
+              links: state.topology.links.map(l => l.id === id ? updated : l)
+            }
+          }));
+          toast.success(newEnabled ? 'Link enabled' : 'Link disabled');
+          this.loadDomains();
+        } catch (err: any) {
+          const msg = err.error?.error || err.message || 'Error toggling link';
+          toast.error(msg);
+        }
+      },
+
       async removeLink(id: string) {
         patchState(store, { isLoading: true, error: null });
         try {

@@ -34,6 +34,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   linkSelected = output<string | null>();
   nodeDelete = output<string>();
   linkDelete = output<string>();
+  linkToggle = output<string>();
 
   private cy!: cytoscape.Core;
   private canvasReady = false;
@@ -49,6 +50,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     elementId: '',
     elementName: '',
     elementType: '',
+    linkEnabled: true,
     // Optional data for links
     sourceNode: { nodeId: '', nodeName: '', iface: '' },
     targetNode: { nodeId: '', nodeName: '', iface: '' }
@@ -141,7 +143,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     this.contextMenu = { ...this.contextMenu, visible: false };
   }
 
-  onContextMenuAction(action: 'terminal' | 'delete' | 'properties' | 'traceroute') {
+  onContextMenuAction(action: 'terminal' | 'delete' | 'properties' | 'traceroute' | 'toggle') {
     if (action === 'terminal') {
       this.openTerminalRequest.emit(this.contextMenu.elementId);
     } else if (action === 'traceroute') {
@@ -152,6 +154,8 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       } else {
         this.nodeSelected.emit(this.contextMenu.elementId);
       }
+    } else if (action === 'toggle') {
+      this.linkToggle.emit(this.contextMenu.elementId);
     } else if (action === 'delete') {
       if (this.contextMenu.elementType === 'edge') {
         this.linkDelete.emit(this.contextMenu.elementId);
@@ -275,6 +279,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         elementId: node.id(),
         elementName: node.data('name'),
         elementType: node.data('type'),
+        linkEnabled: true,
         sourceNode: { nodeId: '', nodeName: '', iface: '' },
         targetNode: { nodeId: '', nodeName: '', iface: '' }
       };
@@ -289,6 +294,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       // Look up full node objects to get names
       const sNode = this.nodes().find(n => n.id === data.source);
       const tNode = this.nodes().find(n => n.id === data.target);
+      const linkObj = this.links().find(l => l.id === edge.id());
 
       this.contextMenu = {
         visible: true,
@@ -297,6 +303,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         elementId: edge.id(),
         elementName: 'Link',
         elementType: 'edge',
+        linkEnabled: linkObj?.enabled ?? true,
         // Populate with correct structure for the event
         sourceNode: {
             nodeId: data.source,
@@ -648,9 +655,10 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         const srcLabel = srcIP ? `${link.source_int}\n${srcIP}` : link.source_int;
         const tgtLabel = tgtIP ? `${link.target_int}\n${tgtIP}` : link.target_int;
 
+        const isDisabled = !(link.enabled ?? true);
         const existingLink = this.cy.getElementById(link.id);
         if (existingLink.empty()) {
-          this.cy.add({
+          const added = this.cy.add({
             group: 'edges',
             data: {
               id: link.id,
@@ -660,6 +668,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
               target_int: tgtLabel
             }
           });
+          if (isDisabled) added.addClass('link-disabled');
         } else {
           // Update labels if IPs changed
           if (existingLink.data('source_int') !== srcLabel) {
@@ -667,6 +676,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           }
           if (existingLink.data('target_int') !== tgtLabel) {
             existingLink.data('target_int', tgtLabel);
+          }
+          // Sync disabled state
+          if (isDisabled) {
+            existingLink.addClass('link-disabled');
+          } else {
+            existingLink.removeClass('link-disabled');
           }
         }
       });

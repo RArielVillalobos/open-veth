@@ -35,6 +35,7 @@ export interface Link {
   target: string;
   source_int: string;
   target_int: string;
+  enabled?: boolean;
 }
 
 export interface Topology {

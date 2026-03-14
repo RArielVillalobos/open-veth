@@ -264,6 +264,20 @@ func (nm *NetworkManager) SetInterfaceIP(pid int, ifaceName string, ipCidr strin
 	})
 }
 
+// SetLinkEnabled brings an interface up or down inside a container namespace (PID)
+func (nm *NetworkManager) SetLinkEnabled(pid int, ifaceName string, enabled bool) error {
+	return nm.runInNs(pid, func() error {
+		link, err := netlink.LinkByName(ifaceName)
+		if err != nil {
+			return fmt.Errorf("interface %s not found: %v", ifaceName, err)
+		}
+		if enabled {
+			return netlink.LinkSetUp(link)
+		}
+		return netlink.LinkSetDown(link)
+	})
+}
+
 // RemoveInterface deletes a network interface from a container namespace (PID)
 func (nm *NetworkManager) RemoveInterface(pid int, ifaceName string) error {
 	return nm.runInNs(pid, func() error {

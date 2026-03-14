@@ -246,20 +246,28 @@ dnsmasq --no-daemon</pre>
                 <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
                     <span class="text-[10px] text-slate-400 font-medium">Internet Gateway</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">Info</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">Auto</span>
                   </div>
                   <div class="p-3 text-[10px] text-slate-400 leading-relaxed">
-                    This node has real internet access via Docker bridge (eth0). Connect routers to enable NAT for your lab.
+                    NAT and IP forwarding are configured automatically. Assign an IP to the lab interface and add return routes for each subnet in your lab.
                   </div>
                 </div>
 
                 <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Enable Forwarding</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">NAT</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Assign lab interface IP</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Setup</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE</pre>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip addr add &lt;IP&gt;/&lt;PREFIX&gt; dev eth1
+ip link set eth1 up</pre>
+                </div>
+
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">Return route (per subnet)</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Routing</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip route add &lt;LAB_SUBNET&gt; via &lt;NEXT_HOP&gt;</pre>
                 </div>
               </div>
             }

@@ -98,6 +98,7 @@ type Link struct {
 	TargetID  string `json:"target" gorm:"index"`
 	SourceInt string `json:"source_int"`
 	TargetInt string `json:"target_int"`
+	Enabled   bool   `json:"enabled" gorm:"default:true"`
 }
 
 // Laboratory represents a saved network project
@@ -160,6 +161,7 @@ type LinkExport struct {
 	Target    string `yaml:"target"`
 	SourceInt string `yaml:"source_int"`
 	TargetInt string `yaml:"target_int"`
+	Enabled   bool   `yaml:"enabled"`
 }
 
 // FormatMAC converts a hardware address byte slice to "aa:bb:cc:dd:ee:ff"

@@ -158,6 +158,15 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'text-background-shape': 'roundrectangle'
     }
   },
+  // Disabled link style
+  {
+    selector: 'edge.link-disabled',
+    style: {
+      'line-color': '#475569',
+      'line-style': 'dashed',
+      'opacity': 0.4,
+    }
+  },
   // Traceroute path highlight
   {
     selector: 'node.traceroute-path',

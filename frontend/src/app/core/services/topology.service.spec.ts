@@ -112,6 +112,24 @@ describe('TopologyService', () => {
     req.flush(null);
   });
 
+  it('toggleLink() should PATCH /links/:id/toggle with enabled=false', () => {
+    const updated = createMockLink({ enabled: false });
+    service.toggleLink('link-1', false).subscribe(res => expect(res).toEqual(updated));
+    const req = httpMock.expectOne(`${API}/links/link-1/toggle`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ enabled: false });
+    req.flush(updated);
+  });
+
+  it('toggleLink() should PATCH /links/:id/toggle with enabled=true', () => {
+    const updated = createMockLink({ enabled: true });
+    service.toggleLink('link-1', true).subscribe(res => expect(res).toEqual(updated));
+    const req = httpMock.expectOne(`${API}/links/link-1/toggle`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ enabled: true });
+    req.flush(updated);
+  });
+
   // --- Laboratories ---
 
   it('getLaboratories() should GET /laboratories', () => {

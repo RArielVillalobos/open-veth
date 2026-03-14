@@ -141,6 +141,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.ui.clearSelection();
   }
 
+  onToggleLink(id: string) {
+    this.store.toggleLink(id);
+  }
+
   onRename() {
     this.ui.toggleLabManager(true);
   }

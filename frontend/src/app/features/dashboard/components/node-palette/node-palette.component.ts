@@ -97,7 +97,7 @@ export class NodePaletteComponent {
       hoverBorder: 'hover:border-sky-500/50',
       category: 'network',
       shortcut: 'I',
-      description: 'Internet gateway. Provides real internet access via Docker bridge.'
+      description: 'NAT gateway with automatic IP forwarding and masquerade. Connect your lab nodes to reach real internet.'
     },
   ];
 

@@ -84,3 +84,25 @@ func (h *Handler) BroadcastLinkCreated(linkID, labID, sourceID, targetID string)
 		},
 	})
 }
+
+// BroadcastLinkToggled emits an event when a link is enabled or disabled
+func (h *Handler) BroadcastLinkToggled(linkID, labID string, enabled bool) {
+	if h.EventHub == nil {
+		return
+	}
+
+	enabledStr := "false"
+	if enabled {
+		enabledStr = "true"
+	}
+
+	h.EventHub.Broadcast(NetworkEvent{
+		Type:      "link:toggled",
+		LabID:     labID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]string{
+			"linkId":  linkID,
+			"enabled": enabledStr,
+		},
+	})
+}

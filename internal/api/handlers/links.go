@@ -41,6 +41,9 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		link.LabID = "lab-1"
 	}
 
+	// New links are always enabled
+	link.Enabled = true
+
 	// Validate interface names
 	if err := models.ValidateInterfaceName(link.SourceInt); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source interface name"})
@@ -123,6 +126,71 @@ func (h *Handler) CreateLink(c *gin.Context) {
 	h.BroadcastLinkCreated(link.ID, link.LabID, link.SourceID, link.TargetID)
 
 	c.JSON(http.StatusCreated, link)
+}
+
+// ToggleLink enables or disables a link by bringing its interfaces up or down
+func (h *Handler) ToggleLink(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	link, found := h.Repo.GetLink(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "link not found"})
+		return
+	}
+
+	source, okS := h.Repo.GetNode(link.SourceID)
+	target, okT := h.Repo.GetNode(link.TargetID)
+	if okS {
+		h.hydrateNode(&source)
+	}
+	if okT {
+		h.hydrateNode(&target)
+	}
+
+	ctx := c.Request.Context()
+
+	setEnabled := func(node models.Node, ifaceName string) {
+		if node.ContainerID == "" {
+			return
+		}
+		pid, err := h.Manager.GetNodePID(ctx, node.ContainerID)
+		if err != nil {
+			h.Logger.Warn("could not get PID for node (might be stopped)",
+				"node", node.Name, "error", err)
+			return
+		}
+		if err := h.Network.SetLinkEnabled(pid, ifaceName, req.Enabled); err != nil {
+			h.Logger.Warn("failed to set link state",
+				"iface", ifaceName, "node", node.Name, "enabled", req.Enabled, "error", err)
+		}
+	}
+
+	if okS {
+		setEnabled(source, link.SourceInt)
+	}
+	if okT {
+		setEnabled(target, link.TargetInt)
+	}
+
+	link.Enabled = req.Enabled
+	if err := h.Repo.SaveLink(link); err != nil {
+		h.Logger.Error("failed to persist link state", "id", link.ID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist link state"})
+		return
+	}
+
+	h.Logger.Info("link toggled", "id", link.ID, "enabled", req.Enabled)
+	h.BroadcastLinkToggled(link.ID, link.LabID, req.Enabled)
+
+	c.JSON(http.StatusOK, link)
 }
 
 // DeleteLink removes a veth pair

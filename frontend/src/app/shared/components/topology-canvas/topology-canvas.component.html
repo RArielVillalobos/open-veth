@@ -52,29 +52,36 @@
   
   <!-- EDGE/LINK MENU -->
   <ng-container *ngIf="contextMenu.elementType === 'edge'">
-    
+
+    <button class="context-menu__item" (click)="onContextMenuAction('toggle')">
+      <span class="context-menu__icon mono text-xs">{{ contextMenu.linkEnabled ? '||' : '▶' }}</span>
+      <span class="context-menu__label">{{ contextMenu.linkEnabled ? 'Disable Link' : 'Enable Link' }}</span>
+    </button>
+
+    <div class="context-menu__separator"></div>
+
     <div class="context-menu__section-header">Packet Capture</div>
-    
+
     <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.sourceNode)">
       <span class="context-menu__icon">📡</span>
       <span class="context-menu__label">Sniff {{ contextMenu.sourceNode.nodeName }}</span>
       <span class="context-menu__meta">{{ contextMenu.sourceNode.iface }}</span>
     </button>
-    
+
     <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.targetNode)">
       <span class="context-menu__icon">📡</span>
       <span class="context-menu__label">Sniff {{ contextMenu.targetNode.nodeName }}</span>
       <span class="context-menu__meta">{{ contextMenu.targetNode.iface }}</span>
     </button>
-    
+
     <div class="context-menu__separator"></div>
-    
-    <button class="context-menu__item context-menu__item--danger" 
+
+    <button class="context-menu__item context-menu__item--danger"
             (click)="onContextMenuAction('delete')">
       <span class="context-menu__icon">🗑</span>
       <span class="context-menu__label">Delete Link</span>
     </button>
-    
+
   </ng-container>
 
 </div>

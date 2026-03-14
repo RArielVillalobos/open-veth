@@ -50,6 +50,7 @@ func setupRouter(h *Handler) *gin.Engine {
 
 		api.GET("/links", h.ListLinks)
 		api.POST("/links", h.CreateLink)
+		api.PATCH("/links/:id/toggle", h.ToggleLink)
 		api.DELETE("/links/:id", h.DeleteLink)
 
 		api.GET("/laboratories", h.ListLaboratories)
@@ -764,5 +765,84 @@ func TestCleanupLaboratoryRemovesOnlyTargetLab(t *testing.T) {
 	_, ok = repo.GetLaboratory("lab-1")
 	if !ok {
 		t.Error("expected lab-1 to still exist after cleanup")
+	}
+}
+
+// =============================================================================
+// ToggleLink
+// =============================================================================
+
+func TestToggleLink_NotFound(t *testing.T) {
+	h, _ := newTestHandler()
+	r := setupRouter(h)
+
+	w := doRequest(r, "PATCH", "/api/v1/links/nonexistent/toggle", map[string]bool{"enabled": false})
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestToggleLink_InvalidBody(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	repo.SaveLink(models.Link{
+		ID: "link-12345", LabID: "lab-1",
+		SourceID: "n1", TargetID: "n2",
+		SourceInt: "eth1", TargetInt: "eth1",
+		Enabled: true,
+	})
+
+	w := doRequest(r, "PATCH", "/api/v1/links/link-12345/toggle", "not-json")
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid body, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestToggleLink_DisableAndEnable(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	// Save nodes without ContainerID so setEnabled returns early (no Manager needed)
+	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1", Name: "HOST-1"})
+	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1", Name: "HOST-2"})
+	repo.SaveLink(models.Link{
+		ID: "link-12345", LabID: "lab-1",
+		SourceID: "n1", TargetID: "n2",
+		SourceInt: "eth1", TargetInt: "eth1",
+		Enabled: true,
+	})
+
+	// Disable
+	w := doRequest(r, "PATCH", "/api/v1/links/link-12345/toggle", map[string]bool{"enabled": false})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var got models.Link
+	json.Unmarshal(w.Body.Bytes(), &got)
+	if got.Enabled {
+		t.Error("expected Enabled=false in response")
+	}
+
+	persisted, _ := repo.GetLink("link-12345")
+	if persisted.Enabled {
+		t.Error("expected Enabled=false persisted in repo")
+	}
+
+	// Re-enable
+	w = doRequest(r, "PATCH", "/api/v1/links/link-12345/toggle", map[string]bool{"enabled": true})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	json.Unmarshal(w.Body.Bytes(), &got)
+	if !got.Enabled {
+		t.Error("expected Enabled=true in response")
+	}
+
+	persisted, _ = repo.GetLink("link-12345")
+	if !persisted.Enabled {
+		t.Error("expected Enabled=true persisted in repo")
 	}
 }

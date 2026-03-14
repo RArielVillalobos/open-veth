@@ -257,6 +257,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.deleteDefaultRoute(ctx, inspect.ID)
 			}
 
+			// Re-apply NAT rules (lost on container restart)
+			if node.Type == models.CLOUD {
+				m.setupCloud(ctx, inspect.ID, node.Name)
+			}
+
 			return inspect.ID, nil
 
 		}
@@ -288,6 +293,11 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	// 7. If node needs a bridge, initialize 'br0'
 	if models.NeedsBridge(node.Type) {
 		m.setupBridge(ctx, resp.ID, node.Name, node.Type)
+	}
+
+	// 8. If node is CLOUD, enable IP forwarding and NAT masquerade
+	if node.Type == models.CLOUD {
+		m.setupCloud(ctx, resp.ID, node.Name)
 	}
 
 	m.logger.Info("node created and started", "name", node.Name, "id", resp.ID[:12])
@@ -350,6 +360,33 @@ func (m *Manager) deleteDefaultRoute(ctx context.Context, containerID string) {
 		_ = m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
 	}
 	// Ignore errors - route might not exist
+}
+
+// setupCloud configures a CLOUD node as a NAT gateway.
+// It enables IP forwarding and sets up masquerade so connected lab nodes
+// can reach the internet through the CLOUD's eth0 (Docker bridge) interface.
+// The iptables check (-C) prevents duplicate rules on container restart.
+func (m *Manager) setupCloud(ctx context.Context, containerID, nodeName string) {
+	setupCmd := "sysctl -w net.ipv4.ip_forward=1 && " +
+		"iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || " +
+		"iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"sh", "-c", setupCmd},
+		AttachStdout: true,
+		AttachStderr: true,
+		Privileged:   true,
+	}
+
+	m.logger.Info("configuring cloud NAT gateway", "name", nodeName)
+
+	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
+		if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
+			m.logger.Warn("failed to configure cloud NAT", "name", nodeName, "error", errStart)
+		}
+	} else {
+		m.logger.Warn("failed to create cloud NAT exec", "name", nodeName, "error", err)
+	}
 }
 
 // setupBridge initializes the bridge interface (br0) inside a switch or hub container.
