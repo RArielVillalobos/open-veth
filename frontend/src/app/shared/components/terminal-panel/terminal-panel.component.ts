@@ -135,6 +135,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     const baseWsUrl = environment.apiUrl.replace(/^http/, 'ws');
     const wsUrl = `${baseWsUrl}/terminal?node=${nodeId}`;
     const socket = new WebSocket(wsUrl);
+    socket.binaryType = 'arraybuffer';
 
     socket.onopen = () => {
       term.writeln(`\x1b[32m✔ Connected to ${nodeName}\x1b[0m`);
@@ -142,10 +143,8 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     };
 
     socket.onmessage = (event) => {
-      if (event.data instanceof Blob) {
-        const reader = new FileReader();
-        reader.onload = () => term.write(reader.result as string);
-        reader.readAsText(event.data);
+      if (event.data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(event.data));
       } else {
         term.write(event.data);
       }

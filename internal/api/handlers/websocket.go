@@ -139,7 +139,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		for {
 			n, err := resp.Reader.Read(buf)
 			if n > 0 {
-				if err := ws.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
+				if err := ws.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
 					return
 				}
 			}
