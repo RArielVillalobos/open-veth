@@ -153,9 +153,14 @@
           </div>
           
           <!-- Integrated Terminal (Only takes space from center) -->
-          <div *ngIf="terminalStore.isOpen()" 
-               class="h-64 border-t border-slate-700 bg-slate-900 shrink-0 z-10 overflow-hidden">
-            <app-terminal-panel></app-terminal-panel>
+          <div *ngIf="terminalStore.isOpen()"
+               class="border-t border-slate-700 bg-slate-900 shrink-0 z-10 overflow-hidden flex flex-col"
+               [style.height.px]="terminalHeight()">
+            <!-- Drag handle -->
+            <div class="h-2 bg-slate-700 hover:bg-blue-500 cursor-ns-resize shrink-0 transition-colors"
+                 (mousedown)="onResizeStart($event)"
+                 (dblclick)="terminalHeight.set(DEFAULT_TERMINAL_HEIGHT)"></div>
+            <app-terminal-panel class="flex-1 min-h-0"></app-terminal-panel>
           </div>
       </div>
 

@@ -73,6 +73,10 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  fitAll() {
+    this.terminals.forEach(({ fit }) => fit.fit());
+  }
+
   private syncTerminals(sessions: TerminalSession[]) {
     const activeIds = sessions.map(s => s.nodeId);
 

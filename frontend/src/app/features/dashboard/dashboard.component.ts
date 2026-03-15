@@ -67,10 +67,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
   });
 
   @ViewChild(TopologyCanvasComponent) canvasComponent!: TopologyCanvasComponent;
+  @ViewChild(TerminalPanelComponent) terminalPanel!: TerminalPanelComponent;
 
   tracerouteResult = signal<TracerouteResponse | null>(null);
+  readonly DEFAULT_TERMINAL_HEIGHT = 256;
+  terminalHeight = signal(this.DEFAULT_TERMINAL_HEIGHT);
 
   private lastLabId: string | null = null;
+  private readonly MIN_TERMINAL_HEIGHT = 120;
+  private readonly MAX_TERMINAL_HEIGHT_RATIO = 0.8;
+  private resizing = false;
+  private resizeStartY = 0;
+  private resizeStartHeight = 0;
+  private boundMouseMove = this.onResizeMove.bind(this);
+  private boundMouseUp = this.onResizeEnd.bind(this);
 
   constructor() {
     effect(() => {
@@ -91,8 +101,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    // Automatic cleanup via DestroyRef, but explicit disconnect is also fine
     this.networkEvents.disconnect();
+    document.removeEventListener('mousemove', this.boundMouseMove);
+    document.removeEventListener('mouseup', this.boundMouseUp);
+  }
+
+  onResizeStart(event: MouseEvent) {
+    this.resizing = true;
+    this.resizeStartY = event.clientY;
+    this.resizeStartHeight = this.terminalHeight();
+    document.addEventListener('mousemove', this.boundMouseMove);
+    document.addEventListener('mouseup', this.boundMouseUp);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    event.preventDefault();
+  }
+
+  private onResizeMove(event: MouseEvent) {
+    if (!this.resizing) return;
+    const delta = this.resizeStartY - event.clientY;
+    const maxHeight = window.innerHeight * this.MAX_TERMINAL_HEIGHT_RATIO;
+    const newHeight = Math.min(maxHeight, Math.max(this.MIN_TERMINAL_HEIGHT, this.resizeStartHeight + delta));
+    this.terminalHeight.set(newHeight);
+  }
+
+  private onResizeEnd() {
+    if (!this.resizing) return;
+    this.resizing = false;
+    document.removeEventListener('mousemove', this.boundMouseMove);
+    document.removeEventListener('mouseup', this.boundMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    requestAnimationFrame(() => this.terminalPanel?.fitAll());
   }
 
   onNodeSelected(id: string | null) {
