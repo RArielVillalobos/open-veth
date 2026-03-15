@@ -175,15 +175,18 @@ func buildDomains(rootToNodes map[string]map[string]bool, rootToLinks map[string
 	var domains []Domain
 	id := 0
 	for root, nodeSet := range rootToNodes {
+		ls := rootToLinks[root]
+		// Skip isolated nodes — a domain with no links has no network connectivity
+		if len(ls) == 0 {
+			continue
+		}
 		nodeIDs := make([]string, 0, len(nodeSet))
 		for nid := range nodeSet {
 			nodeIDs = append(nodeIDs, nid)
 		}
-		linkIDs := make([]string, 0)
-		if ls, ok := rootToLinks[root]; ok {
-			for lid := range ls {
-				linkIDs = append(linkIDs, lid)
-			}
+		linkIDs := make([]string, 0, len(ls))
+		for lid := range ls {
+			linkIDs = append(linkIDs, lid)
 		}
 		domains = append(domains, Domain{
 			ID:      id,

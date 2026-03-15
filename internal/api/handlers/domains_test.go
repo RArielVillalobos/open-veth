@@ -43,22 +43,17 @@ func TestDomainsEmptyLab(t *testing.T) {
 }
 
 func TestDomainsSingleIsolatedNode(t *testing.T) {
+	// An isolated node with no links is not part of any domain
 	nodes := []models.Node{{ID: "pc1", Type: models.HOST}}
 
 	bd := computeBroadcastDomains(nodes, nil)
 	cd := computeCollisionDomains(nodes, nil)
 
-	if len(bd) != 1 {
-		t.Fatalf("expected 1 broadcast domain, got %d", len(bd))
+	if len(bd) != 0 {
+		t.Fatalf("expected 0 broadcast domains for isolated node, got %d", len(bd))
 	}
-	if len(cd) != 1 {
-		t.Fatalf("expected 1 collision domain, got %d", len(cd))
-	}
-	if bd[0].NodeIDs[0] != "pc1" {
-		t.Errorf("expected pc1 in broadcast domain, got %v", bd[0].NodeIDs)
-	}
-	if len(bd[0].LinkIDs) != 0 {
-		t.Errorf("expected 0 links in broadcast domain, got %v", bd[0].LinkIDs)
+	if len(cd) != 0 {
+		t.Fatalf("expected 0 collision domains for isolated node, got %d", len(cd))
 	}
 }
 
@@ -354,7 +349,7 @@ func TestDomainsRingTopology(t *testing.T) {
 }
 
 func TestDomainsIsolatedRouterNoLinks(t *testing.T) {
-	// Router with no links: each per-link-key node with 0 links gets its own isolated domain
+	// Isolated nodes with no links are not part of any domain
 	nodes := []models.Node{
 		{ID: "r1", Type: models.ROUTER},
 		{ID: "pc1", Type: models.HOST},
@@ -363,20 +358,11 @@ func TestDomainsIsolatedRouterNoLinks(t *testing.T) {
 	bd := computeBroadcastDomains(nodes, nil)
 	cd := computeCollisionDomains(nodes, nil)
 
-	// Router uses per-link keys → isolated → own domain; HOST also isolated
-	if len(bd) != 2 {
-		t.Fatalf("expected 2 broadcast domains (1 per isolated node), got %d: %+v", len(bd), bd)
+	if len(bd) != 0 {
+		t.Fatalf("expected 0 broadcast domains for isolated nodes, got %d: %+v", len(bd), bd)
 	}
-	if len(cd) != 2 {
-		t.Fatalf("expected 2 collision domains (1 per isolated node), got %d: %+v", len(cd), cd)
-	}
-	for _, d := range bd {
-		if len(d.NodeIDs) != 1 {
-			t.Errorf("expected 1 node per isolated domain, got %v", d.NodeIDs)
-		}
-		if len(d.LinkIDs) != 0 {
-			t.Errorf("expected 0 links for isolated domain, got %v", d.LinkIDs)
-		}
+	if len(cd) != 0 {
+		t.Fatalf("expected 0 collision domains for isolated nodes, got %d: %+v", len(cd), cd)
 	}
 }
 
