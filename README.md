@@ -81,7 +81,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
-| **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, direct internet access |
+| **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, sudo, direct internet access |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 

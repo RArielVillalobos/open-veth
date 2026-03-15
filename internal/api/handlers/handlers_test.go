@@ -3,7 +3,9 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -68,8 +70,24 @@ func setupRouter(h *Handler) *gin.Engine {
 		api.DELETE("/laboratories/:id/cleanup", h.CleanupLaboratory)
 
 		api.POST("/nodes/:id/traceroute", h.RunTraceroute)
+	api.POST("/nodes/:id/upload", h.UploadFile)
 	}
 	return r
+}
+
+// doMultipartRequest builds a multipart/form-data request with a single file field.
+func doMultipartRequest(r *gin.Engine, path, filename, content string) *httptest.ResponseRecorder {
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	fw, _ := w.CreateFormFile("file", filename)
+	io.WriteString(fw, content)
+	w.Close()
+
+	req := httptest.NewRequest("POST", path, &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
 }
 
 func doRequest(r *gin.Engine, method, path string, body interface{}) *httptest.ResponseRecorder {
@@ -844,5 +862,72 @@ func TestToggleLink_DisableAndEnable(t *testing.T) {
 	persisted, _ = repo.GetLink("link-12345")
 	if !persisted.Enabled {
 		t.Error("expected Enabled=true persisted in repo")
+	}
+}
+
+// =============================================================================
+// Upload
+// =============================================================================
+
+func TestUploadFile_NodeNotFound(t *testing.T) {
+	h, _ := newTestHandler()
+	r := setupRouter(h)
+
+	w := doMultipartRequest(r, "/api/v1/nodes/nonexistent/upload", "test.sh", "echo hello")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUploadFile_NodeNotRunning(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	// Node exists but has no ContainerID (stopped)
+	repo.SaveNode(models.Node{ID: "node-stopped", Name: "stopped", Type: models.HOST})
+
+	w := doMultipartRequest(r, "/api/v1/nodes/node-stopped/upload", "test.sh", "echo hello")
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUploadFile_InvalidPath(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	repo.SaveNode(models.Node{ID: "node-1", Name: "n1", Type: models.HOST, ContainerID: "fake-id"})
+
+	// Path without leading slash
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("file", "test.sh")
+	io.WriteString(fw, "echo hello")
+	mw.Close()
+
+	req := httptest.NewRequest("POST", "/api/v1/nodes/node-1/upload?path=root", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid path, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUploadFile_NoFile(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	repo.SaveNode(models.Node{ID: "node-1", Name: "n1", Type: models.HOST, ContainerID: "fake-id"})
+
+	// Send request with no file field
+	req := httptest.NewRequest("POST", "/api/v1/nodes/node-1/upload", strings.NewReader(""))
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=xxx")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing file, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

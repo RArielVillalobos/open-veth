@@ -26,6 +26,7 @@ export interface Node {
   x?: number;
   y?: number;
   status?: 'pending' | 'running' | 'error';
+  container_id?: string; // Runtime info
   interfaces?: InterfaceInfo[]; // Runtime info
 }
 

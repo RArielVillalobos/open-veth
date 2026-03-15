@@ -104,6 +104,15 @@ export class TopologyService {
     );
   }
 
+  uploadFile(nodeId: string, file: File, path: string = '/root'): Observable<{ message: string; filename: string; path: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ message: string; filename: string; path: string }>(
+      `${this.apiUrl}/nodes/${nodeId}/upload?path=${encodeURIComponent(path)}`,
+      formData
+    );
+  }
+
   exportTopology(): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/topology/export`, { responseType: 'blob' });
   }

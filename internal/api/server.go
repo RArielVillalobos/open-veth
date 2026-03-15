@@ -81,6 +81,7 @@ func (s *Server) setupRoutes() {
 		api.GET("/nodes/:id/interfaces", s.handler.GetNodeInterfaces)
 		api.GET("/nodes/:id/routes", s.handler.GetNodeRoutes)
 		api.POST("/nodes/:id/traceroute", s.handler.RunTraceroute)
+		api.POST("/nodes/:id/upload", s.handler.UploadFile)
 
 		// Links
 		api.GET("/links", s.handler.ListLinks)

@@ -28,6 +28,10 @@ export class PropertiesPanelComponent {
   routes = signal<RouteInfo[]>([]);
   loadingRoutes = signal(false);
   showHelp = signal(false);
+  uploading = signal(false);
+  uploadResult = signal<{ success: boolean; path: string } | null>(null);
+  showConnect = signal(false);
+
 
   // Whether the selected node is a bridge-based node (switch/hub)
   isBridgeNode = computed(() => {
@@ -56,6 +60,7 @@ export class PropertiesPanelComponent {
       const node = this.selectedNode();
       // Reset state immediately
       this.routes.set([]);
+      this.uploadResult.set(null);
       
       if (node && node.type !== 'switch' && node.type !== 'hub') {
         // Use setTimeout to ensure we don't trigger change detection during render
@@ -84,6 +89,33 @@ export class PropertiesPanelComponent {
       this.toast.error('Failed to load routes: ' + (err.error?.error || err.message || 'unknown error'));
     } finally {
       this.loadingRoutes.set(false);
+    }
+  }
+
+  copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      this.toast.success('Copied to clipboard');
+    });
+  }
+
+  async onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const nodeId = this.selectedNode()?.id;
+    if (!file || !nodeId) return;
+
+    this.uploading.set(true);
+    this.uploadResult.set(null);
+    try {
+      const result = await firstValueFrom(this.service.uploadFile(nodeId, file));
+      this.uploadResult.set({ success: true, path: result.path });
+      this.toast.success(`Uploaded ${result.filename} to ${result.path}`);
+    } catch (err: any) {
+      this.uploadResult.set({ success: false, path: '' });
+      this.toast.error('Upload failed: ' + (err.error?.error || err.message || 'unknown error'));
+    } finally {
+      this.uploading.set(false);
+      input.value = '';
     }
   }
 
