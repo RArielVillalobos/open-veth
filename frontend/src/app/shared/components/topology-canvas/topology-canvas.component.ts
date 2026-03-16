@@ -195,6 +195,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  fitToView() {
+    if (this.cy) {
+      this.cy.fit(undefined, 50);
+    }
+  }
+
   onTracerouteResult(result: TracerouteResponse) {
     this.tracerouteResult = result;
     this.tracerouteLoading = false;

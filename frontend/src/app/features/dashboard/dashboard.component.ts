@@ -191,8 +191,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   async onExport() {
     try {
-      const blob = await firstValueFrom(this.service.exportTopology());
-      this.fileService.downloadBlob(blob, `topology-${new Date().getTime()}.yaml`);
+      const lab = this.store.topology();
+      const blob = await firstValueFrom(this.service.exportTopology(lab.id));
+      this.fileService.downloadBlob(blob, `${lab.name}.yaml`);
     } catch (err) {
       console.error('Failed to export topology', err);
       this.toast.error('Export failed');
@@ -206,9 +207,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     try {
       const content = await this.fileService.readAsText(file);
-      await firstValueFrom(this.service.importTopology(content));
-      this.toast.success('Topology imported successfully');
-      this.store.loadTopology();
+      const labId = this.store.topology().id;
+      const result = await firstValueFrom(this.service.importTopology(content, labId));
+      if (result.errors?.length) {
+        this.toast.error(`Import partial: ${result.errors.length} error(s) — ${result.errors[0]}`);
+      } else {
+        this.toast.success(`Topology imported: ${result.nodes} nodes, ${result.links} links`);
+      }
+      await this.store.loadTopology();
+      setTimeout(() => this.canvasComponent?.fitToView());
     } catch (err: any) {
       console.error('Failed to import topology', err);
       this.toast.error('Import failed: ' + (err.error?.error || err.message));

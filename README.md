@@ -6,7 +6,6 @@
 ![Frontend](https://img.shields.io/badge/Frontend-Angular_21-DD0031?logo=angular)
 ![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker)
 ![License](https://img.shields.io/badge/License-AGPL%20v3-green)
-![Version](https://img.shields.io/badge/Version-0.4--beta-orange)
 
 ---
 
@@ -61,7 +60,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **Dynamic Routing** | Full FRRouting support (OSPF, BGP, IS-IS, Static) |
 | **SSH Between Nodes** | Connect from one node to another within the lab |
 | **DHCP Server** | Automatic IP assignment for realistic LAN labs |
-| **Infrastructure as Code** | Export/import topologies as YAML |
+| **Infrastructure as Code** | Export/import topologies as YAML — includes node positions, links, IP configs, and static routes |
 | **Lab Management** | Create, save, and switch between lab projects |
 | **State Persistence** | IP configurations auto-saved every 30s and restored on lab activation |
 | **Broadcast/Collision Domain Overlay** | Visualize broadcast and collision domains highlighted on the topology canvas |
@@ -227,6 +226,47 @@ ip link set eth1 up
 ip route add default via 10.0.1.1
 ping 8.8.8.8   # should work
 ```
+
+### Topology YAML Format
+
+Export and import full lab configurations, including IP addresses and static routes:
+
+```yaml
+name: My Lab
+nodes:
+  - name: R1
+    type: router
+    x: 200
+    y: 150
+    interfaces:
+      - interface: eth1
+        address: 10.0.1.1/30
+      - interface: eth2
+        address: 10.0.2.1/30
+    routes:
+      - dst: 10.0.3.0/24
+        gateway: 10.0.2.2
+        dev: eth2
+  - name: HOST-1
+    type: host
+    x: 400
+    y: 150
+    interfaces:
+      - interface: eth1
+        address: 10.0.1.2/30
+    routes:
+      - dst: 0.0.0.0/0
+        gateway: 10.0.1.1
+        dev: eth1
+links:
+  - source: R1
+    target: HOST-1
+    source_int: eth1
+    target_int: eth1
+    enabled: true
+```
+
+On import, IP addresses and routes are applied to the containers immediately and persisted to the database so they survive restarts.
 
 ### Link Toggle — Simulate Link Failures
 

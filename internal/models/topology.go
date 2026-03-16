@@ -19,6 +19,15 @@ func NeedsBridge(t NodeType) bool {
 	return t == SWITCH || t == HUB
 }
 
+// IsValidNodeType returns true if the given type is a known node type
+func IsValidNodeType(t NodeType) bool {
+	switch t {
+	case ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX:
+		return true
+	}
+	return false
+}
+
 // KeepEth0 returns true for node types that should NOT rename eth0 to mgmt0.
 // CLOUD nodes keep eth0 to maintain connectivity to Docker bridge (internet access).
 func KeepEth0(t NodeType) bool {
@@ -144,25 +153,35 @@ type Topology struct {
 // --- Export Models (Clean YAML) ---
 
 type LabExport struct {
-	Version string       `yaml:"version"`
-	Name    string       `yaml:"name"`
-	Nodes   []NodeExport `yaml:"nodes"`
-	Links   []LinkExport `yaml:"links"`
+	Name  string       `yaml:"name"`
+	Nodes []NodeExport `yaml:"nodes"`
+	Links []LinkExport `yaml:"links"`
 }
 
 type NodeExport struct {
-	ID   string   `yaml:"id"`
 	Name string   `yaml:"name"`
 	Type NodeType `yaml:"type"`
 	// Image removed for security abstraction
-	X float64 `yaml:"x"`
-	Y float64 `yaml:"y"`
+	X          float64           `yaml:"x"`
+	Y          float64           `yaml:"y"`
+	Interfaces []InterfaceExport `yaml:"interfaces,omitempty"`
+	Routes     []RouteExport     `yaml:"routes,omitempty"`
+}
+
+type InterfaceExport struct {
+	Interface string `yaml:"interface"`
+	Address   string `yaml:"address"`
+}
+
+type RouteExport struct {
+	Dst     string `yaml:"dst"`
+	Gateway string `yaml:"gateway,omitempty"`
+	Dev     string `yaml:"dev"`
 }
 
 type LinkExport struct {
-	ID        string `yaml:"id"`
-	Source    string `yaml:"source"`
-	Target    string `yaml:"target"`
+	Source    string `yaml:"source"`     // node name
+	Target    string `yaml:"target"`     // node name
 	SourceInt string `yaml:"source_int"`
 	TargetInt string `yaml:"target_int"`
 	Enabled   bool   `yaml:"enabled"`

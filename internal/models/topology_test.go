@@ -24,6 +24,22 @@ func TestGetImageForType(t *testing.T) {
 	}
 }
 
+func TestIsValidNodeType(t *testing.T) {
+	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX}
+	for _, tt := range valid {
+		if !IsValidNodeType(tt) {
+			t.Errorf("IsValidNodeType(%q) = false, want true", tt)
+		}
+	}
+
+	invalid := []NodeType{"hypervisor", "vm", "", "ROUTER", "Host"}
+	for _, tt := range invalid {
+		if IsValidNodeType(tt) {
+			t.Errorf("IsValidNodeType(%q) = true, want false", tt)
+		}
+	}
+}
+
 func TestFormatMAC(t *testing.T) {
 	tests := []struct {
 		name     string

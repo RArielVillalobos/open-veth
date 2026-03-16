@@ -189,18 +189,18 @@ describe('TopologyService', () => {
     req.flush(response);
   });
 
-  it('exportTopology() should GET /topology/export as blob', () => {
-    service.exportTopology().subscribe(res => expect(res instanceof Blob).toBe(true));
-    const req = httpMock.expectOne(`${API}/topology/export`);
+  it('exportTopology() should GET /topology/export?lab_id as blob', () => {
+    service.exportTopology('lab-1').subscribe(res => expect(res instanceof Blob).toBe(true));
+    const req = httpMock.expectOne(`${API}/topology/export?lab_id=lab-1`);
     expect(req.request.method).toBe('GET');
     expect(req.request.responseType).toBe('blob');
     req.flush(new Blob(['yaml content']));
   });
 
-  it('importTopology() should POST /topology/import with yaml content-type', () => {
+  it('importTopology() should POST /topology/import?lab_id with yaml content-type', () => {
     const yaml = 'name: Test\nnodes: []';
-    service.importTopology(yaml).subscribe();
-    const req = httpMock.expectOne(`${API}/topology/import`);
+    service.importTopology(yaml, 'lab-1').subscribe();
+    const req = httpMock.expectOne(`${API}/topology/import?lab_id=lab-1`);
     expect(req.request.method).toBe('POST');
     expect(req.request.headers.get('Content-Type')).toBe('application/x-yaml');
     expect(req.request.body).toBe(yaml);

@@ -113,14 +113,15 @@ export class TopologyService {
     );
   }
 
-  exportTopology(): Observable<Blob> {
-    return this.http.get(`${this.apiUrl}/topology/export`, { responseType: 'blob' });
+  exportTopology(labId: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/topology/export?lab_id=${labId}`, { responseType: 'blob' });
   }
 
-  importTopology(yamlContent: string): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/topology/import`, yamlContent, {
-      headers: { 'Content-Type': 'application/x-yaml' }
-    });
+  importTopology(yamlContent: string, labId: string): Observable<{ message: string; nodes: number; links: number; errors: string[] }> {
+    return this.http.post<{ message: string; nodes: number; links: number; errors: string[] }>(
+      `${this.apiUrl}/topology/import?lab_id=${labId}`, yamlContent,
+      { headers: { 'Content-Type': 'application/x-yaml' } }
+    );
   }
 
   // --- Legacy (Batch Deploy) ---

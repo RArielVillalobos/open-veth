@@ -353,21 +353,26 @@ func TestHandleExport(t *testing.T) {
 
 	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Test Lab"})
 	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1", Name: "HOST-1", Type: models.HOST, X: 10, Y: 20})
-	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1", SourceID: "n1", TargetID: "n1", SourceInt: "eth0", TargetInt: "eth1"})
+	repo.SaveNode(models.Node{ID: "n2", LabID: "lab-1", Name: "HOST-2", Type: models.HOST, X: 200, Y: 20})
+	repo.SaveLink(models.Link{ID: "l1", LabID: "lab-1", SourceID: "n1", TargetID: "n2", SourceInt: "eth0", TargetInt: "eth0"})
 
 	w := doRequest(r, "GET", "/api/v1/topology/export?lab_id=lab-1", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	contentType := w.Header().Get("Content-Type")
-	if contentType != "application/x-yaml" {
-		t.Errorf("expected content-type application/x-yaml, got %q", contentType)
+	if ct := w.Header().Get("Content-Type"); ct != "application/x-yaml" {
+		t.Errorf("expected content-type application/x-yaml, got %q", ct)
 	}
 
 	body := w.Body.String()
-	if len(body) == 0 {
-		t.Error("expected non-empty YAML body")
+
+	// Links must reference nodes by name, not by internal ID
+	if !strings.Contains(body, "HOST-1") || !strings.Contains(body, "HOST-2") {
+		t.Errorf("expected node names in YAML, got:\n%s", body)
+	}
+	if strings.Contains(body, "n1") || strings.Contains(body, "n2") {
+		t.Errorf("internal IDs must not appear in exported YAML, got:\n%s", body)
 	}
 
 	// Empty lab export should still work
@@ -644,10 +649,12 @@ func TestImportCreatesLaboratory(t *testing.T) {
 	h, repo := newTestHandler()
 	r := setupRouter(h)
 
-	// Valid YAML with no nodes/links — should create the lab without hitting Docker
+	// Lab must exist before importing
+	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "My Lab"})
+
+	// Valid YAML with no nodes/links — should succeed without hitting Docker
 	yamlBody := `
-version: "0.4"
-name: "Imported Lab"
+name: Imported Lab
 nodes: []
 links: []
 `
@@ -660,10 +667,10 @@ links: []
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Verify lab was created in repo
+	// Lab ID is preserved; name is updated from the YAML
 	lab, ok := repo.GetLaboratory("lab-1")
 	if !ok {
-		t.Fatal("expected lab-1 to be created in repo")
+		t.Fatal("expected lab-1 to still exist in repo")
 	}
 	if lab.Name != "Imported Lab" {
 		t.Errorf("expected lab name 'Imported Lab', got %q", lab.Name)
@@ -685,8 +692,7 @@ func TestImportOverwritesExistingLab(t *testing.T) {
 	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Old Lab"})
 
 	yamlBody := `
-version: "0.4"
-name: "New Lab"
+name: New Lab
 nodes: []
 links: []
 `
@@ -706,6 +712,141 @@ links: []
 	}
 	if lab.Name != "New Lab" {
 		t.Errorf("expected 'New Lab', got %q", lab.Name)
+	}
+}
+
+func TestExportIncludesInterfacesAndRoutes(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Test Lab"})
+	repo.SaveNode(models.Node{ID: "n1", LabID: "lab-1", Name: "HOST-1", Type: models.HOST})
+
+	repo.SaveInterfaceConfigs("lab-1", []models.InterfaceConfig{
+		{LabID: "lab-1", NodeID: "n1", Interface: "eth0", Address: "10.0.0.1/24"},
+	})
+	repo.SaveRouteConfigs("lab-1", []models.RouteConfig{
+		{LabID: "lab-1", NodeID: "n1", Dst: "0.0.0.0/0", Gateway: "10.0.0.254", Dev: "eth0"},
+	})
+
+	w := doRequest(r, "GET", "/api/v1/topology/export?lab_id=lab-1", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "10.0.0.1/24") {
+		t.Errorf("expected IP address in YAML, got:\n%s", body)
+	}
+	if !strings.Contains(body, "0.0.0.0/0") {
+		t.Errorf("expected route dst in YAML, got:\n%s", body)
+	}
+	if !strings.Contains(body, "10.0.0.254") {
+		t.Errorf("expected route gateway in YAML, got:\n%s", body)
+	}
+}
+
+func TestImportYAMLWithConfigsIsAccepted(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Existing Lab"})
+
+	// YAML with interfaces and routes but no nodes — verifies the parser accepts
+	// the new fields without returning 400. Full Docker flow is an integration test.
+	yamlBody := `
+name: "Config Lab"
+nodes: []
+links: []
+`
+	req := httptest.NewRequest("POST", "/api/v1/topology/import", bytes.NewBufferString(yamlBody))
+	req.Header.Set("Content-Type", "application/x-yaml")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for valid YAML with config fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestImportRejectsUnknownLab(t *testing.T) {
+	h, _ := newTestHandler()
+	r := setupRouter(h)
+
+	// No lab pre-created — should return 404
+	yamlBody := `
+name: Some Lab
+nodes: []
+links: []
+`
+	w := doRequest(r, "POST", "/api/v1/topology/import?lab_id=lab-nonexistent",
+		bytes.NewBufferString(yamlBody))
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown lab, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestImportRejectsUnknownLinkNode(t *testing.T) {
+	h, _ := newTestHandler()
+	r := setupRouter(h)
+
+	yamlBody := `
+name: Bad Lab
+nodes:
+  - name: HOST-1
+    type: host
+links:
+  - source: HOST-1
+    target: GHOST-NODE
+    source_int: eth0
+    target_int: eth0
+`
+	req := httptest.NewRequest("POST", "/api/v1/topology/import", bytes.NewBufferString(yamlBody))
+	req.Header.Set("Content-Type", "application/x-yaml")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for link referencing unknown node, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestImportRejectsInvalidNodeType(t *testing.T) {
+	h, _ := newTestHandler()
+	r := setupRouter(h)
+
+	yamlBody := `
+name: Bad Lab
+nodes:
+  - name: HOST-1
+    type: hypervisor
+links: []
+`
+	req := httptest.NewRequest("POST", "/api/v1/topology/import", bytes.NewBufferString(yamlBody))
+	req.Header.Set("Content-Type", "application/x-yaml")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid node type, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestExportContentDispositionQuoted(t *testing.T) {
+	h, repo := newTestHandler()
+	r := setupRouter(h)
+
+	repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "My Lab"})
+
+	w := doRequest(r, "GET", "/api/v1/topology/export?lab_id=lab-1", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	cd := w.Header().Get("Content-Disposition")
+	expected := `attachment; filename="My Lab.yaml"`
+	if cd != expected {
+		t.Errorf("Content-Disposition = %q, want %q", cd, expected)
 	}
 }
 
