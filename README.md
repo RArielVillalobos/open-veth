@@ -80,9 +80,9 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
-| **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, sudo, direct internet access |
+| **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 
-All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
+All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
 ---
 
@@ -97,18 +97,25 @@ All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`, `iperf3`
 | Make | - | Required |
 | Linux / WSL2 | - | Netlink operations require Linux kernel |
 
-> **Windows Users**: OpenVeth requires Linux networking. Use WSL2 with Docker Desktop configured for WSL integration.
+> **Windows Users**: OpenVeth requires Linux networking. Docker Desktop must be configured to use WSL2 as the backend (this is the default in recent versions). Once Docker is running, use `start.bat` as described below.
 
 ### Installation
 
+**Linux / macOS:**
 ```bash
 git clone https://github.com/RArielVillalobos/open-veth.git
 cd open-veth
 make up
 ```
 
+**Windows (Docker Desktop with WSL2):**
+```
+1. Clone the repository
+2. Double-click start.bat
+```
+
 That's it! The command will:
-- Build node images (Host, Router — Switch, Hub, and Cloud reuse the Host image)
+- Build node images (Host, Router, Linux — Switch, Hub, and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL
 
@@ -173,6 +180,7 @@ graph TD
         R[ROUTER - FRR]
         S[SWITCH - Bridge]
         HB[HUB - Repeater]
+        L[LINUX - Debian]
     end
 
     Veth -.->|connects| Containers

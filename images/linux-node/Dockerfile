@@ -1,5 +1,12 @@
 FROM debian:bookworm-slim
 
+# Enable man pages (slim images exclude them by default)
+# Also reinstall base packages so their man pages are included
+RUN sed -i '/usr\/share\/man/d' /etc/dpkg/dpkg.cfg.d/docker \
+    && apt-get update \
+    && apt-get install -y --reinstall coreutils findutils grep sed gzip \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install networking tools + scripting essentials
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Networking
@@ -26,6 +33,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bc \
     man-db \
     manpages \
+    manpages-es \
+    less \
+    bash-completion \
+    locales \
+    netcat-openbsd \
+    dnsutils \
     # Editors & tools
     vim \
     nano \
@@ -35,6 +48,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
     cron \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && sed -i '/es_ES.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen
+ENV LANG=es_ES.UTF-8
 
 # Configure SSH
 RUN mkdir -p /run/sshd
