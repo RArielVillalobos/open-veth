@@ -21,7 +21,7 @@ export interface RouteInfo {
 export interface Node {
   id: string;
   name: string;
-  type: 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux';
+  type: 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux' | 'server';
   // Image removed: Backend managed
   x?: number;
   y?: number;

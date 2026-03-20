@@ -46,6 +46,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # SSH
     openssh-client \
     openssh-server \
+    # Web server
+    nginx \
     cron \
     && rm -rf /var/lib/apt/lists/*
 

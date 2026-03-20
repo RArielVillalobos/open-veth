@@ -3,7 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Node } from '../../../../models/topology.model';
 
-type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux';
+type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux' | 'server';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -111,11 +111,23 @@ export class NodePaletteComponent {
       shortcut: 'L',
       description: 'Debian Linux with bash, python3, cron and apt. Has direct internet access. Ideal for scripting and automation practice.'
     },
+    {
+      id: 'server',
+      label: 'Server',
+      subtitle: 'Debian + systemd',
+      icon: 'server.svg',
+      placeholder: 'e.g. SRV1',
+      accentBorder: 'border-orange-500',
+      hoverBorder: 'hover:border-orange-500/50',
+      category: 'end',
+      shortcut: 'V',
+      description: 'Debian with systemd as PID 1. Manage services with systemctl. Includes nginx, apache2, mariadb, dnsmasq, chrony, vsftpd. Ideal for sysadmin and services labs.'
+    },
   ];
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0, server: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;
@@ -196,5 +208,6 @@ export class NodePaletteComponent {
     if (key === 'H') this.startNaming('host');
     if (key === 'I') this.startNaming('cloud');
     if (key === 'L') this.startNaming('linux');
+    if (key === 'V') this.startNaming('server');
   }
 }

@@ -19,7 +19,12 @@ docker build -t openveth/linux:latest ./images/linux-node
 if %errorlevel% neq 0 ( echo ERROR al construir linux & pause & exit /b 1 )
 
 echo.
-echo [4/4] Levantando OpenVeth...
+echo [4/5] Construyendo imagen: server...
+docker build -t openveth/server:latest ./images/server-node
+if %errorlevel% neq 0 ( echo ERROR al construir server & pause & exit /b 1 )
+
+echo.
+echo [5/5] Levantando OpenVeth...
 docker compose up -d --build
 if %errorlevel% neq 0 ( echo ERROR al levantar OpenVeth & pause & exit /b 1 )
 

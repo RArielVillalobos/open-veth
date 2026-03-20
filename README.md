@@ -68,6 +68,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
 | **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
 | **Linux Node** | Debian-based node with bash, python3, cron and apt — direct internet access for scripting and automation practice |
+| **Server Node** | Debian with systemd as PID 1 — manage services with `systemctl`, inspect logs with `journalctl`. Ideal for sysadmin, services, and automation labs |
 
 ---
 
@@ -81,6 +82,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
+| **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
@@ -115,7 +117,7 @@ make up
 ```
 
 That's it! The command will:
-- Build node images (Host, Router, Linux — Switch, Hub, and Cloud reuse the Host image)
+- Build node images (Host, Router, Linux, Server — Switch, Hub, and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL
 
@@ -181,6 +183,7 @@ graph TD
         S[SWITCH - Bridge]
         HB[HUB - Repeater]
         L[LINUX - Debian]
+        SRV[SERVER - Debian+systemd]
     end
 
     Veth -.->|connects| Containers
@@ -307,6 +310,8 @@ Right-click any cable on the canvas and select **Disable Link** to bring the int
 - **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets with live packet capture
 - **Network Troubleshooting**: Visualize broadcast/collision domains and trace packet paths interactively
 - **Network Administration**: Practice SSH, remote management, and troubleshooting
+- **System Administration**: Practice service management with systemd, configure nginx/apache2/dnsmasq, manage users and firewall rules
+- **Scripting & Automation**: Write bash scripts, schedule cron jobs, automate network configuration across multiple nodes
 - **Infrastructure Design**: Prototype topologies before production deployment
 
 ---

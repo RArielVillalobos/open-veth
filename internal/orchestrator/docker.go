@@ -200,8 +200,14 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		},
 	}
 
+	caps := []string{"NET_ADMIN"}
+	if node.Type == models.SERVER {
+		// systemd requires SYS_ADMIN to manage cgroups inside the container
+		caps = append(caps, "SYS_ADMIN")
+	}
+
 	hostConfig := &container.HostConfig{
-		CapAdd: []string{"NET_ADMIN"},
+		CapAdd: caps,
 	}
 
 	// Mount named volume for FRR config persistence on routers
@@ -213,6 +219,17 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				Target: "/etc/frr",
 			},
 		}
+	}
+
+	// systemd requires /sys/fs/cgroup mounted from the host and cgroupns=host
+	if node.Type == models.SERVER {
+		hostConfig.CgroupnsMode = "host"
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   "/sys/fs/cgroup",
+			Target:   "/sys/fs/cgroup",
+			ReadOnly: false,
+		})
 	}
 
 	// 3. Create container (Conflict handling)
