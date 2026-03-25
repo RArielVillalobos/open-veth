@@ -198,6 +198,7 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 				h.Logger.Warn("failed to get PID for running node", "node", node.Name, "error", err)
 			}
 			h.Runtime.Set(node.ID, ctr.ID, pid)
+			h.storeMonitorPorts(ctx, &node, ctr.ID)
 			node.ContainerID = ctr.ID
 			node.PID = pid
 			nodeMap[node.ID] = node
@@ -218,6 +219,7 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 			h.Logger.Warn("failed to get PID for revived node", "node", node.Name, "error", err)
 		}
 		h.Runtime.Set(node.ID, cid, pid)
+		h.storeMonitorPorts(ctx, &node, cid)
 		node.ContainerID = cid
 		node.PID = pid
 		nodeMap[node.ID] = node

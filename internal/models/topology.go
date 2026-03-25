@@ -13,6 +13,7 @@ const (
 	CLOUD   NodeType = "cloud"   // Internet gateway - keeps eth0 connected to Docker bridge
 	LINUX   NodeType = "linux"   // Debian-based node for scripting and general use
 	SERVER  NodeType = "server"  // Debian with systemd — for sysadmin, services and automation labs
+	MONITOR NodeType = "monitor" // Grafana + Prometheus pre-configured — for observability labs
 )
 
 // NeedsBridge returns true for node types that use an internal bridge (br0)
@@ -23,7 +24,7 @@ func NeedsBridge(t NodeType) bool {
 // IsValidNodeType returns true if the given type is a known node type
 func IsValidNodeType(t NodeType) bool {
 	switch t {
-	case ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX, SERVER:
+	case ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX, SERVER, MONITOR:
 		return true
 	}
 	return false
@@ -32,15 +33,16 @@ func IsValidNodeType(t NodeType) bool {
 // KeepEth0 returns true for node types that should NOT rename eth0 to mgmt0.
 // CLOUD nodes keep eth0 to maintain connectivity to Docker bridge (internet access).
 func KeepEth0(t NodeType) bool {
-	return t == CLOUD || t == LINUX || t == SERVER
+	return t == CLOUD || t == LINUX || t == SERVER || t == MONITOR
 }
 
 // Official Images
 const (
-	ImgRouter = "openveth/router:latest"
-	ImgHost   = "openveth/host:latest"
-	ImgLinux  = "openveth/linux:latest"
-	ImgServer = "openveth/server:latest"
+	ImgRouter  = "openveth/router:latest"
+	ImgHost    = "openveth/host:latest"
+	ImgLinux   = "openveth/linux:latest"
+	ImgServer  = "openveth/server:latest"
+	ImgMonitor = "openveth/monitor:latest"
 )
 
 // GetImageForType returns the official docker image for a given node type
@@ -60,6 +62,8 @@ func GetImageForType(t NodeType) string {
 		return ImgLinux
 	case SERVER:
 		return ImgServer
+	case MONITOR:
+		return ImgMonitor
 	default:
 		return ImgHost
 	}
@@ -78,8 +82,9 @@ type Node struct {
 	Y          float64  `json:"y"` // Canvas position
 
 	// Runtime state (not persisted, rebuilt from Docker on startup)
-	ContainerID string `json:"container_id" gorm:"-"`
-	PID         int    `json:"pid" gorm:"-"`
+	ContainerID  string         `json:"container_id" gorm:"-"`
+	PID          int            `json:"pid" gorm:"-"`
+	ServicePorts map[string]int `json:"service_ports,omitempty" gorm:"-"`
 
 	// Runtime Info (Not persisted in DB)
 	Interfaces []InterfaceInfo `json:"interfaces" gorm:"-"`

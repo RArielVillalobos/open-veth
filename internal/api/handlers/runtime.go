@@ -4,8 +4,9 @@ import "sync"
 
 // RuntimeState holds ephemeral Docker state for a node
 type RuntimeState struct {
-	ContainerID string
-	PID         int
+	ContainerID  string
+	PID          int
+	ServicePorts map[string]int // only populated for MONITOR nodes
 }
 
 // RuntimeStore is a thread-safe in-memory store for node runtime state.
@@ -27,6 +28,16 @@ func (r *RuntimeStore) Set(nodeID, containerID string, pid int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.nodes[nodeID] = RuntimeState{ContainerID: containerID, PID: pid}
+}
+
+// SetServicePorts stores the mapped host ports for a MONITOR node.
+// If the node is not yet in the store it is upserted with only the ports set.
+func (r *RuntimeStore) SetServicePorts(nodeID string, ports map[string]int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	state := r.nodes[nodeID] // zero value if missing
+	state.ServicePorts = ports
+	r.nodes[nodeID] = state
 }
 
 // Get retrieves runtime state for a node

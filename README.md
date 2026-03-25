@@ -69,6 +69,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
 | **Linux Node** | Debian-based node with bash, python3, cron and apt — direct internet access for scripting and automation practice |
 | **Server Node** | Debian with systemd as PID 1 — manage services with `systemctl`, inspect logs with `journalctl`. Ideal for sysadmin, services, and automation labs |
+| **Monitor Node** | Grafana + Prometheus + snmp_exporter pre-installed and auto-started — drag it onto the canvas, connect it to your topology, and open Grafana directly from the UI. Scrape hosts with `node_exporter` and routers/switches with SNMP. Ideal for learning observability concepts |
 
 ---
 
@@ -83,6 +84,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
+| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana 10 + Prometheus + snmp_exporter pre-installed and auto-started via systemd. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Open Grafana and Prometheus directly from the node panel. `node_exporter` and `blackbox_exporter` available in `/opt/exporters/` to copy to other nodes. `snmp_exporter` runs on port 9116 with the official `snmp.yml` — scrape any SNMP-enabled node (routers, switches) without extra setup |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
@@ -117,7 +119,7 @@ make up
 ```
 
 That's it! The command will:
-- Build node images (Host, Router, Linux, Server — Switch, Hub, and Cloud reuse the Host image)
+- Build node images (Host, Router, Linux, Server, Monitor — Switch, Hub, and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL
 
@@ -184,6 +186,7 @@ graph TD
         HB[HUB - Repeater]
         L[LINUX - Debian]
         SRV[SERVER - Debian+systemd]
+        MON[MONITOR - Grafana+Prometheus]
     end
 
     Veth -.->|connects| Containers
@@ -301,6 +304,8 @@ Right-click any cable on the canvas and select **Disable Link** to bring the int
 | Internet connectivity | ✅ | ✅ | ✅ | ❌ |
 | Broadcast/collision domain overlay | ✅ | ❌ | ❌ | ❌ |
 | Visual traceroute | ✅ | ❌ | ❌ | ❌ |
+| Grafana + Prometheus built-in | ✅ | ❌ | ❌ | ❌ |
+| SNMP monitoring | ✅ | ✅ | ✅ | ❌ |
 
 ---
 
@@ -312,6 +317,7 @@ Right-click any cable on the canvas and select **Disable Link** to bring the int
 - **Network Administration**: Practice SSH, remote management, and troubleshooting
 - **System Administration**: Practice service management with systemd, configure nginx/apache2/dnsmasq, manage users and firewall rules
 - **Scripting & Automation**: Write bash scripts, schedule cron jobs, automate network configuration across multiple nodes
+- **Observability**: Deploy a Monitor node with Grafana + Prometheus + snmp_exporter pre-configured. Install `node_exporter` on hosts for system metrics, or enable `snmpd` on routers for interface traffic via SNMP — the full observability stack in minutes
 - **Infrastructure Design**: Prototype topologies before production deployment
 
 ---

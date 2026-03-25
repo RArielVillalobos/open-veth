@@ -3,7 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Node } from '../../../../models/topology.model';
 
-type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux' | 'server';
+type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -49,7 +49,7 @@ export class NodePaletteComponent {
       hoverBorder: 'hover:border-blue-500/50',
       category: 'network',
       shortcut: 'R',
-      description: 'Layer 3 device with FRRouting support. Supports OSPF, BGP, IS-IS.'
+      description: 'Debian-based Layer 3 device with FRRouting. Supports OSPF, BGP, IS-IS. Has snmpd pre-installed for SNMP monitoring.'
     },
     { 
       id: 'switch', 
@@ -123,11 +123,23 @@ export class NodePaletteComponent {
       shortcut: 'V',
       description: 'Debian with systemd as PID 1. Manage services with systemctl. Includes nginx, apache2, mariadb, dnsmasq, chrony, vsftpd. Ideal for sysadmin and services labs.'
     },
+    {
+      id: 'monitor',
+      label: 'Monitor',
+      subtitle: 'Grafana + Prometheus',
+      icon: 'monitor.svg',
+      placeholder: 'e.g. MON1',
+      accentBorder: 'border-cyan-500',
+      hoverBorder: 'hover:border-cyan-500/50',
+      category: 'end',
+      shortcut: 'M',
+      description: 'Grafana, Prometheus and snmp_exporter pre-configured and running. Scrape hosts with node_exporter or routers with SNMP. Open Grafana directly from the node panel.'
+    },
   ];
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0, server: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0, server: 0, monitor: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;
@@ -209,5 +221,6 @@ export class NodePaletteComponent {
     if (key === 'I') this.startNaming('cloud');
     if (key === 'L') this.startNaming('linux');
     if (key === 'V') this.startNaming('server');
+    if (key === 'M') this.startNaming('monitor');
   }
 }
