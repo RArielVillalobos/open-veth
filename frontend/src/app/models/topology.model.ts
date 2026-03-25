@@ -21,13 +21,14 @@ export interface RouteInfo {
 export interface Node {
   id: string;
   name: string;
-  type: 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux' | 'server';
+  type: 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor';
   // Image removed: Backend managed
   x?: number;
   y?: number;
   status?: 'pending' | 'running' | 'error';
   container_id?: string; // Runtime info
   interfaces?: InterfaceInfo[]; // Runtime info
+  service_ports?: Record<string, number>; // Runtime info — only for monitor nodes
 }
 
 export interface Link {

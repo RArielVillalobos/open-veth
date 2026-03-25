@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"open-veth/internal/models"
@@ -19,6 +20,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-connections/nat"
 )
 
 // Manager handles communication with the Docker Daemon
@@ -201,7 +203,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	caps := []string{"NET_ADMIN"}
-	if node.Type == models.SERVER {
+	if node.Type == models.SERVER || node.Type == models.MONITOR {
 		// systemd requires SYS_ADMIN to manage cgroups inside the container
 		caps = append(caps, "SYS_ADMIN")
 	}
@@ -222,7 +224,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	// systemd requires /sys/fs/cgroup mounted from the host and cgroupns=host
-	if node.Type == models.SERVER {
+	if node.Type == models.SERVER || node.Type == models.MONITOR {
 		hostConfig.CgroupnsMode = "host"
 		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
 			Type:     mount.TypeBind,
@@ -230,6 +232,18 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			Target:   "/sys/fs/cgroup",
 			ReadOnly: false,
 		})
+	}
+
+	// MONITOR: expose Grafana (3000) and Prometheus (9090) on dynamic host ports
+	if node.Type == models.MONITOR {
+		config.ExposedPorts = nat.PortSet{
+			"3000/tcp": struct{}{},
+			"9090/tcp": struct{}{},
+		}
+		hostConfig.PortBindings = nat.PortMap{
+			"3000/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
+			"9090/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
+		}
 	}
 
 	// 3. Create container (Conflict handling)
@@ -723,6 +737,37 @@ func (m *Manager) ConfigureRoute(ctx context.Context, containerID, dst, gateway,
 	}
 
 	return nil
+}
+
+// GetServicePorts returns the host-mapped ports for a MONITOR node.
+// Docker assigns random host ports when the container is created with HostPort: "0".
+func (m *Manager) GetServicePorts(ctx context.Context, containerID string) (map[string]int, error) {
+	inspect, err := m.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		shortID := containerID
+		if len(shortID) > 12 {
+			shortID = shortID[:12]
+		}
+		return nil, fmt.Errorf("error inspecting container %s: %v", shortID, err)
+	}
+
+	ports := make(map[string]int)
+	for containerPort, bindings := range inspect.NetworkSettings.Ports {
+		if len(bindings) == 0 {
+			continue
+		}
+		hostPort, err := strconv.Atoi(bindings[0].HostPort)
+		if err != nil || hostPort == 0 {
+			continue
+		}
+		switch containerPort.Port() {
+		case "3000":
+			ports["grafana"] = hostPort
+		case "9090":
+			ports["prometheus"] = hostPort
+		}
+	}
+	return ports, nil
 }
 
 // frrVolumeName returns the deterministic volume name for a router node's FRR config

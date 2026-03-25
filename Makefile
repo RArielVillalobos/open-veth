@@ -60,10 +60,18 @@ deps-ui: ## Install frontend dependencies
 	cd $(FRONTEND_DIR) && npm install
 
 # --- Node Images ---
-images: ## Build node images (Host, Router and Linux)
+images: ## Build node images (Host, Router/Debian+FRR, Linux, Server, Monitor)
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
 	$(DOCKER_CMD) build -t openveth/linux:latest ./images/linux-node
+	$(DOCKER_CMD) build -t openveth/server:latest ./images/server-node
+	$(DOCKER_CMD) build -t openveth/monitor:latest ./images/monitor-node
+
+router-image: ## Build only the router node image (Debian + FRRouting + snmpd)
+	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
+
+monitor-image: ## Build only the monitor node image (Grafana + Prometheus + snmp_exporter)
+	$(DOCKER_CMD) build -t openveth/monitor:latest ./images/monitor-node
 
 # --- Testing ---
 test-go: ## Run Go tests

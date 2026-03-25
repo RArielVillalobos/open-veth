@@ -39,6 +39,18 @@ export class PropertiesPanelComponent {
     return t === 'switch' || t === 'hub';
   });
 
+  isMonitorNode = computed(() => this.selectedNode()?.type === 'monitor');
+
+  grafanaUrl = computed(() => {
+    const port = this.selectedNode()?.service_ports?.['grafana'];
+    return port ? `http://localhost:${port}` : null;
+  });
+
+  prometheusUrl = computed(() => {
+    const port = this.selectedNode()?.service_ports?.['prometheus'];
+    return port ? `http://localhost:${port}` : null;
+  });
+
   // Safe check for interfaces to use in template
   hasInterfaces = computed(() => {
     const n = this.selectedNode();

@@ -305,6 +305,8 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		h.Runtime.Set(n.ID, containerID, pid)
 		nodes[i].ContainerID = containerID
 		nodes[i].PID = pid
+
+		h.storeMonitorPorts(ctx, &nodes[i], containerID)
 	}
 
 	// 6. Rebuild Links
