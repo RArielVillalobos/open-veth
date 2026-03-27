@@ -38,8 +38,109 @@ RUN ARCH=$(dpkg --print-architecture) && \
     tar -xzf /tmp/blackbox_exporter.tar.gz -C /tmp && \
     mv "/tmp/blackbox_exporter-${BLACKBOX_EXPORTER_VERSION}.linux-${ARCH}/blackbox_exporter" /opt/exporters/blackbox_exporter && \
     cp /usr/local/bin/node_exporter /opt/exporters/node_exporter && \
-    chmod +x /opt/exporters/* && \
     rm -rf /tmp/blackbox_exporter*
+
+# Download nginx-prometheus-exporter to /opt/exporters/
+ARG NGINX_EXPORTER_VERSION=1.3.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/nginx/nginx-prometheus-exporter/releases/download/v${NGINX_EXPORTER_VERSION}/nginx-prometheus-exporter_${NGINX_EXPORTER_VERSION}_linux_${ARCH}.tar.gz" \
+        -O /tmp/nginx_exporter.tar.gz && \
+    tar -xzf /tmp/nginx_exporter.tar.gz -C /tmp && \
+    mv /tmp/nginx-prometheus-exporter /opt/exporters/nginx_exporter && \
+    rm -rf /tmp/nginx_exporter*
+
+# Download postgres_exporter to /opt/exporters/
+ARG POSTGRES_EXPORTER_VERSION=0.15.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/prometheus-community/postgres_exporter/releases/download/v${POSTGRES_EXPORTER_VERSION}/postgres_exporter-${POSTGRES_EXPORTER_VERSION}.linux-${ARCH}.tar.gz" \
+        -O /tmp/postgres_exporter.tar.gz && \
+    tar -xzf /tmp/postgres_exporter.tar.gz -C /tmp && \
+    mv "/tmp/postgres_exporter-${POSTGRES_EXPORTER_VERSION}.linux-${ARCH}/postgres_exporter" /opt/exporters/postgres_exporter && \
+    rm -rf /tmp/postgres_exporter*
+
+# Download mysqld_exporter to /opt/exporters/
+ARG MYSQL_EXPORTER_VERSION=0.15.1
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/prometheus/mysqld_exporter/releases/download/v${MYSQL_EXPORTER_VERSION}/mysqld_exporter-${MYSQL_EXPORTER_VERSION}.linux-${ARCH}.tar.gz" \
+        -O /tmp/mysql_exporter.tar.gz && \
+    tar -xzf /tmp/mysql_exporter.tar.gz -C /tmp && \
+    mv "/tmp/mysqld_exporter-${MYSQL_EXPORTER_VERSION}.linux-${ARCH}/mysqld_exporter" /opt/exporters/mysql_exporter && \
+    rm -rf /tmp/mysql_exporter*
+
+# Download redis_exporter to /opt/exporters/
+ARG REDIS_EXPORTER_VERSION=1.62.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/oliver006/redis_exporter/releases/download/v${REDIS_EXPORTER_VERSION}/redis_exporter-v${REDIS_EXPORTER_VERSION}.linux-${ARCH}.tar.gz" \
+        -O /tmp/redis_exporter.tar.gz && \
+    tar -xzf /tmp/redis_exporter.tar.gz -C /tmp && \
+    mv "/tmp/redis_exporter-v${REDIS_EXPORTER_VERSION}.linux-${ARCH}/redis_exporter" /opt/exporters/redis_exporter && \
+    rm -rf /tmp/redis_exporter*
+
+# Download Promtail to /opt/exporters/ — agent to ship logs to Loki (copy to lab nodes)
+ARG PROMTAIL_VERSION=3.0.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/grafana/loki/releases/download/v${PROMTAIL_VERSION}/promtail-linux-${ARCH}.zip" \
+        -O /tmp/promtail.zip && \
+    apt-get update && apt-get install -y --no-install-recommends unzip && \
+    unzip -q /tmp/promtail.zip -d /tmp && \
+    mv "/tmp/promtail-linux-${ARCH}" /opt/exporters/promtail && \
+    rm -rf /tmp/promtail* && \
+    rm -rf /var/lib/apt/lists/*
+
+# Download apache_exporter to /opt/exporters/
+ARG APACHE_EXPORTER_VERSION=1.0.8
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/Lusitaniae/apache_exporter/releases/download/v${APACHE_EXPORTER_VERSION}/apache_exporter-${APACHE_EXPORTER_VERSION}.linux-${ARCH}.tar.gz" \
+        -O /tmp/apache_exporter.tar.gz && \
+    tar -xzf /tmp/apache_exporter.tar.gz -C /tmp && \
+    mv "/tmp/apache_exporter-${APACHE_EXPORTER_VERSION}.linux-${ARCH}/apache_exporter" /opt/exporters/apache_exporter && \
+    rm -rf /tmp/apache_exporter*
+
+# Fix permissions on all exporters
+RUN chmod +x /opt/exporters/*
+
+# Download Loki binary — log aggregation backend
+ARG LOKI_VERSION=3.0.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/grafana/loki/releases/download/v${LOKI_VERSION}/loki-linux-${ARCH}.zip" \
+        -O /tmp/loki.zip && \
+    apt-get update && apt-get install -y --no-install-recommends unzip && \
+    unzip -q /tmp/loki.zip -d /tmp && \
+    mv "/tmp/loki-linux-${ARCH}" /usr/local/bin/loki && \
+    chmod +x /usr/local/bin/loki && \
+    rm -rf /tmp/loki* && \
+    rm -rf /var/lib/apt/lists/*
+
+# Configure Loki
+RUN mkdir -p /etc/loki /var/lib/loki
+
+RUN cat > /etc/loki/loki.yml <<'EOF'
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  path_prefix: /var/lib/loki
+  storage:
+    filesystem:
+      chunks_directory: /var/lib/loki/chunks
+      rules_directory: /var/lib/loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+EOF
 
 # Install SNMP client tools
 RUN apt-get update && apt-get install -y --no-install-recommends snmp && \
@@ -139,11 +240,27 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
+# Create Loki systemd service
+RUN cat > /etc/systemd/system/loki.service <<'EOF'
+[Unit]
+Description=Grafana Loki Log Aggregation
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/loki --config.file=/etc/loki/loki.yml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # Enable services — start automatically when the container boots
 RUN systemctl enable grafana-server && \
     systemctl enable prometheus && \
     systemctl enable node_exporter && \
-    systemctl enable snmp_exporter
+    systemctl enable snmp_exporter && \
+    systemctl enable loki
 
 EXPOSE 3000 9090
 
