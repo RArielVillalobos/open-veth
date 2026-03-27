@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -106,6 +107,7 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		AttachStdin:  true,
 		Tty:          true,
 		Cmd:          []string{shell},
+		ConsoleSize:  &[2]uint{50, 220}, // default — frontend will send resize immediately after connect
 	}
 
 	// 3. Create exec instance in container
@@ -154,6 +156,15 @@ func (h *Handler) HandleTerminal(c *gin.Context) {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
 			break
+		}
+
+		// Handle terminal resize control message: {"type":"resize","cols":N,"rows":N}
+		if cols, rows, ok := parseResizeMessage(msg); ok {
+			h.Manager.GetDockerClient().ContainerExecResize(ctx, execID.ID, container.ResizeOptions{ //nolint:errcheck
+				Width:  cols,
+				Height: rows,
+			})
+			continue
 		}
 
 		cmd := string(msg)
@@ -279,6 +290,26 @@ func isNetworkConfigCommand(input string) bool {
 	}
 
 	return false
+}
+
+// parseResizeMessage attempts to parse a terminal resize control message.
+// Returns cols, rows, and true if msg is a valid {"type":"resize","cols":N,"rows":N} payload.
+func parseResizeMessage(msg []byte) (cols, rows uint, ok bool) {
+	if len(msg) == 0 || msg[0] != '{' {
+		return 0, 0, false
+	}
+	var ctrl struct {
+		Type string `json:"type"`
+		Cols uint   `json:"cols"`
+		Rows uint   `json:"rows"`
+	}
+	if err := json.Unmarshal(msg, &ctrl); err != nil {
+		return 0, 0, false
+	}
+	if ctrl.Type != "resize" || ctrl.Cols == 0 || ctrl.Rows == 0 {
+		return 0, 0, false
+	}
+	return ctrl.Cols, ctrl.Rows, true
 }
 
 // HandleSniff starts a live capture session over WebSockets

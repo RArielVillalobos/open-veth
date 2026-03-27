@@ -20,7 +20,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
   @ViewChildren('termContainer') termContainers!: QueryList<ElementRef>;
 
-  private terminals = new Map<string, { term: Terminal, fit: FitAddon, socket: WebSocket }>();
+  private terminals = new Map<string, { term: Terminal, fit: FitAddon, socket: WebSocket, resizeObserver: ResizeObserver }>();
 
   constructor() {
     // Reaccionar a cambios en la lista de nodos activos
@@ -49,6 +49,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.terminals.forEach(t => {
+      t.resizeObserver.disconnect();
       t.socket.close();
       t.term.dispose();
     });
@@ -74,7 +75,12 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
   }
 
   fitAll() {
-    this.terminals.forEach(({ fit }) => fit.fit());
+    this.terminals.forEach(({ fit, socket, term }) => {
+      fit.fit();
+      if (socket.readyState === WebSocket.OPEN && term.cols > 0) {
+        socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }
+    });
   }
 
   private syncTerminals(sessions: TerminalSession[]) {
@@ -83,6 +89,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     // 1. Eliminar terminales cerradas
     for (const [id, instance] of this.terminals) {
       if (!activeIds.includes(id)) {
+        instance.resizeObserver.disconnect();
         instance.socket.close();
         instance.term.dispose();
         this.terminals.delete(id);
@@ -141,9 +148,16 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     const socket = new WebSocket(wsUrl);
     socket.binaryType = 'arraybuffer';
 
+    const sendResize = () => {
+      if (socket.readyState === WebSocket.OPEN && term.cols > 0) {
+        socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }
+    };
+
     socket.onopen = () => {
       term.writeln(`\x1b[32m✔ Connected to ${nodeName}\x1b[0m`);
       fitAddon.fit();
+      sendResize();
     };
 
     socket.onmessage = (event) => {
@@ -160,6 +174,13 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
     socket.onclose = () => term.writeln('\r\n\x1b[31m✖ Connection closed.\x1b[0m');
 
-    this.terminals.set(nodeId, { term, fit: fitAddon, socket });
+    // Resize PTY when container size changes (panel resize, tab switch, etc.)
+    const resizeObserver = new ResizeObserver(() => {
+      fitAddon.fit();
+      sendResize();
+    });
+    resizeObserver.observe(container);
+
+    this.terminals.set(nodeId, { term, fit: fitAddon, socket, resizeObserver });
   }
 }
