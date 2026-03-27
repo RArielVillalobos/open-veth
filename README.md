@@ -83,8 +83,8 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
-| **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
-| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana 10 + Prometheus + snmp_exporter pre-installed and auto-started via systemd. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Open Grafana and Prometheus directly from the node panel. `node_exporter` and `blackbox_exporter` available in `/opt/exporters/` to copy to other nodes. `snmp_exporter` runs on port 9116 with the official `snmp.yml` — scrape any SNMP-enabled node (routers, switches) without extra setup |
+| **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
+| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana 10 + Prometheus + Loki + snmp_exporter pre-installed and auto-started via systemd. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. `snmp_exporter` runs on port 9116 — scrape any SNMP-enabled node (routers, switches) without extra setup. Loki runs on port 3100 for log aggregation. The following exporters/agents are available in `/opt/exporters/` ready to copy to any lab node via `scp`: `node_exporter` (system metrics), `blackbox_exporter` (ping/HTTP/TCP/DNS probes), `promtail` (log shipping to Loki), `nginx_exporter` (nginx), `apache_exporter` (Apache), `postgres_exporter` (PostgreSQL), `mysql_exporter` (MySQL/MariaDB), `redis_exporter` (Redis) |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
@@ -315,9 +315,9 @@ Right-click any cable on the canvas and select **Disable Link** to bring the int
 - **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets with live packet capture
 - **Network Troubleshooting**: Visualize broadcast/collision domains and trace packet paths interactively
 - **Network Administration**: Practice SSH, remote management, and troubleshooting
-- **System Administration**: Practice service management with systemd, configure nginx/apache2/dnsmasq, manage users and firewall rules
+- **System Administration**: Practice service management with systemd, configure nginx/apache2/dnsmasq/NFS, manage users and firewall rules
 - **Scripting & Automation**: Write bash scripts, schedule cron jobs, automate network configuration across multiple nodes
-- **Observability**: Deploy a Monitor node with Grafana + Prometheus + snmp_exporter pre-configured. Install `node_exporter` on hosts for system metrics, or enable `snmpd` on routers for interface traffic via SNMP — the full observability stack in minutes
+- **Observability**: Deploy a Monitor node with Grafana + Prometheus + Loki + snmp_exporter pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` — `node_exporter` for system metrics, `promtail` to ship logs to Loki, `nginx_exporter` for web servers, `postgres_exporter`/`mysql_exporter` for databases, `redis_exporter` for cache, `blackbox_exporter` for probing connectivity. Correlate metrics and logs in the same Grafana dashboard — the full observability stack in minutes
 - **Infrastructure Design**: Prototype topologies before production deployment
 
 ---
