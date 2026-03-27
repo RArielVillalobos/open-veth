@@ -293,8 +293,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.setupCloud(ctx, inspect.ID, node.Name)
 			}
 
-			// Re-apply default gateway for LINUX nodes (lost on container restart)
-			if node.Type == models.LINUX {
+			// Re-apply default gateway for LINUX/SERVER nodes (lost on container restart)
+			if node.Type == models.LINUX || node.Type == models.SERVER {
 				m.setupLinuxGateway(ctx, inspect.ID, node.Name)
 			}
 
@@ -336,8 +336,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.setupCloud(ctx, resp.ID, node.Name)
 	}
 
-	// 9. If node is LINUX, restore default gateway for direct internet access
-	if node.Type == models.LINUX {
+	// 9. If node is LINUX or SERVER, restore default gateway for direct internet access
+	if node.Type == models.LINUX || node.Type == models.SERVER {
 		m.setupLinuxGateway(ctx, resp.ID, node.Name)
 	}
 

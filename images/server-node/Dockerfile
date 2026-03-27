@@ -69,6 +69,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dnsmasq \
     chrony \
     vsftpd \
+    nfs-kernel-server \
+    nfs-common \
     vim \
     nano \
     && rm -rf /var/lib/apt/lists/*
