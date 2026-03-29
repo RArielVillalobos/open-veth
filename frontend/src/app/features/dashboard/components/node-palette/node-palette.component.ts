@@ -1,9 +1,7 @@
 import { Component, output, input, signal, computed, HostListener, ElementRef, viewChild, inject, Injector, afterNextRender } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Node } from '../../../../models/topology.model';
-
-type NodeType = 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor';
+import { Node, NodeType } from '../../../../models/topology.model';
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -135,11 +133,23 @@ export class NodePaletteComponent {
       shortcut: 'M',
       description: 'Grafana, Prometheus and snmp_exporter pre-configured and running. Scrape hosts with node_exporter or routers with SNMP. Open Grafana directly from the node panel.'
     },
+    {
+      id: 'tester',
+      label: 'Tester',
+      subtitle: 'Load & Stress',
+      icon: 'tester.svg',
+      placeholder: 'e.g. TST1',
+      accentBorder: 'border-rose-500',
+      hoverBorder: 'hover:border-rose-500/50',
+      category: 'end',
+      shortcut: 'T',
+      description: 'Debian with wrk, k6, siege, ab, iperf3, hping3, vegeta, stress-ng and locust. Ideal for HTTP load testing, network throughput measurement and system stress testing.'
+    },
   ];
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0, server: 0, monitor: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0, server: 0, monitor: 0, tester: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;
@@ -214,13 +224,7 @@ export class NodePaletteComponent {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 
     const key = event.key.toUpperCase();
-    if (key === 'R') this.startNaming('router');
-    if (key === 'S') this.startNaming('switch');
-    if (key === 'U') this.startNaming('hub');
-    if (key === 'H') this.startNaming('host');
-    if (key === 'I') this.startNaming('cloud');
-    if (key === 'L') this.startNaming('linux');
-    if (key === 'V') this.startNaming('server');
-    if (key === 'M') this.startNaming('monitor');
+    const match = this.nodeTypeConfigs.find(nt => nt.shortcut === key);
+    if (match) this.startNaming(match.id);
   }
 }

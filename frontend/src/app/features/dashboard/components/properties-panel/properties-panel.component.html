@@ -21,7 +21,9 @@
                'bg-violet-500/10 ring-1 ring-violet-500/30': selectedNode()?.type === 'hub',
                'bg-sky-500/10 ring-1 ring-sky-500/30': selectedNode()?.type === 'cloud',
                'bg-red-500/10 ring-1 ring-red-500/30': selectedNode()?.type === 'linux',
-               'bg-cyan-500/10 ring-1 ring-cyan-500/30': selectedNode()?.type === 'monitor'
+               'bg-orange-500/10 ring-1 ring-orange-500/30': selectedNode()?.type === 'server',
+               'bg-cyan-500/10 ring-1 ring-cyan-500/30': selectedNode()?.type === 'monitor',
+               'bg-rose-500/10 ring-1 ring-rose-500/30': selectedNode()?.type === 'tester'
              }">
           <img [src]="'assets/icons/' + selectedNode()?.type + '.svg'" 
                class="w-8 h-8"

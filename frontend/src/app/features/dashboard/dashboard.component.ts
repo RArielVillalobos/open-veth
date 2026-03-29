@@ -18,7 +18,7 @@ import { LabManagerComponent } from './components/lab-manager/lab-manager.compon
 import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
 import { firstValueFrom } from 'rxjs';
 import { FileService } from '../../core/services/file.service';
-import { TracerouteResponse } from '../../models/topology.model';
+import { TracerouteResponse, NodeType } from '../../models/topology.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -157,7 +157,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  onAddNode(event: { type: 'router' | 'host' | 'switch' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor'; name: string }) {
+  onAddNode(event: { type: NodeType; name: string }) {
     this.ui.markInteraction();
     const { nodes, links } = this.store.topology();
     const { x, y } = this.layoutService.getNextNodePosition(nodes, links);

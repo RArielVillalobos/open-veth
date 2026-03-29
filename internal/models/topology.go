@@ -14,6 +14,7 @@ const (
 	LINUX   NodeType = "linux"   // Debian-based node for scripting and general use
 	SERVER  NodeType = "server"  // Debian with systemd — for sysadmin, services and automation labs
 	MONITOR NodeType = "monitor" // Grafana + Prometheus pre-configured — for observability labs
+	TESTER  NodeType = "tester"  // Debian with wrk, k6, siege, iperf3, locust — for load and stress testing
 )
 
 // NeedsBridge returns true for node types that use an internal bridge (br0)
@@ -24,7 +25,7 @@ func NeedsBridge(t NodeType) bool {
 // IsValidNodeType returns true if the given type is a known node type
 func IsValidNodeType(t NodeType) bool {
 	switch t {
-	case ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX, SERVER, MONITOR:
+	case ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX, SERVER, MONITOR, TESTER:
 		return true
 	}
 	return false
@@ -33,7 +34,7 @@ func IsValidNodeType(t NodeType) bool {
 // KeepEth0 returns true for node types that should NOT rename eth0 to mgmt0.
 // CLOUD nodes keep eth0 to maintain connectivity to Docker bridge (internet access).
 func KeepEth0(t NodeType) bool {
-	return t == CLOUD || t == LINUX || t == SERVER || t == MONITOR
+	return t == CLOUD || t == LINUX || t == SERVER || t == MONITOR || t == TESTER
 }
 
 // Official Images
@@ -43,6 +44,7 @@ const (
 	ImgLinux   = "openveth/linux:latest"
 	ImgServer  = "openveth/server:latest"
 	ImgMonitor = "openveth/monitor:latest"
+	ImgTester  = "openveth/tester:latest"
 )
 
 // GetImageForType returns the official docker image for a given node type
@@ -64,6 +66,8 @@ func GetImageForType(t NodeType) string {
 		return ImgServer
 	case MONITOR:
 		return ImgMonitor
+	case TESTER:
+		return ImgTester
 	default:
 		return ImgHost
 	}

@@ -18,10 +18,12 @@ export interface RouteInfo {
   metric?: number;
 }
 
+export type NodeType = 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor' | 'tester';
+
 export interface Node {
   id: string;
   name: string;
-  type: 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor';
+  type: NodeType;
   // Image removed: Backend managed
   x?: number;
   y?: number;
