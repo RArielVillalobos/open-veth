@@ -67,10 +67,6 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
 | **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
 | **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
-| **Linux Node** | Debian-based node with bash, python3, cron and apt — direct internet access for scripting and automation practice |
-| **Server Node** | Debian with systemd as PID 1 — manage services with `systemctl`, inspect logs with `journalctl`. Ideal for sysadmin, services, and automation labs |
-| **Monitor Node** | Grafana + Prometheus + snmp_exporter pre-installed and auto-started — drag it onto the canvas, connect it to your topology, and open Grafana directly from the UI. Scrape hosts with `node_exporter` and routers/switches with SNMP. Ideal for learning observability concepts |
-| **Tester Node** | Debian with `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng` and `locust` pre-installed — generate HTTP load, measure network throughput, and stress test services. Pair it with the Monitor node to observe results in real-time |
 
 ---
 
@@ -85,8 +81,8 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
-| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana 10 + Prometheus + Loki + snmp_exporter pre-installed and auto-started via systemd. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. `snmp_exporter` runs on port 9116 — scrape any SNMP-enabled node (routers, switches) without extra setup. Loki runs on port 3100 for log aggregation. The following exporters/agents are available in `/opt/exporters/` ready to copy to any lab node via `scp`: `node_exporter` (system metrics), `blackbox_exporter` (ping/HTTP/TCP/DNS probes), `promtail` (log shipping to Loki), `nginx_exporter` (nginx), `apache_exporter` (Apache), `postgres_exporter` (PostgreSQL), `mysql_exporter` (MySQL/MariaDB), `redis_exporter` (Redis) |
-| **TESTER** | Debian bookworm | Load and stress testing — `wrk` (HTTP benchmarking with Lua scripting), `k6` (load testing with JS), `siege` (concurrent user simulation), `ab` (Apache Benchmark), `iperf3` (TCP/UDP throughput), `hping3` (packet crafting and flood), `vegeta` (rate-controlled load testing), `stress-ng` (CPU/RAM/I/O stress), `locust` (Python load testing with web UI). Use `tc netem` to simulate degraded network conditions |
+| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + Loki + snmp_exporter pre-installed and auto-started. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp` |
+| **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
@@ -321,7 +317,7 @@ Right-click any cable on the canvas and select **Disable Link** to bring the int
 - **Network Administration**: Practice SSH, remote management, and troubleshooting
 - **System Administration**: Practice service management with systemd, configure nginx/apache2/dnsmasq/NFS, manage users and firewall rules
 - **Scripting & Automation**: Write bash scripts, schedule cron jobs, automate network configuration across multiple nodes
-- **Observability**: Deploy a Monitor node with Grafana + Prometheus + Loki + snmp_exporter pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` — `node_exporter` for system metrics, `promtail` to ship logs to Loki, `nginx_exporter` for web servers, `postgres_exporter`/`mysql_exporter` for databases, `redis_exporter` for cache, `blackbox_exporter` for probing connectivity. Correlate metrics and logs in the same Grafana dashboard — the full observability stack in minutes
+- **Observability**: Deploy a Monitor node with Grafana + Prometheus + Loki pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` and correlate metrics and logs in real-time
 - **Load & Stress Testing**: Deploy a Tester node with `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng` and `locust` pre-installed. Generate HTTP load against a Server node, measure TCP/UDP throughput with `iperf3`, simulate degraded network conditions with `tc netem`, and observe the impact in real-time on the Monitor node
 - **Infrastructure Design**: Prototype topologies before production deployment
 
