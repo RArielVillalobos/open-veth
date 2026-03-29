@@ -81,7 +81,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
-| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + Loki + snmp_exporter pre-installed and auto-started. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp` |
+| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + Loki + snmp_exporter pre-installed and auto-started. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
 | **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`

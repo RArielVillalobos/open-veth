@@ -96,6 +96,15 @@ RUN ARCH=$(dpkg --print-architecture) && \
     mv "/tmp/apache_exporter-${APACHE_EXPORTER_VERSION}.linux-${ARCH}/apache_exporter" /opt/exporters/apache_exporter && \
     rm -rf /tmp/apache_exporter*
 
+# Download frr_exporter to /opt/exporters/ — copy to router nodes to expose BGP/OSPF metrics
+ARG FRR_EXPORTER_VERSION=1.10.1
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget -q "https://github.com/tynany/frr_exporter/releases/download/v${FRR_EXPORTER_VERSION}/frr_exporter-${FRR_EXPORTER_VERSION}.linux-${ARCH}.tar.gz" \
+        -O /tmp/frr_exporter.tar.gz && \
+    tar -xzf /tmp/frr_exporter.tar.gz -C /tmp && \
+    mv "/tmp/frr_exporter-${FRR_EXPORTER_VERSION}.linux-${ARCH}/frr_exporter" /opt/exporters/frr_exporter && \
+    rm -rf /tmp/frr_exporter*
+
 # Fix permissions on all exporters
 RUN chmod +x /opt/exporters/*
 
