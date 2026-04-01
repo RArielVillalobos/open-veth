@@ -8,6 +8,7 @@ import (
 
 	"open-veth/internal/api/handlers"
 	"open-veth/internal/config"
+	"open-veth/internal/models"
 	"open-veth/internal/orchestrator"
 	"open-veth/internal/storage"
 
@@ -80,6 +81,8 @@ func (s *Server) setupRoutes() {
 		api.DELETE("/nodes/:id", s.handler.DeleteNode)
 		api.GET("/nodes/:id/interfaces", s.handler.GetNodeInterfaces)
 		api.GET("/nodes/:id/routes", s.handler.GetNodeRoutes)
+		api.POST("/nodes/:id/stop", s.handler.StopNode)
+		api.POST("/nodes/:id/start", s.handler.StartNode)
 		api.POST("/nodes/:id/traceroute", s.handler.RunTraceroute)
 		api.POST("/nodes/:id/upload", s.handler.UploadFile)
 
@@ -167,6 +170,43 @@ func (s *Server) StartEventHub() {
 		s.logger.Info("starting network events hub")
 		go s.handler.EventHub.Run()
 	}
+}
+
+// StartDockerWatcher listens to Docker container events and propagates node
+// lifecycle changes (die/start) to connected WebSocket clients.
+func (s *Server) StartDockerWatcher(ctx context.Context) {
+	go func() {
+		s.logger.Info("starting docker event watcher")
+		s.handler.Manager.WatchEvents(ctx, func(ev orchestrator.ContainerEvent) {
+			node, found := s.handler.Runtime.FindByContainerID(ev.ContainerID)
+			if !found {
+				return
+			}
+			dbNode, ok := s.handler.Repo.GetNode(node.NodeID)
+			if !ok {
+				return
+			}
+			// Run DB write + broadcast in a goroutine so the event loop is not blocked
+			go func(n models.Node, action string) {
+				switch action {
+				case "die":
+					n.Status = models.NodeStatusStopped
+					if err := s.handler.Repo.SaveNode(n); err != nil {
+						s.logger.Warn("failed to persist node stopped status", "node", n.Name, "error", err)
+					}
+					s.handler.BroadcastNodeStopped(n.ID, n.LabID)
+					s.logger.Info("node stopped (external)", "name", n.Name)
+				case "start":
+					n.Status = models.NodeStatusRunning
+					if err := s.handler.Repo.SaveNode(n); err != nil {
+						s.logger.Warn("failed to persist node running status", "node", n.Name, "error", err)
+					}
+					s.handler.BroadcastNodeStarted(n.ID, n.LabID)
+					s.logger.Info("node started (external)", "name", n.Name)
+				}
+			}(dbNode, ev.Action)
+		})
+	}()
 }
 
 // StopEventHub signals the network events hub to shut down

@@ -200,6 +200,36 @@ export const TopologyStore = signalStore(
         }
       },
 
+      async toggleNodePower(id: string) {
+        const node = store.topology().nodes.find(n => n.id === id);
+        if (!node) return;
+        const shouldStart = node.status === 'stopped';
+        try {
+          const updated = await firstValueFrom(
+            shouldStart ? service.startNode(id) : service.stopNode(id)
+          );
+          patchState(store, (state) => ({
+            topology: {
+              ...state.topology,
+              nodes: state.topology.nodes.map(n => n.id === id ? { ...n, status: updated.status } : n)
+            }
+          }));
+          toast.success(shouldStart ? `Node ${node.name} started` : `Node ${node.name} stopped`);
+        } catch (err: any) {
+          const msg = err.error?.error || err.message || 'Error toggling node power';
+          toast.error(msg);
+        }
+      },
+
+      updateNodeStatus(id: string, status: 'running' | 'stopped') {
+        patchState(store, (state) => ({
+          topology: {
+            ...state.topology,
+            nodes: state.topology.nodes.map(n => n.id === id ? { ...n, status } : n)
+          }
+        }));
+      },
+
       async fetchNodeInterfaces(id: string) {
         try {
           const interfaces = await firstValueFrom(service.getNodeInterfaces(id));

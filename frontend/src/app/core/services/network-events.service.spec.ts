@@ -7,6 +7,7 @@ function createMockTopologyStore() {
   return {
     fetchNodeInterfaces: vi.fn(),
     loadTopology: vi.fn(),
+    updateNodeStatus: vi.fn(),
   };
 }
 
@@ -74,6 +75,38 @@ describe('NetworkEventsService', () => {
     });
 
     expect(mockStore.loadTopology).toHaveBeenCalled();
+  });
+
+  it('should handle node:stopped by calling updateNodeStatus with stopped', () => {
+    (service as any).handleEvent({
+      type: 'node:stopped',
+      nodeId: 'node-123',
+      timestamp: Date.now(),
+    });
+
+    expect(mockStore.updateNodeStatus).toHaveBeenCalledWith('node-123', 'stopped');
+    expect(mockStore.loadTopology).not.toHaveBeenCalled();
+  });
+
+  it('should handle node:started by calling updateNodeStatus with running', () => {
+    (service as any).handleEvent({
+      type: 'node:started',
+      nodeId: 'node-123',
+      timestamp: Date.now(),
+    });
+
+    expect(mockStore.updateNodeStatus).toHaveBeenCalledWith('node-123', 'running');
+    expect(mockStore.loadTopology).not.toHaveBeenCalled();
+  });
+
+  it('should ignore node:stopped without nodeId', () => {
+    (service as any).handleEvent({
+      type: 'node:stopped',
+      nodeId: '',
+      timestamp: Date.now(),
+    });
+
+    expect(mockStore.updateNodeStatus).not.toHaveBeenCalled();
   });
 
   it('should not call store on unknown event type', () => {

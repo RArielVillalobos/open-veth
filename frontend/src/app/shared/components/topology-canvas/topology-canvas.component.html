@@ -18,16 +18,22 @@
   <ng-container *ngIf="contextMenu.elementType !== 'edge'">
     
     <!-- Primary Actions -->
-    <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'hub'" 
-            class="context-menu__item context-menu__item--primary" 
+    <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'hub'"
+            class="context-menu__item context-menu__item--primary"
+            [class.context-menu__item--disabled]="isContextNodeStopped"
+            [disabled]="isContextNodeStopped"
+            [title]="isContextNodeStopped ? 'Node is powered off' : ''"
             (click)="onContextMenuAction('terminal')">
       <span class="context-menu__icon mono text-xs">>_</span>
       <span class="context-menu__label">Open Terminal</span>
     </button>
-    
+
     <!-- Traceroute -->
     <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'hub'"
             class="context-menu__item"
+            [class.context-menu__item--disabled]="isContextNodeStopped"
+            [disabled]="isContextNodeStopped"
+            [title]="isContextNodeStopped ? 'Node is powered off' : ''"
             (click)="onContextMenuAction('traceroute')">
       <span class="context-menu__icon mono text-xs">~></span>
       <span class="context-menu__label">Traceroute</span>
@@ -38,11 +44,17 @@
       <span class="context-menu__icon">⚡</span>
       <span class="context-menu__label">Properties</span>
     </button>
-    
+
     <div class="context-menu__separator"></div>
-    
+
+    <!-- Power Control -->
+    <button class="context-menu__item" (click)="onContextMenuAction('power')">
+      <span class="context-menu__icon mono text-xs">{{ isContextNodeStopped ? '▶' : '⏹' }}</span>
+      <span class="context-menu__label">{{ isContextNodeStopped ? 'Power On' : 'Power Off' }}</span>
+    </button>
+
     <!-- Danger Zone -->
-    <button class="context-menu__item context-menu__item--danger" 
+    <button class="context-menu__item context-menu__item--danger"
             (click)="onContextMenuAction('delete')">
       <span class="context-menu__icon">🗑</span>
       <span class="context-menu__label">Delete Node</span>

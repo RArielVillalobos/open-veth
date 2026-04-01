@@ -114,6 +114,14 @@ export class NetworkEventsService {
         this.store.loadTopology();
         break;
 
+      case 'node:stopped':
+        if (event.nodeId) this.store.updateNodeStatus(event.nodeId, 'stopped');
+        break;
+
+      case 'node:started':
+        if (event.nodeId) this.store.updateNodeStatus(event.nodeId, 'running');
+        break;
+
       default:
         this.log('Unknown event type:', event.type);
     }

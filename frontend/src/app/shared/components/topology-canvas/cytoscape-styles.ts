@@ -207,6 +207,13 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'opacity': 0.4,
     }
   },
+  // Stopped node style
+  {
+    selector: 'node.node-stopped',
+    style: {
+      'opacity': 0.4,
+    }
+  },
   // Traceroute path highlight
   {
     selector: 'node.traceroute-path',

@@ -40,6 +40,14 @@ export class TopologyService {
     return this.http.delete<void>(`${this.apiUrl}/nodes/${id}`);
   }
 
+  stopNode(id: string): Observable<Node> {
+    return this.http.post<Node>(`${this.apiUrl}/nodes/${id}/stop`, {});
+  }
+
+  startNode(id: string): Observable<Node> {
+    return this.http.post<Node>(`${this.apiUrl}/nodes/${id}/start`, {});
+  }
+
   // --- Links ---
   getLinks(labId?: string): Observable<Link[]> {
     let url = `${this.apiUrl}/links`;
