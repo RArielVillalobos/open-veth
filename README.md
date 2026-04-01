@@ -118,7 +118,7 @@ make up
 ```
 
 That's it! The command will:
-- Build node images (Host, Router, Linux, Server, Monitor, Tester — Switch, Hub, and Cloud reuse the Host image)
+- Pull node images from Docker Hub (Host, Router, Linux, Server, Monitor, Tester — Switch, Hub, and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL
 

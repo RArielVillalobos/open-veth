@@ -7,7 +7,7 @@ COMPOSE_CMD=docker compose
 FRONTEND_DIR=frontend
 SCRIPTS_DIR=scripts
 
-.PHONY: all up down images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke help
+.PHONY: all up down pull-images images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -15,7 +15,7 @@ help: ## Show this help
 all: help
 
 # --- Quick Start (Docker) ---
-up: images ## Start OpenVeth (auto-detects available ports)
+up: pull-images ## Start OpenVeth (auto-detects available ports)
 	@$(SCRIPTS_DIR)/find-ports.sh
 	@echo ""
 	@$(COMPOSE_CMD) up -d --build
@@ -60,7 +60,15 @@ deps-ui: ## Install frontend dependencies
 	cd $(FRONTEND_DIR) && npm install
 
 # --- Node Images ---
-images: ## Build node images (Host, Router/Debian+FRR, Linux, Server, Monitor, Tester)
+pull-images: ## Pull node images from Docker Hub (openveth/*)
+	$(DOCKER_CMD) pull openveth/host:latest
+	$(DOCKER_CMD) pull openveth/router:latest
+	$(DOCKER_CMD) pull openveth/linux:latest
+	$(DOCKER_CMD) pull openveth/server:latest
+	$(DOCKER_CMD) pull openveth/monitor:latest
+	$(DOCKER_CMD) pull openveth/tester:latest
+
+images: ## Build node images locally (Host, Router/Debian+FRR, Linux, Server, Monitor, Tester)
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
 	$(DOCKER_CMD) build -t openveth/linux:latest ./images/linux-node
