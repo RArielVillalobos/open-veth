@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"open-veth/internal/models"
@@ -211,17 +212,6 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	hostConfig := &container.HostConfig{
 		CapAdd: caps,
-	}
-
-	// Mount named volume for FRR config persistence on routers
-	if node.Type == models.ROUTER {
-		hostConfig.Mounts = []mount.Mount{
-			{
-				Type:   mount.TypeVolume,
-				Source: frrVolumeName(node.Name),
-				Target: "/etc/frr",
-			},
-		}
 	}
 
 	// systemd requires /sys/fs/cgroup mounted from the host and cgroupns=host
@@ -631,6 +621,32 @@ func (m *Manager) StartNode(ctx context.Context, nodeName string) error {
 	return nil
 }
 
+// ImageExists returns true if the given image exists in the local Docker daemon.
+func (m *Manager) ImageExists(ctx context.Context, imageName string) bool {
+	_, _, err := m.cli.ImageInspectWithRaw(ctx, imageName)
+	return err == nil
+}
+
+// CommitNode creates a local Docker image from a running container, capturing its current filesystem state.
+func (m *Manager) CommitNode(ctx context.Context, containerID, imageName string) error {
+	m.logger.Info("committing node snapshot", "container", containerID[:min(12, len(containerID))], "image", imageName)
+	_, err := m.cli.ContainerCommit(ctx, containerID, container.CommitOptions{
+		Reference: imageName,
+	})
+	if err != nil {
+		return fmt.Errorf("error committing node %s: %v", containerID[:min(12, len(containerID))], err)
+	}
+	return nil
+}
+
+// RemoveImage removes a local Docker image. Ignores not-found errors.
+func (m *Manager) RemoveImage(ctx context.Context, imageName string) {
+	_, err := m.cli.ImageRemove(ctx, imageName, image.RemoveOptions{Force: true})
+	if err != nil && !client.IsErrNotFound(err) {
+		m.logger.Warn("failed to remove snapshot image", "image", imageName, "error", err)
+	}
+}
+
 // DeleteNode stops and removes a container (Cleanup)
 func (m *Manager) DeleteNode(ctx context.Context, nodeName string) error {
 	m.logger.Info("deleting node", "name", nodeName)
@@ -840,21 +856,30 @@ func (m *Manager) GetServicePorts(ctx context.Context, containerID string) (map[
 	return ports, nil
 }
 
-// frrVolumeName returns the deterministic volume name for a router node's FRR config
-func frrVolumeName(nodeName string) string {
-	return "openveth-frr-" + nodeName
-}
-
-// RemoveNodeVolumes removes any named volumes associated with a node
-func (m *Manager) RemoveNodeVolumes(ctx context.Context, nodeName string) {
-	volName := frrVolumeName(nodeName)
-	if err := m.cli.VolumeRemove(ctx, volName, true); err != nil {
-		// Ignore errors — volume may not exist (host/switch nodes)
-		m.logger.Debug("volume removal skipped", "volume", volName, "reason", err)
+// RemoveAllSnapshotImages removes all local Docker images with the openveth-snapshot prefix.
+func (m *Manager) RemoveAllSnapshotImages(ctx context.Context) int {
+	images, err := m.cli.ImageList(ctx, image.ListOptions{})
+	if err != nil {
+		m.logger.Warn("failed to list images for snapshot cleanup", "error", err)
+		return 0
 	}
+	removed := 0
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if strings.HasPrefix(tag, "openveth-snapshot:") {
+				if _, err := m.cli.ImageRemove(ctx, img.ID, image.RemoveOptions{Force: true}); err != nil {
+					m.logger.Warn("failed to remove snapshot image", "image", tag, "error", err)
+				} else {
+					removed++
+				}
+				break
+			}
+		}
+	}
+	return removed
 }
 
-// RemoveAllOpenVethVolumes removes all volumes with the openveth-frr- prefix
+// RemoveAllOpenVethVolumes removes any legacy openveth-frr-* volumes left from older versions.
 func (m *Manager) RemoveAllOpenVethVolumes(ctx context.Context) int {
 	f := filters.NewArgs()
 	f.Add("name", "openveth-frr-")

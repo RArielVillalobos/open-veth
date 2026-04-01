@@ -2,6 +2,24 @@ package models
 
 import "testing"
 
+func TestSnapshotImageName(t *testing.T) {
+	tests := []struct {
+		nodeID   string
+		expected string
+	}{
+		{"abc123", "openveth-snapshot:abc123"},
+		{"550e8400-e29b-41d4-a716-446655440000", "openveth-snapshot:550e8400-e29b-41d4-a716-446655440000"},
+		{"", "openveth-snapshot:"},
+	}
+
+	for _, tt := range tests {
+		got := SnapshotImageName(tt.nodeID)
+		if got != tt.expected {
+			t.Errorf("SnapshotImageName(%q) = %q, want %q", tt.nodeID, got, tt.expected)
+		}
+	}
+}
+
 func TestGetImageForType(t *testing.T) {
 	tests := []struct {
 		nodeType NodeType

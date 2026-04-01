@@ -16,6 +16,7 @@ export class LabManagerComponent {
 
   editingLabId = signal<string | null>(null);
   editingName = signal('');
+  activatingLabId = signal<string | null>(null);
 
   renameInputs = viewChildren<ElementRef<HTMLInputElement>>('renameInput');
 
@@ -39,8 +40,10 @@ export class LabManagerComponent {
     this.store.createLaboratory(name.trim());
   }
 
-  switchLab(id: string) {
-    this.store.switchLab(id);
+  async switchLab(id: string) {
+    this.activatingLabId.set(id);
+    await this.store.switchLab(id);
+    this.activatingLabId.set(null);
     this.close.emit();
   }
 

@@ -181,8 +181,8 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 			h.Logger.Warn("failed to delete container", "name", node.Name, "error", err)
 		}
 	}
-	if h.Manager != nil {
-		h.Manager.RemoveNodeVolumes(ctx, node.Name)
+	if h.Manager != nil && node.SnapshotImage != "" {
+		h.Manager.RemoveImage(ctx, node.SnapshotImage)
 	}
 
 	// 3. Delete from DB (cascade removes links + interface configs)

@@ -70,6 +70,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   @ViewChild(TerminalPanelComponent) terminalPanel!: TerminalPanelComponent;
 
   tracerouteResult = signal<TracerouteResponse | null>(null);
+  isSavingState = signal(false);
   readonly DEFAULT_TERMINAL_HEIGHT = 256;
   terminalHeight = signal(this.DEFAULT_TERMINAL_HEIGHT);
 
@@ -249,13 +250,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   async onSaveState() {
+    if (this.isSavingState()) return;
+    this.isSavingState.set(true);
     const labId = this.store.topology().id;
     try {
       const result = await firstValueFrom(this.service.saveLabState(labId));
-      this.toast.success(`State saved: ${result.ips_saved} IPs, ${result.routes_saved} routes persisted`);
+      this.toast.success(`State saved: ${result.ips_saved} IPs, ${result.routes_saved} routes, ${result.snapshots_saved} snapshots`);
     } catch (err: any) {
       console.error('Failed to save lab state', err);
       this.toast.error('Save failed: ' + (err.error?.error || err.message));
+    } finally {
+      this.isSavingState.set(false);
     }
   }
 

@@ -649,6 +649,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
             position: { x: node.x || 100, y: node.y || 100 }
           });
           if (node.status === 'stopped') added.addClass('node-stopped');
+          if (node.snapshot_image) added.addClass('has-snapshot');
           if (this.canvasReady) newNodeIds.push(node.id);
         } else {
           if (existing.data('label') !== node.name) {
@@ -658,6 +659,11 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
             existing.addClass('node-stopped');
           } else {
             existing.removeClass('node-stopped');
+          }
+          if (node.snapshot_image) {
+            existing.addClass('has-snapshot');
+          } else {
+            existing.removeClass('has-snapshot');
           }
         }
       });

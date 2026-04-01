@@ -113,8 +113,12 @@
             <div class="mt-auto flex gap-2">
               <button *ngIf="lab.id !== store.currentLabId()"
                       (click)="switchLab(lab.id)"
-                      class="flex-1 bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-2 rounded-lg text-xs font-medium transition-colors">
-                Open Project
+                      [disabled]="activatingLabId() !== null"
+                      class="flex-1 bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                <svg *ngIf="activatingLabId() === lab.id" class="w-3 h-3 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                {{ activatingLabId() === lab.id ? 'Activating...' : 'Open Project' }}
               </button>
               
               <button *ngIf="lab.id === store.currentLabId()"

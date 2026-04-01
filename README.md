@@ -62,7 +62,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **DHCP Server** | Automatic IP assignment for realistic LAN labs |
 | **Infrastructure as Code** | Export/import topologies as YAML — includes node positions, links, IP configs, and static routes |
 | **Lab Management** | Create, save, and switch between lab projects |
-| **State Persistence** | IP configurations auto-saved every 30s and restored on lab activation |
+| **State Persistence** | IP/route configs auto-saved every 30s. Manual Save also snapshots the full filesystem of each node (`docker commit`) — surviving lab switches and restarts |
 | **Broadcast/Collision Domain Overlay** | Visualize broadcast and collision domains highlighted on the topology canvas |
 | **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
 | **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
@@ -204,6 +204,7 @@ graph TD
 6. **Links** → Can be enabled/disabled at runtime (right-click → Disable/Enable) without deleting them, simulating link failures
 7. **Node power** → Nodes can be powered off and on (right-click → Power Off/On). The backend listens to Docker events so the UI updates even when a node shuts itself down from within (e.g. `systemctl poweroff`)
 8. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
+9. **Filesystem snapshots** → The Save button runs `docker commit` on every running node, capturing the full filesystem state (configs in `/etc`, installed packages, etc.). On next lab activation, each node boots from its snapshot instead of the base image
 
 ---
 

@@ -129,11 +129,35 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 		return
 	}
 
-	h.Logger.Info("lab state saved", "id", labID, "ips_saved", len(configs), "routes_saved", len(routeConfigs))
+	// Commit each running node's filesystem as a local snapshot image
+	snapshotsSaved := 0
+	for i := range nodes {
+		node := &nodes[i]
+		if node.ContainerID == "" {
+			continue
+		}
+		if node.SnapshotImage != "" {
+			h.Manager.RemoveImage(ctx, node.SnapshotImage)
+		}
+		imageName := models.SnapshotImageName(node.ID)
+		if err := h.Manager.CommitNode(ctx, node.ContainerID, imageName); err != nil {
+			h.Logger.Warn("failed to commit node snapshot", "node", node.Name, "error", err)
+			continue
+		}
+		node.SnapshotImage = imageName
+		if err := h.Repo.SaveNode(*node); err != nil {
+			h.Logger.Warn("failed to save snapshot image to db", "node", node.Name, "error", err)
+		} else {
+			snapshotsSaved++
+		}
+	}
+
+	h.Logger.Info("lab state saved", "id", labID, "ips_saved", len(configs), "routes_saved", len(routeConfigs), "snapshots", snapshotsSaved)
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "state saved",
-		"ips_saved":    len(configs),
-		"routes_saved": len(routeConfigs),
+		"message":         "state saved",
+		"ips_saved":       len(configs),
+		"routes_saved":    len(routeConfigs),
+		"snapshots_saved": snapshotsSaved,
 	})
 }
 
@@ -228,8 +252,8 @@ func (h *Handler) CleanupLaboratory(c *gin.Context) {
 				h.Logger.Warn("failed to delete container during lab cleanup", "node", node.Name, "error", err)
 			}
 		}
-		if h.Manager != nil {
-			h.Manager.RemoveNodeVolumes(ctx, node.Name)
+		if h.Manager != nil && node.SnapshotImage != "" {
+			h.Manager.RemoveImage(ctx, node.SnapshotImage)
 		}
 		if err := h.Repo.DeleteNode(node.ID); err != nil {
 			h.Logger.Warn("failed to delete node from DB", "node", node.ID, "error", err)
@@ -290,6 +314,10 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 	}
 
 	for i, n := range nodes {
+		// Use snapshot image if it exists locally, falling back to base image
+		if n.SnapshotImage != "" && h.Manager.ImageExists(ctx, n.SnapshotImage) {
+			n.Image = n.SnapshotImage
+		}
 		// Re-create container
 		containerID, err := h.Manager.CreateNode(ctx, n)
 		if err != nil {

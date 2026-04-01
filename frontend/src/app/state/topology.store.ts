@@ -102,18 +102,19 @@ export const TopologyStore = signalStore(
 
       // --- Lab Management ---
       async switchLab(labId: string) {
+        const labName = store.laboratories().find(l => l.id === labId)?.name ?? labId;
         localStorage.setItem(LAB_ID_KEY, labId);
         patchState(store, { isLoading: true, currentLabId: labId, domains: null, activeDomainOverlay: null });
-        toast.info(`Activating laboratory: ${labId}...`);
-        
+        toast.info(`Activating "${labName}"...`);
+
         try {
             // 1. Tell backend to swap containers
             await firstValueFrom(service.activateLaboratory(labId));
-            
+
             // 2. Reload UI state
             await this.loadTopology();
-            
-            toast.success(`Lab ${labId} is now active`);
+
+            toast.success(`"${labName}" is now active`);
         } catch (err: any) {
             patchState(store, { isLoading: false, error: err.message });
             toast.error('Failed to activate lab: ' + err.message);
