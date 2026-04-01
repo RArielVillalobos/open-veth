@@ -14,6 +14,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
@@ -558,6 +559,75 @@ func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID strin
 		return fmt.Errorf("failed to start exec for interface up: %v", err)
 	}
 
+	return nil
+}
+
+// ContainerEvent represents a relevant Docker container lifecycle event
+type ContainerEvent struct {
+	Action      string // "die", "start"
+	ContainerID string
+}
+
+// WatchEvents streams Docker container events filtered to OpenVeth containers.
+// It calls the provided callback for each relevant event until ctx is cancelled.
+func (m *Manager) WatchEvents(ctx context.Context, callback func(ContainerEvent)) {
+	f := filters.NewArgs()
+	f.Add("type", "container")
+	f.Add("event", "die")
+	f.Add("event", "start")
+	f.Add("label", "openveth=true")
+
+	eventsCh, errCh := m.cli.Events(ctx, events.ListOptions{Filters: f})
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err, ok := <-errCh:
+			if !ok {
+				return
+			}
+			if err != nil && ctx.Err() == nil {
+				m.logger.Warn("docker event stream error, restarting", "error", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(3 * time.Second):
+				}
+				eventsCh, errCh = m.cli.Events(ctx, events.ListOptions{Filters: f})
+			}
+		case ev := <-eventsCh:
+			callback(ContainerEvent{
+				Action:      string(ev.Action),
+				ContainerID: ev.Actor.ID,
+			})
+		}
+	}
+}
+
+// StopNode stops a running container without removing it
+func (m *Manager) StopNode(ctx context.Context, nodeName string) error {
+	m.logger.Info("stopping node", "name", nodeName)
+	err := m.cli.ContainerStop(ctx, nodeName, container.StopOptions{})
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("error stopping node %s: %v", nodeName, err)
+	}
+	return nil
+}
+
+// StartNode starts a stopped container
+func (m *Manager) StartNode(ctx context.Context, nodeName string) error {
+	m.logger.Info("starting node", "name", nodeName)
+	err := m.cli.ContainerStart(ctx, nodeName, container.StartOptions{})
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return fmt.Errorf("container %s not found", nodeName)
+		}
+		return fmt.Errorf("error starting node %s: %v", nodeName, err)
+	}
 	return nil
 }
 

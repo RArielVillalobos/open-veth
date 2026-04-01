@@ -61,3 +61,21 @@ func (r *RuntimeStore) Clear() {
 	defer r.mu.Unlock()
 	r.nodes = make(map[string]RuntimeState)
 }
+
+// NodeRef holds the nodeID and its runtime state, used when searching by containerID
+type NodeRef struct {
+	NodeID string
+	RuntimeState
+}
+
+// FindByContainerID returns the node whose container matches the given ID (full or short)
+func (r *RuntimeStore) FindByContainerID(containerID string) (NodeRef, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for nodeID, state := range r.nodes {
+		if state.ContainerID == containerID || (len(containerID) >= 12 && len(state.ContainerID) >= 12 && state.ContainerID[:12] == containerID[:12]) {
+			return NodeRef{NodeID: nodeID, RuntimeState: state}, true
+		}
+	}
+	return NodeRef{}, false
+}

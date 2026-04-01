@@ -85,6 +85,32 @@ func (h *Handler) BroadcastLinkCreated(linkID, labID, sourceID, targetID string)
 	})
 }
 
+// BroadcastNodeStopped emits an event when a node is stopped
+func (h *Handler) BroadcastNodeStopped(nodeID, labID string) {
+	if h.EventHub == nil {
+		return
+	}
+	h.EventHub.Broadcast(NetworkEvent{
+		Type:      "node:stopped",
+		NodeID:    nodeID,
+		LabID:     labID,
+		Timestamp: time.Now().Unix(),
+	})
+}
+
+// BroadcastNodeStarted emits an event when a node is started
+func (h *Handler) BroadcastNodeStarted(nodeID, labID string) {
+	if h.EventHub == nil {
+		return
+	}
+	h.EventHub.Broadcast(NetworkEvent{
+		Type:      "node:started",
+		NodeID:    nodeID,
+		LabID:     labID,
+		Timestamp: time.Now().Unix(),
+	})
+}
+
 // BroadcastLinkToggled emits an event when a link is enabled or disabled
 func (h *Handler) BroadcastLinkToggled(linkID, labID string, enabled bool) {
 	if h.EventHub == nil {

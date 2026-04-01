@@ -35,6 +35,7 @@ func main() {
 	srv := api.NewServer(mgr, cfg, logger)
 	srv.StartEventHub()
 	srv.StartAutoSave(cfg.Server.AutoSaveInterval)
+	srv.StartDockerWatcher(ctx)
 
 	httpServer := &http.Server{
 		Addr:    cfg.Server.Address,

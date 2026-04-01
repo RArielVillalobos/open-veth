@@ -67,6 +67,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
 | **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
 | **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
+| **Node Power Control** | Power off and on any node — right-click a node and select Power Off/On. The UI updates in real-time, including when a node is shut down from within (e.g. `systemctl poweroff` on a SERVER node) |
 
 ---
 
@@ -201,7 +202,8 @@ graph TD
 4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames)
 5. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge. On creation, automatically enable IP forwarding and set up `iptables MASQUERADE` so connected lab nodes can reach real internet
 6. **Links** → Can be enabled/disabled at runtime (right-click → Disable/Enable) without deleting them, simulating link failures
-7. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
+7. **Node power** → Nodes can be powered off and on (right-click → Power Off/On). The backend listens to Docker events so the UI updates even when a node shuts itself down from within (e.g. `systemctl poweroff`)
+8. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
 
 ---
 
@@ -285,6 +287,22 @@ On import, IP addresses and routes are applied to the containers immediately and
 
 Right-click any cable on the canvas and select **Disable Link** to bring the interfaces down without deleting the connection. Re-enable it at any time. Useful for testing routing protocol convergence (OSPF/BGP failover), STP, and redundancy scenarios.
 
+### Node Power Control — Simulate Node Failures
+
+Right-click any node and select **Power Off** to stop the container without deleting it. The node turns transparent on the canvas and all its links become inactive. Select **Power On** to restart it.
+
+This is distinct from disconnecting a cable:
+
+| | Disable Link | Power Off |
+|---|---|---|
+| Node stays running | ✅ | ❌ |
+| Affects | One interface | All interfaces |
+| Services (nginx, sshd...) | Active | Stopped |
+| Routing protocols | Partial reconvergence | Full session drop |
+| Analogy | Unplug a cable | Cut the power |
+
+The UI updates in real-time even when the node shuts itself down from within — for example, running `systemctl poweroff` inside a SERVER node triggers an immediate visual update via the Docker event stream. Useful for testing OSPF/BGP reconvergence, high-availability setups, and service recovery scenarios.
+
 ---
 
 ## Why OpenVeth?
@@ -303,6 +321,7 @@ Right-click any cable on the canvas and select **Disable Link** to bring the int
 | Internet connectivity | ✅ | ✅ | ✅ | ❌ |
 | Broadcast/collision domain overlay | ✅ | ❌ | ❌ | ❌ |
 | Visual traceroute | ✅ | ❌ | ❌ | ❌ |
+| Node power off/on | ✅ | ✅ | ✅ | ❌ |
 | Grafana + Prometheus built-in | ✅ | ❌ | ❌ | ❌ |
 | Load testing node built-in | ✅ | ❌ | ❌ | ❌ |
 | SNMP monitoring | ✅ | ✅ | ✅ | ❌ |

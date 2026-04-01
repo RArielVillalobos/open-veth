@@ -27,7 +27,7 @@ export interface Node {
   // Image removed: Backend managed
   x?: number;
   y?: number;
-  status?: 'pending' | 'running' | 'error';
+  status?: 'pending' | 'running' | 'stopped' | 'error';
   container_id?: string; // Runtime info
   interfaces?: InterfaceInfo[]; // Runtime info
   service_ports?: Record<string, number>; // Runtime info — only for monitor nodes

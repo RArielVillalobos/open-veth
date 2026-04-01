@@ -26,6 +26,8 @@ function createMockTopologyService() {
     getNodeRoutes: vi.fn().mockReturnValue(of([])),
     updateNodePosition: vi.fn().mockReturnValue(of(undefined)),
     getDomains: vi.fn().mockReturnValue(of({ broadcast_domains: [], collision_domains: [] })),
+    stopNode: vi.fn(),
+    startNode: vi.fn(),
   };
 }
 
@@ -481,5 +483,79 @@ describe('TopologyStore', () => {
     await store.cleanupCurrentLab();
 
     expect(store.domains()).toBeNull();
+  });
+
+  // --- toggleNodePower ---
+
+  it('toggleNodePower should stop a running node', async () => {
+    const node = createMockNode({ id: 'node-1', status: 'running' });
+    mockService.getNodes.mockReturnValue(of([node]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    const stopped = { ...node, status: 'stopped' as const };
+    mockService.stopNode.mockReturnValue(of(stopped));
+
+    await store.toggleNodePower('node-1');
+
+    expect(mockService.stopNode).toHaveBeenCalledWith('node-1');
+    expect(store.topology().nodes.find(n => n.id === 'node-1')?.status).toBe('stopped');
+    expect(mockToast.success).toHaveBeenCalledWith(expect.stringContaining('stopped'));
+  });
+
+  it('toggleNodePower should start a stopped node', async () => {
+    const node = createMockNode({ id: 'node-1', status: 'stopped' });
+    mockService.getNodes.mockReturnValue(of([node]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    const running = { ...node, status: 'running' as const };
+    mockService.startNode.mockReturnValue(of(running));
+
+    await store.toggleNodePower('node-1');
+
+    expect(mockService.startNode).toHaveBeenCalledWith('node-1');
+    expect(store.topology().nodes.find(n => n.id === 'node-1')?.status).toBe('running');
+    expect(mockToast.success).toHaveBeenCalledWith(expect.stringContaining('started'));
+  });
+
+  it('toggleNodePower should handle errors', async () => {
+    const node = createMockNode({ id: 'node-1', status: 'running' });
+    mockService.getNodes.mockReturnValue(of([node]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    mockService.stopNode.mockReturnValue(throwError(() => ({ message: 'Docker error' })));
+
+    await store.toggleNodePower('node-1');
+
+    expect(mockToast.error).toHaveBeenCalledWith('Docker error');
+    expect(store.topology().nodes.find(n => n.id === 'node-1')?.status).toBe('running');
+  });
+
+  it('toggleNodePower should do nothing for unknown node', async () => {
+    await store.toggleNodePower('nonexistent');
+
+    expect(mockService.stopNode).not.toHaveBeenCalled();
+    expect(mockService.startNode).not.toHaveBeenCalled();
+  });
+
+  // --- updateNodeStatus ---
+
+  it('updateNodeStatus should update only the targeted node', async () => {
+    const node1 = createMockNode({ id: 'node-1', status: 'running' });
+    const node2 = createMockNode({ id: 'node-2', status: 'running' });
+    mockService.getNodes.mockReturnValue(of([node1, node2]));
+    mockService.getLinks.mockReturnValue(of([]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory()]));
+    await store.loadTopology();
+
+    store.updateNodeStatus('node-1', 'stopped');
+
+    expect(store.topology().nodes.find(n => n.id === 'node-1')?.status).toBe('stopped');
+    expect(store.topology().nodes.find(n => n.id === 'node-2')?.status).toBe('running');
   });
 });

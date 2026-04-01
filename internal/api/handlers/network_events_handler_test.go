@@ -83,6 +83,52 @@ func TestBroadcastNodeCreated(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
+func TestBroadcastNodeStopped(t *testing.T) {
+	hub := NewNetworkEventHub()
+	go hub.Run()
+	defer hub.Stop()
+
+	h := &Handler{
+		EventHub: hub,
+		Logger:   slog.New(slog.NewTextHandler(os.Stderr, nil)),
+	}
+
+	h.BroadcastNodeStopped("node-1", "lab-1")
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestBroadcastNodeStopped_NilHub(t *testing.T) {
+	h := &Handler{
+		EventHub: nil,
+		Logger:   slog.New(slog.NewTextHandler(os.Stderr, nil)),
+	}
+
+	h.BroadcastNodeStopped("node-1", "lab-1")
+}
+
+func TestBroadcastNodeStarted(t *testing.T) {
+	hub := NewNetworkEventHub()
+	go hub.Run()
+	defer hub.Stop()
+
+	h := &Handler{
+		EventHub: hub,
+		Logger:   slog.New(slog.NewTextHandler(os.Stderr, nil)),
+	}
+
+	h.BroadcastNodeStarted("node-1", "lab-1")
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestBroadcastNodeStarted_NilHub(t *testing.T) {
+	h := &Handler{
+		EventHub: nil,
+		Logger:   slog.New(slog.NewTextHandler(os.Stderr, nil)),
+	}
+
+	h.BroadcastNodeStarted("node-1", "lab-1")
+}
+
 func TestBroadcastLinkCreated(t *testing.T) {
 	hub := NewNetworkEventHub()
 	go hub.Run()

@@ -17,6 +17,12 @@ const (
 	TESTER  NodeType = "tester"  // Debian with wrk, k6, siege, iperf3, locust — for load and stress testing
 )
 
+// Node status constants
+const (
+	NodeStatusRunning = "running"
+	NodeStatusStopped = "stopped"
+)
+
 // NeedsBridge returns true for node types that use an internal bridge (br0)
 func NeedsBridge(t NodeType) bool {
 	return t == SWITCH || t == HUB
@@ -84,6 +90,7 @@ type Node struct {
 	RAMLimit   string   `json:"ram_limit"`
 	X          float64  `json:"x"` // Canvas position
 	Y          float64  `json:"y"` // Canvas position
+	Status     string   `json:"status" gorm:"default:running"` // NodeStatusRunning | NodeStatusStopped
 
 	// Runtime state (not persisted, rebuilt from Docker on startup)
 	ContainerID  string         `json:"container_id" gorm:"-"`

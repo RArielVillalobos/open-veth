@@ -198,6 +198,78 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// StopNode stops a running node container without deleting it
+func (h *Handler) StopNode(c *gin.Context) {
+	id := c.Param("id")
+	node, found := h.Repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+	h.hydrateNode(&node)
+
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node has no container"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	if err := h.Manager.StopNode(ctx, node.Name); err != nil {
+		h.Logger.Error("failed to stop node", "name", node.Name, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	node.Status = models.NodeStatusStopped
+	if err := h.Repo.SaveNode(node); err != nil {
+		h.Logger.Warn("failed to persist node status", "name", node.Name, "error", err)
+	}
+
+	h.BroadcastNodeStopped(node.ID, node.LabID)
+	h.Logger.Info("node stopped", "name", node.Name)
+	c.JSON(http.StatusOK, node)
+}
+
+// StartNode starts a stopped node container
+func (h *Handler) StartNode(c *gin.Context) {
+	id := c.Param("id")
+	node, found := h.Repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+	h.hydrateNode(&node)
+
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node has no container"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	if err := h.Manager.StartNode(ctx, node.Name); err != nil {
+		h.Logger.Error("failed to start node", "name", node.Name, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	pid, err := h.Manager.GetNodePID(ctx, node.ContainerID)
+	if err != nil {
+		h.Logger.Warn("failed to get node PID after start", "name", node.Name, "error", err)
+	} else {
+		h.Runtime.Set(node.ID, node.ContainerID, pid)
+		node.PID = pid
+	}
+
+	node.Status = models.NodeStatusRunning
+	if err := h.Repo.SaveNode(node); err != nil {
+		h.Logger.Warn("failed to persist node status", "name", node.Name, "error", err)
+	}
+
+	h.BroadcastNodeStarted(node.ID, node.LabID)
+	h.Logger.Info("node started", "name", node.Name)
+	c.JSON(http.StatusOK, node)
+}
+
 // GetNodeInterfaces returns live interface information for a node
 func (h *Handler) GetNodeInterfaces(c *gin.Context) {
 	id := c.Param("id")
