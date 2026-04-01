@@ -214,6 +214,15 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'opacity': 0.4,
     }
   },
+  // Snapshot saved indicator
+  {
+    selector: 'node.has-snapshot',
+    style: {
+      'border-width': 2,
+      'border-color': '#10b981',
+      'border-opacity': 0.7,
+    }
+  },
   // Traceroute path highlight
   {
     selector: 'node.traceroute-path',

@@ -90,28 +90,33 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 
 	h.Logger.Info("starting system cleanup")
 
-	containers, err := h.Manager.GetOpenVethContainers(ctx)
-	if err != nil {
-		h.Logger.Error("failed to list containers for cleanup", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list containers"})
-		return
-	}
-
 	cleaned := 0
-	for _, ct := range containers {
-		if err := h.Manager.DeleteNode(ctx, ct.ID); err != nil {
-			h.Logger.Warn("failed to remove container during cleanup", "container", ct.ID[:12], "error", err)
-		} else {
-			cleaned++
+	volumesRemoved := 0
+	snapshotsRemoved := 0
+
+	if h.Manager != nil {
+		containers, err := h.Manager.GetOpenVethContainers(ctx)
+		if err != nil {
+			h.Logger.Error("failed to list containers for cleanup", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list containers"})
+			return
 		}
+		for _, ct := range containers {
+			if err := h.Manager.DeleteNode(ctx, ct.ID); err != nil {
+				h.Logger.Warn("failed to remove container during cleanup", "container", ct.ID[:12], "error", err)
+			} else {
+				cleaned++
+			}
+		}
+		volumesRemoved = h.Manager.RemoveAllOpenVethVolumes(ctx)
+		snapshotsRemoved = h.Manager.RemoveAllSnapshotImages(ctx)
 	}
 
 	h.Repo.ClearAll()
 	h.Runtime.Clear()
-	volumesRemoved := h.Manager.RemoveAllOpenVethVolumes(ctx)
 
-	h.Logger.Info("cleanup completed", "containers_removed", cleaned, "volumes_removed", volumesRemoved)
-	c.JSON(http.StatusOK, gin.H{"message": "cleanup complete", "containers_removed": cleaned, "volumes_removed": volumesRemoved})
+	h.Logger.Info("cleanup completed", "containers_removed", cleaned, "volumes_removed", volumesRemoved, "snapshots_removed", snapshotsRemoved)
+	c.JSON(http.StatusOK, gin.H{"message": "cleanup complete", "containers_removed": cleaned, "volumes_removed": volumesRemoved, "snapshots_removed": snapshotsRemoved})
 }
 
 // ReconcileState ensures Docker matches the Database state (The Janitor)

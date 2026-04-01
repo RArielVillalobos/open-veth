@@ -28,6 +28,7 @@ export interface Node {
   x?: number;
   y?: number;
   status?: 'pending' | 'running' | 'stopped' | 'error';
+  snapshot_image?: string; // Set after "Save State" — node will boot from this image
   container_id?: string; // Runtime info
   interfaces?: InterfaceInfo[]; // Runtime info
   service_ports?: Record<string, number>; // Runtime info — only for monitor nodes
@@ -65,6 +66,7 @@ export interface SaveStateResponse {
   message: string;
   ips_saved: number;
   routes_saved: number;
+  snapshots_saved: number;
 }
 
 export interface Domain {

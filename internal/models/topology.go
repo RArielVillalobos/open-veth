@@ -43,6 +43,11 @@ func KeepEth0(t NodeType) bool {
 	return t == CLOUD || t == LINUX || t == SERVER || t == MONITOR || t == TESTER
 }
 
+// SnapshotImageName returns the local Docker image name used to snapshot a node's filesystem.
+func SnapshotImageName(nodeID string) string {
+	return "openveth-snapshot:" + nodeID
+}
+
 // Official Images
 const (
 	ImgRouter  = "openveth/router:latest"
@@ -91,6 +96,9 @@ type Node struct {
 	X          float64  `json:"x"` // Canvas position
 	Y          float64  `json:"y"` // Canvas position
 	Status     string   `json:"status" gorm:"default:running"` // NodeStatusRunning | NodeStatusStopped
+
+	// Snapshot: local image created by "Save State" — used on next lab activation instead of base image
+	SnapshotImage string `json:"snapshot_image,omitempty"`
 
 	// Runtime state (not persisted, rebuilt from Docker on startup)
 	ContainerID  string         `json:"container_id" gorm:"-"`
