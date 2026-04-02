@@ -282,32 +282,51 @@ func (h *Handler) CleanupLaboratory(c *gin.Context) {
 	})
 }
 
-// ActivateLaboratory stops all containers and revives the specified lab
+// ActivateLaboratory asynchronously stops all containers and revives the specified lab.
+// Returns 202 immediately; completion is reported via the /events WebSocket as "lab:activated".
 func (h *Handler) ActivateLaboratory(c *gin.Context) {
 	labID := c.Param("id")
-	ctx := c.Request.Context()
 
-	// 1. Verify Lab Exists
 	if _, ok := h.Repo.GetLaboratory(labID); !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "laboratory not found"})
 		return
 	}
 
-	h.Logger.Info("activating laboratory", "id", labID)
+	// Non-blocking lock: reject if another lab operation is already in progress
+	if !h.labOpMu.TryLock() {
+		c.JSON(http.StatusConflict, gin.H{"error": "another lab operation is in progress"})
+		return
+	}
 
-	// 2. Acquire lock for the entire save-nuke-rebuild sequence
-	h.labOpMu.Lock()
-	defer h.labOpMu.Unlock()
+	h.Logger.Info("activating laboratory (async)", "id", labID)
+	c.JSON(http.StatusAccepted, gin.H{"message": "activation started", "lab_id": labID})
 
-	// 3. Save current active lab state before destroying containers
+	// Run activation in background; use a fresh context since the request context
+	// will be cancelled as soon as the HTTP handler returns.
+	go func() {
+		defer h.labOpMu.Unlock()
+		h.runActivation(context.Background(), labID)
+	}()
+}
+
+// runActivation performs the full lab rebuild sequence and broadcasts the result.
+// Must be called while holding labOpMu.
+func (h *Handler) runActivation(ctx context.Context, labID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			h.Logger.Error("panic during lab activation", "lab", labID, "panic", r)
+			h.BroadcastLabActivationFailed(labID, "internal error during activation")
+		}
+	}()
+
+	// 1. Save current active lab state before destroying containers
 	if err := h.saveAllLabsStateLocked(ctx); err != nil {
 		h.Logger.Warn("failed to save state before lab switch", "error", err)
 	}
 
-	// 4. NUKE: Delete ALL running containers to free resources (state already saved in step 3)
+	// 2. NUKE: Delete ALL running containers to free resources
 	h.Runtime.Clear()
-	containers, err := h.Manager.GetOpenVethContainers(ctx)
-	if err == nil {
+	if containers, err := h.Manager.GetOpenVethContainers(ctx); err == nil {
 		for _, container := range containers {
 			if err := h.Manager.DeleteNode(ctx, container.ID); err != nil {
 				h.Logger.Warn("failed to stop container during lab activation",
@@ -316,24 +335,21 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	// 5. Rebuild Nodes
+	// 3. Rebuild Nodes
 	nodes, err := h.Repo.ListNodesByLab(labID)
 	if err != nil {
 		h.Logger.Error("failed to fetch nodes for lab", "lab", labID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch nodes: " + err.Error()})
+		h.BroadcastLabActivationFailed(labID, "failed to fetch nodes")
 		return
 	}
 
-	// Build node lookup map for O(1) access in link rebuild and IP restore steps
 	nodeMap := make(map[string]models.Node, len(nodes))
-
 	nodesRevived := 0
+
 	for i, n := range nodes {
-		// Use snapshot image if it exists locally, falling back to base image
 		if n.SnapshotImage != "" && h.Manager.ImageExists(ctx, n.SnapshotImage) {
 			n.Image = n.SnapshotImage
 		}
-		// Re-create container
 		containerID, err := h.Manager.CreateNode(ctx, n)
 		if err != nil {
 			h.Logger.Error("failed to revive node", "node", n.Name, "error", err)
@@ -341,7 +357,6 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 			continue
 		}
 
-		// Update Runtime Info
 		pid, err := h.Manager.GetNodePID(ctx, containerID)
 		if err != nil {
 			h.Logger.Warn("failed to get PID for revived node", "node", n.Name, "error", err)
@@ -349,78 +364,68 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		h.Runtime.Set(n.ID, containerID, pid)
 		nodes[i].ContainerID = containerID
 		nodes[i].PID = pid
-
 		h.storeMonitorPorts(ctx, &nodes[i], containerID)
 		nodeMap[n.ID] = nodes[i]
 		nodesRevived++
 	}
 
-	// 6. Rebuild Links
-	links, err := h.Repo.ListLinksByLab(labID)
-	if err != nil {
+	// 4. Rebuild Links
+	if links, err := h.Repo.ListLinksByLab(labID); err != nil {
 		h.Logger.Warn("failed to fetch links for lab", "lab", labID, "error", err)
-	}
-
-	for _, l := range links {
-		srcNode, foundS := nodeMap[l.SourceID]
-		tgtNode, foundT := nodeMap[l.TargetID]
-
-		if foundS && foundT && srcNode.PID > 0 && tgtNode.PID > 0 {
-			if err := h.Network.CreateLink(l, srcNode.PID, tgtNode.PID); err != nil {
-				h.Logger.Error("failed to revive link", "link", l.ID, "error", err)
-			} else {
-				// Re-attach bridges if needed
-				if models.NeedsBridge(srcNode.Type) {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt, srcNode.Type)
-				}
-				if models.NeedsBridge(tgtNode.Type) {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt, tgtNode.Type)
+	} else {
+		for _, l := range links {
+			srcNode, foundS := nodeMap[l.SourceID]
+			tgtNode, foundT := nodeMap[l.TargetID]
+			if foundS && foundT && srcNode.PID > 0 && tgtNode.PID > 0 {
+				if err := h.Network.CreateLink(l, srcNode.PID, tgtNode.PID); err != nil {
+					h.Logger.Error("failed to revive link", "link", l.ID, "error", err)
+				} else {
+					if models.NeedsBridge(srcNode.Type) {
+						_ = h.Manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt, srcNode.Type)
+					}
+					if models.NeedsBridge(tgtNode.Type) {
+						_ = h.Manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt, tgtNode.Type)
+					}
 				}
 			}
 		}
 	}
 
-	// 7. Restore saved IP configurations
-	savedConfigs, err := h.Repo.GetInterfaceConfigsByLab(labID)
-	if err != nil {
-		h.Logger.Warn("failed to fetch saved configs", "lab", labID, "error", err)
-	}
-
+	// 5. Restore saved IP configurations
 	restoredIPs := 0
-	for _, cfg := range savedConfigs {
-		if n, ok := nodeMap[cfg.NodeID]; ok && n.ContainerID != "" {
-			if err := h.Manager.ConfigureInterface(ctx, n.ContainerID, cfg.Interface, cfg.Address); err != nil {
-				h.Logger.Warn("failed to restore IP config",
-					"node", n.Name, "interface", cfg.Interface, "address", cfg.Address, "error", err)
-			} else {
-				restoredIPs++
+	if savedConfigs, err := h.Repo.GetInterfaceConfigsByLab(labID); err != nil {
+		h.Logger.Warn("failed to fetch saved configs", "lab", labID, "error", err)
+	} else {
+		for _, cfg := range savedConfigs {
+			if n, ok := nodeMap[cfg.NodeID]; ok && n.ContainerID != "" {
+				if err := h.Manager.ConfigureInterface(ctx, n.ContainerID, cfg.Interface, cfg.Address); err != nil {
+					h.Logger.Warn("failed to restore IP config",
+						"node", n.Name, "interface", cfg.Interface, "address", cfg.Address, "error", err)
+				} else {
+					restoredIPs++
+				}
 			}
 		}
 	}
 
-	// 8. Restore saved route configurations (must happen after IPs are restored)
-	savedRoutes, err := h.Repo.GetRouteConfigsByLab(labID)
-	if err != nil {
-		h.Logger.Warn("failed to fetch saved routes", "lab", labID, "error", err)
-	}
-
+	// 6. Restore saved route configurations (must happen after IPs are restored)
 	restoredRoutes := 0
-	for _, cfg := range savedRoutes {
-		if n, ok := nodeMap[cfg.NodeID]; ok && n.ContainerID != "" {
-			if err := h.Manager.ConfigureRoute(ctx, n.ContainerID, cfg.Dst, cfg.Gateway, cfg.Dev); err != nil {
-				h.Logger.Warn("failed to restore route",
-					"node", n.Name, "dst", cfg.Dst, "gw", cfg.Gateway, "error", err)
-			} else {
-				restoredRoutes++
+	if savedRoutes, err := h.Repo.GetRouteConfigsByLab(labID); err != nil {
+		h.Logger.Warn("failed to fetch saved routes", "lab", labID, "error", err)
+	} else {
+		for _, cfg := range savedRoutes {
+			if n, ok := nodeMap[cfg.NodeID]; ok && n.ContainerID != "" {
+				if err := h.Manager.ConfigureRoute(ctx, n.ContainerID, cfg.Dst, cfg.Gateway, cfg.Dev); err != nil {
+					h.Logger.Warn("failed to restore route",
+						"node", n.Name, "dst", cfg.Dst, "gw", cfg.Gateway, "error", err)
+				} else {
+					restoredRoutes++
+				}
 			}
 		}
 	}
 
-	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", nodesRevived, "ips_restored", restoredIPs, "routes_restored", restoredRoutes)
-	c.JSON(http.StatusOK, gin.H{
-		"message":         "laboratory activated",
-		"nodes_revived":   nodesRevived,
-		"ips_restored":    restoredIPs,
-		"routes_restored": restoredRoutes,
-	})
+	h.Logger.Info("laboratory activated", "id", labID,
+		"nodes_revived", nodesRevived, "ips_restored", restoredIPs, "routes_restored", restoredRoutes)
+	h.BroadcastLabActivated(labID, nodesRevived, restoredIPs, restoredRoutes)
 }

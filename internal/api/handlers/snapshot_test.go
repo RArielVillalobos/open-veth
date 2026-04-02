@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"open-veth/internal/models"
 
@@ -14,6 +15,7 @@ func setupSnapshotRouter(h *Handler) *gin.Engine {
 	r := gin.New()
 	api := r.Group("/api/v1")
 	api.POST("/laboratories/:id/save-state", h.SaveLabState)
+	api.POST("/laboratories/:id/activate", h.ActivateLaboratory)
 	api.DELETE("/nodes/:id", h.DeleteNode)
 	api.DELETE("/cleanup", h.HandleCleanup)
 	api.DELETE("/laboratories/:id", h.DeleteLaboratory)
@@ -155,4 +157,45 @@ func TestDeleteLaboratory_WithSnapshots_CallsDockerRemove(t *testing.T) {
 	assert.Panics(t, func() {
 		doRequest(r, "DELETE", "/api/v1/laboratories/lab-1", nil)
 	})
+}
+
+// =============================================================================
+// ActivateLaboratory — async activation
+// =============================================================================
+
+func TestActivateLaboratory_NotFound(t *testing.T) {
+	h, _ := newTestHandler()
+	r := setupSnapshotRouter(h)
+
+	rec := doRequest(r, "POST", "/api/v1/laboratories/nonexistent/activate", nil)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestActivateLaboratory_Conflict(t *testing.T) {
+	h, repo := newTestHandler()
+	_ = repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Test Lab"})
+	r := setupSnapshotRouter(h)
+
+	// Hold the lock to simulate another operation in progress
+	h.labOpMu.Lock()
+	defer h.labOpMu.Unlock()
+
+	rec := doRequest(r, "POST", "/api/v1/laboratories/lab-1/activate", nil)
+
+	assert.Equal(t, http.StatusConflict, rec.Code)
+}
+
+func TestActivateLaboratory_Accepted(t *testing.T) {
+	h, repo := newTestHandler()
+	_ = repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Test Lab"})
+	r := setupSnapshotRouter(h)
+
+	rec := doRequest(r, "POST", "/api/v1/laboratories/lab-1/activate", nil)
+
+	// 202 returned immediately — background goroutine recovers from nil Manager panic
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	// Allow the background goroutine to finish before the test exits
+	time.Sleep(50 * time.Millisecond)
 }

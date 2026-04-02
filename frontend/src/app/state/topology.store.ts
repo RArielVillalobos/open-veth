@@ -108,17 +108,27 @@ export const TopologyStore = signalStore(
         toast.info(`Activating "${labName}"...`);
 
         try {
-            // 1. Tell backend to swap containers
-            await firstValueFrom(service.activateLaboratory(labId));
-
-            // 2. Reload UI state
-            await this.loadTopology();
-
-            toast.success(`"${labName}" is now active`);
+          // Returns 202 immediately — actual completion arrives via lab:activated WebSocket event
+          await firstValueFrom(service.activateLaboratory(labId));
         } catch (err: any) {
-            patchState(store, { isLoading: false, error: err.message });
-            toast.error('Failed to activate lab: ' + err.message);
+          patchState(store, { isLoading: false });
+          if (err.status === 409) {
+            toast.error('Another lab operation is in progress, please wait');
+          } else {
+            toast.error('Failed to start activation: ' + (err.error?.error || err.message));
+          }
         }
+      },
+
+      async onLabActivated(labId: string) {
+        await this.loadTopology(); // clears isLoading when done
+        const labName = store.laboratories().find(l => l.id === labId)?.name ?? labId;
+        toast.success(`"${labName}" is now active`);
+      },
+
+      onLabActivationFailed(labId: string, reason: string) {
+        patchState(store, { isLoading: false });
+        toast.error(`Lab activation failed: ${reason}`);
       },
 
       async createLaboratory(name: string) {

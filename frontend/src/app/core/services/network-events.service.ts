@@ -122,6 +122,17 @@ export class NetworkEventsService {
         if (event.nodeId) this.store.updateNodeStatus(event.nodeId, 'running');
         break;
 
+      case 'lab:activated':
+        if (event.labId) this.store.onLabActivated(event.labId);
+        break;
+
+      case 'lab:activation_failed':
+        this.store.onLabActivationFailed(
+          event.labId ?? '',
+          (event.data?.['reason'] as string) || 'unknown error'
+        );
+        break;
+
       default:
         this.log('Unknown event type:', event.type);
     }

@@ -111,6 +111,38 @@ func (h *Handler) BroadcastNodeStarted(nodeID, labID string) {
 	})
 }
 
+// BroadcastLabActivated emits an event when async lab activation completes successfully
+func (h *Handler) BroadcastLabActivated(labID string, nodesRevived, ipsRestored, routesRestored int) {
+	if h.EventHub == nil {
+		return
+	}
+	h.EventHub.Broadcast(NetworkEvent{
+		Type:      "lab:activated",
+		LabID:     labID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]any{
+			"nodes_revived":   nodesRevived,
+			"ips_restored":    ipsRestored,
+			"routes_restored": routesRestored,
+		},
+	})
+}
+
+// BroadcastLabActivationFailed emits an event when async lab activation fails
+func (h *Handler) BroadcastLabActivationFailed(labID, reason string) {
+	if h.EventHub == nil {
+		return
+	}
+	h.EventHub.Broadcast(NetworkEvent{
+		Type:      "lab:activation_failed",
+		LabID:     labID,
+		Timestamp: time.Now().Unix(),
+		Data: map[string]any{
+			"reason": reason,
+		},
+	})
+}
+
 // BroadcastLinkToggled emits an event when a link is enabled or disabled
 func (h *Handler) BroadcastLinkToggled(linkID, labID string, enabled bool) {
 	if h.EventHub == nil {
