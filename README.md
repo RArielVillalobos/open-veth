@@ -82,7 +82,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
-| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + Loki + snmp_exporter pre-installed and auto-started. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
+| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + snmp_exporter pre-installed and auto-started. Loki is installed but disabled by default — enable with `systemctl enable loki --now`. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
 | **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
@@ -117,18 +117,30 @@ make up
 2. Double-click start.bat
 ```
 
+> `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
+
 That's it! The command will:
 - Pull node images from Docker Hub (Host, Router, Linux, Server, Monitor, Tester — Switch, Hub, and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
-- Start the application and show you the URL
+- Start the application and show you the URL to open in your browser
 
 ```
 ========================================
-  OpenVeth is running!
-  Frontend: http://localhost:8080
-  Backend:  http://localhost:8081
+  OpenVeth listo!
+  Abri tu browser en:
+  http://localhost:80
 ========================================
 ```
+
+### Credentials
+
+| Access | URL / Command | User | Password |
+|--------|--------------|------|----------|
+| OpenVeth UI | `http://localhost` | — | — |
+| Node terminal (SSH) | `ssh root@<node-ip>` | `root` | `openveth` |
+| Grafana (MONITOR node) | `http://localhost:<mapped-port>` | `admin` | `admin` |
+
+> The Grafana port is auto-assigned — find it in the node card after activating a lab with a MONITOR node.
 
 ### Useful Commands
 
