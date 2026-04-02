@@ -19,6 +19,18 @@
 
 ---
 
+## Use Cases
+
+- **Networking Courses**: Hands-on labs for CCNA, Network+, Linux networking — routing, switching, VLANs, NAT
+- **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets with live packet capture
+- **Network Troubleshooting**: Visualize broadcast/collision domains and trace packet paths interactively
+- **System Administration**: Practice service management with systemd, configure nginx, apache2, dnsmasq, NFS, vsftpd — everything runs on real Debian with real `systemctl`
+- **Observability**: Deploy a Monitor node with Grafana + Prometheus pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` and build your own dashboards from scratch
+- **Load & Stress Testing**: Generate HTTP load with `wrk` or `k6`, measure throughput with `iperf3`, simulate degraded links with `tc netem` — all from a dedicated Tester node
+- **Security**: Practice iptables rules, NAT, port forwarding and firewall policies in an isolated environment
+
+---
+
 ### Observability Labs — Grafana + Prometheus + SNMP
 
 Connect a Monitor node to your topology and get Grafana + Prometheus running out of the box. All exporters are pre-installed and ready to use — no setup needed on the monitor side. Dashboards are built by the student from scratch, which is the point — exploring metrics, building queries and designing visualizations is part of the learning experience.
@@ -359,18 +371,6 @@ The UI updates in real-time even when the node shuts itself down from within —
 | MAC address table (live) | ✅ | ❌ | ❌ | ❌ |
 
 ---
-
-## Use Cases
-
-- **Networking Courses**: Hands-on labs for CCNA, Network+, Linux networking
-- **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets with live packet capture
-- **Network Troubleshooting**: Visualize broadcast/collision domains and trace packet paths interactively
-- **Network Administration**: Practice SSH, remote management, and troubleshooting
-- **System Administration**: Practice service management with systemd, configure nginx/apache2/dnsmasq/NFS, manage users and firewall rules
-- **Scripting & Automation**: Write bash scripts, schedule cron jobs, automate network configuration across multiple nodes
-- **Observability**: Deploy a Monitor node with Grafana + Prometheus + Loki pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` and correlate metrics and logs in real-time
-- **Load & Stress Testing**: Deploy a Tester node with `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng` and `locust` pre-installed. Generate HTTP load against a Server node, measure TCP/UDP throughput with `iperf3`, simulate degraded network conditions with `tc netem`, and observe the impact in real-time on the Monitor node
-- **Infrastructure Design**: Prototype topologies before production deployment
 
 ---
 
