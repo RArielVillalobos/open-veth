@@ -22,8 +22,8 @@
   width: 100%;
   height: 100%;
   min-height: 600px;
-  background-color: #f8fafc;
-  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+  background-color: #020617;
+  background-image: radial-gradient(#1e293b 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
@@ -85,13 +85,13 @@
 .context-menu {
   position: absolute;
   z-index: 9999;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: 10px;
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.1), 
-    0 10px 10px -5px rgba(0, 0, 0, 0.04),
-    0 0 0 1px rgba(0, 0, 0, 0.02);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.5),
+    0 10px 10px -5px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
   min-width: 220px;
   max-width: 300px;
   overflow: hidden;
@@ -102,9 +102,9 @@
     padding: 10px 14px 6px 14px;
     font-size: 13px;
     font-weight: 600;
-    color: #0f172a;
+    color: #f1f5f9;
     letter-spacing: -0.01em;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid #334155;
     margin-bottom: 4px;
   }
 
@@ -127,33 +127,33 @@
     background: none;
     border: none;
     font-size: 14px;
-    color: #334155;
+    color: #cbd5e1;
     cursor: pointer;
     transition: all 0.15s ease;
     border-radius: 6px;
     margin: 2px 0;
 
     &:hover {
-      background: #f8fafc;
-      color: #0f172a;
+      background: #334155;
+      color: #f1f5f9;
     }
 
     &--primary {
-      color: #2563eb;
+      color: #34d399;
       font-weight: 500;
-      
+
       &:hover {
-        background: #eff6ff;
-        color: #1d4ed8;
+        background: rgba(52, 211, 153, 0.12);
+        color: #6ee7b7;
       }
     }
 
     &--danger {
-      color: #dc2626;
+      color: #f87171;
 
       &:hover {
-        background: #fef2f2;
-        color: #b91c1c;
+        background: rgba(220, 38, 38, 0.15);
+        color: #fca5a5;
       }
     }
 
@@ -176,8 +176,8 @@
 
   &__shortcut {
     font-size: 11px;
-    color: #94a3b8;
-    background: #f1f5f9;
+    color: #64748b;
+    background: #0f172a;
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 500;
@@ -186,8 +186,8 @@
 
   &__meta {
     font-size: 11px;
-    color: #94a3b8;
-    background: #f8fafc;
+    color: #64748b;
+    background: #0f172a;
     padding: 2px 8px;
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
@@ -195,7 +195,7 @@
 
   &__separator {
     height: 1px;
-    background: #e2e8f0;
+    background: #334155;
     margin: 6px 4px;
   }
 }

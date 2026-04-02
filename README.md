@@ -104,7 +104,7 @@ All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
 ### Installation
 
-**Linux / macOS:**
+**Linux:**
 ```bash
 git clone https://github.com/RArielVillalobos/open-veth.git
 cd open-veth

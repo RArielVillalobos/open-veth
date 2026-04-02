@@ -52,6 +52,8 @@
         gap: 4px;
         transition: all 0.2s;
 
+        svg { width: 14px; height: 14px; }
+
         &:hover {
           background-color: #334155;
           color: #f1f5f9;
@@ -83,16 +85,18 @@
       }
 
       &--active {
-        background-color: #1e293b; 
-        color: #3b82f6; 
-        border-top: 3px solid #3b82f6;
+        background-color: #1e293b;
+        color: #34d399;
+        border-top: 3px solid #34d399;
         font-weight: 600;
         height: 34px; /* Un poco más alto */
         margin-bottom: -1px; /* Solapar borde */
         z-index: 10;
+
+        .icon { color: #34d399; }
       }
 
-      .icon { font-size: 14px; }
+      .icon { font-size: 14px; color: #64748b; }
       
       .close-btn {
         background: none;

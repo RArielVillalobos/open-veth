@@ -53,7 +53,7 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
     selector: 'node',
     style: {
       'label': 'data(label)',
-      'color': '#1e293b',
+      'color': '#e2e8f0',
       'font-size': '12px',
       'font-weight': 'bold',
       'text-valign': 'bottom',
@@ -66,8 +66,8 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'background-color': 'transparent',
       'background-opacity': 0,
       'border-width': 0,
-      'text-outline-color': '#f8fafc',
-      'text-outline-width': 0
+      'text-outline-color': '#020617',
+      'text-outline-width': 2
     }
   },
   {
@@ -190,10 +190,10 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
       'target-text-offset': 32,
       'font-size': '10px',
       'font-family': 'JetBrains Mono, monospace',
-      'color': '#475569',
+      'color': '#cbd5e1',
       'text-wrap': 'wrap',
-      'text-background-opacity': 1,
-      'text-background-color': '#f1f5f9',
+      'text-background-opacity': 0.85,
+      'text-background-color': '#0f172a',
       'text-background-padding': '3px',
       'text-background-shape': 'roundrectangle'
     }
@@ -212,15 +212,6 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
     selector: 'node.node-stopped',
     style: {
       'opacity': 0.4,
-    }
-  },
-  // Snapshot saved indicator
-  {
-    selector: 'node.has-snapshot',
-    style: {
-      'border-width': 2,
-      'border-color': '#10b981',
-      'border-opacity': 0.7,
     }
   },
   // Traceroute path highlight
