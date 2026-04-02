@@ -31,7 +31,7 @@ Connect a Monitor node to your topology and get Grafana + Prometheus running out
 Copy any exporter from `/opt/exporters/` on the monitor to the target node via `scp`.
 
 <p align="center">
-  <img src="https://i.imgur.com/SiXOYNm.gif" alt="Observability lab - Grafana metrics in real-time while wrk generates HTTP load" width="800">
+  <img src="assets/grafana-obs.gif" alt="Observability lab - Grafana metrics in real-time while wrk generates HTTP load" width="800">
 </p>
 <p align="center"><i>wrk generating HTTP load against an nginx server — CPU, network and memory metrics live in Grafana via node_exporter. The managed switch exposes interface metrics via SNMP.</i></p>
 
