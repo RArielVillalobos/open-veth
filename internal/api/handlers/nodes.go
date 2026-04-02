@@ -246,7 +246,9 @@ func (h *Handler) StartNode(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	if err := h.Manager.StartNode(ctx, node.Name); err != nil {
+	// Use CreateNode which handles all post-restart setup:
+	// WaitForReady, eth0→mgmt0 rename, bridge init, cloud NAT, linux gateway
+	if _, err := h.Manager.CreateNode(ctx, node); err != nil {
 		h.Logger.Error("failed to start node", "name", node.Name, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -258,6 +260,82 @@ func (h *Handler) StartNode(c *gin.Context) {
 	} else {
 		h.Runtime.Set(node.ID, node.ContainerID, pid)
 		node.PID = pid
+	}
+
+	// Reattach veth pairs (network namespace is fresh after restart)
+	// Also restore peer IPs: when a veth pair is recreated, the peer's end is also
+	// replaced with a new interface that loses its IP address.
+	labIfaces, _ := h.Repo.GetInterfaceConfigsByLab(node.LabID)
+	if links, err := h.Repo.ListLinksByNode(node.ID); err == nil {
+		for _, l := range links {
+			peerID := l.TargetID
+			nodeIface, peerIface := l.SourceInt, l.TargetInt
+			if l.TargetID == node.ID {
+				peerID = l.SourceID
+				nodeIface, peerIface = l.TargetInt, l.SourceInt
+			}
+
+			peerState, ok := h.Runtime.Get(peerID)
+			if !ok || peerState.PID == 0 {
+				h.Logger.Warn("peer not running, skipping link restore", "link", l.ID)
+				continue
+			}
+			peerNode, found := h.Repo.GetNode(peerID)
+			if !found {
+				continue
+			}
+			peerNode.ContainerID = peerState.ContainerID
+			peerNode.PID = peerState.PID
+
+			srcPID, tgtPID := node.PID, peerState.PID
+			if l.TargetID == node.ID {
+				srcPID, tgtPID = peerState.PID, node.PID
+			}
+
+			if err := h.Network.CreateLink(l, srcPID, tgtPID); err != nil {
+				h.Logger.Warn("failed to restore link after power on", "link", l.ID, "error", err)
+				continue
+			}
+
+			// Bridge attachment for powered-on node
+			if models.NeedsBridge(node.Type) {
+				_ = h.Manager.AttachInterfaceToBridge(ctx, node.ContainerID, nodeIface, node.Type)
+			}
+			// Bridge attachment for peer (e.g. peer is SWITCH/HUB)
+			if models.NeedsBridge(peerNode.Type) {
+				_ = h.Manager.AttachInterfaceToBridge(ctx, peerNode.ContainerID, peerIface, peerNode.Type)
+			}
+
+			// Restore peer's IP on this interface (its veth end was also recreated)
+			for _, cfg := range labIfaces {
+				if cfg.NodeID == peerID && cfg.Interface == peerIface {
+					if err := h.Manager.ConfigureInterface(ctx, peerNode.ContainerID, cfg.Interface, cfg.Address); err != nil {
+						h.Logger.Warn("failed to restore peer IP after power on", "peer", peerNode.Name, "iface", cfg.Interface, "error", err)
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Reapply saved IP configurations for the powered-on node
+	for _, cfg := range labIfaces {
+		if cfg.NodeID != node.ID {
+			continue
+		}
+		if err := h.Manager.ConfigureInterface(ctx, node.ContainerID, cfg.Interface, cfg.Address); err != nil {
+			h.Logger.Warn("failed to restore IP after power on", "node", node.Name, "iface", cfg.Interface, "error", err)
+		}
+	}
+	if routes, err := h.Repo.GetRouteConfigsByLab(node.LabID); err == nil {
+		for _, cfg := range routes {
+			if cfg.NodeID != node.ID {
+				continue
+			}
+			if err := h.Manager.ConfigureRoute(ctx, node.ContainerID, cfg.Dst, cfg.Gateway, cfg.Dev); err != nil {
+				h.Logger.Warn("failed to restore route after power on", "node", node.Name, "dst", cfg.Dst, "error", err)
+			}
+		}
 	}
 
 	node.Status = models.NodeStatusRunning
