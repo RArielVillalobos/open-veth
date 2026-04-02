@@ -268,8 +268,9 @@ EOF
 RUN systemctl enable grafana-server && \
     systemctl enable prometheus && \
     systemctl enable node_exporter && \
-    systemctl enable snmp_exporter && \
-    systemctl enable loki
+    systemctl enable snmp_exporter
+# Loki is installed but disabled by default — enable manually with:
+#   systemctl enable loki --now
 
 EXPOSE 3000 9090
 
