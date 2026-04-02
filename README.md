@@ -19,6 +19,24 @@
 
 ---
 
+### Observability Labs — Grafana + Prometheus + SNMP
+
+Connect a Monitor node to your topology and get Grafana + Prometheus running out of the box. All exporters are pre-installed and ready to use — no setup needed on the monitor side. Dashboards are built by the student from scratch, which is the point — exploring metrics, building queries and designing visualizations is part of the learning experience.
+
+- **Any node** → `node_exporter` (CPU, memory, network, disk)
+- **nginx / apache** → `nginx_exporter` / `apache_exporter`
+- **Router (FRRouting)** → `frr_exporter` (BGP peers, OSPF neighbors, routing table)
+- **Switch** → SNMP via `snmp_exporter` (interface counters, bridge stats)
+
+Copy any exporter from `/opt/exporters/` on the monitor to the target node via `scp`.
+
+<p align="center">
+  <img src="https://i.imgur.com/SiXOYNm.gif" alt="Observability lab - Grafana metrics in real-time while wrk generates HTTP load" width="800">
+</p>
+<p align="center"><i>wrk generating HTTP load against an nginx server — CPU, network and memory metrics live in Grafana via node_exporter. The managed switch exposes interface metrics via SNMP.</i></p>
+
+---
+
 ### Broadcast & Collision Domain Overlay
 
 Visualize **broadcast** and **collision** domains directly on the topology canvas with a single click.
