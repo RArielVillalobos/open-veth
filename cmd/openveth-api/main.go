@@ -37,6 +37,10 @@ func main() {
 	srv.StartAutoSave(cfg.Server.AutoSaveInterval)
 	srv.StartDockerWatcher(ctx)
 
+	if err := srv.Reconcile(ctx); err != nil {
+		logger.Warn("startup reconciliation failed", "error", err)
+	}
+
 	httpServer := &http.Server{
 		Addr:    cfg.Server.Address,
 		Handler: srv.Handler(),
