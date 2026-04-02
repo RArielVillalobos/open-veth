@@ -116,7 +116,9 @@ func (h *Handler) CreateLink(c *gin.Context) {
 	}
 
 	if err := h.Repo.SaveLink(link); err != nil {
-		h.Logger.Error("failed to save link to DB", "id", link.ID, "error", err)
+		h.Logger.Error("failed to save link to DB, rolling back veth pair", "id", link.ID, "error", err)
+		h.Network.RemoveInterface(srcPID, link.SourceInt)
+		h.Network.RemoveInterface(tgtPID, link.TargetInt)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist link"})
 		return
 	}
@@ -245,6 +247,10 @@ func (h *Handler) DeleteLink(c *gin.Context) {
 	}
 
 	// 3. Delete from DB
-	h.Repo.DeleteLink(id)
+	if err := h.Repo.DeleteLink(id); err != nil {
+		h.Logger.Error("failed to delete link from DB", "id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete link"})
+		return
+	}
 	c.Status(http.StatusNoContent)
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 
 	"open-veth/internal/models"
@@ -77,8 +78,18 @@ func (h *Handler) UpdateLaboratory(c *gin.Context) {
 // DeleteLaboratory removes a laboratory and all its resources
 func (h *Handler) DeleteLaboratory(c *gin.Context) {
 	id := c.Param("id")
+	ctx := c.Request.Context()
 
 	h.Logger.Info("deleting laboratory", "id", id)
+
+	// Remove snapshot images for all nodes before deleting from DB
+	if nodes, err := h.Repo.ListNodesByLab(id); err == nil {
+		for _, node := range nodes {
+			if node.SnapshotImage != "" {
+				h.Manager.RemoveImage(ctx, node.SnapshotImage)
+			}
+		}
+	}
 
 	if err := h.Repo.DeleteLaboratory(id); err != nil {
 		h.Logger.Error("failed to delete laboratory", "id", id, "error", err)
@@ -184,7 +195,7 @@ func (h *Handler) captureLabState(ctx context.Context, labID string, nodes []mod
 				continue
 			}
 			for _, addr := range iface.IPAddresses {
-				if len(addr.Address) > 4 && addr.Address[:4] == "fe80" {
+				if ip := net.ParseIP(addr.Address); ip != nil && ip.IsLinkLocalUnicast() {
 					continue
 				}
 				configs = append(configs, models.InterfaceConfig{
@@ -313,6 +324,10 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		return
 	}
 
+	// Build node lookup map for O(1) access in link rebuild and IP restore steps
+	nodeMap := make(map[string]models.Node, len(nodes))
+
+	nodesRevived := 0
 	for i, n := range nodes {
 		// Use snapshot image if it exists locally, falling back to base image
 		if n.SnapshotImage != "" && h.Manager.ImageExists(ctx, n.SnapshotImage) {
@@ -322,6 +337,7 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		containerID, err := h.Manager.CreateNode(ctx, n)
 		if err != nil {
 			h.Logger.Error("failed to revive node", "node", n.Name, "error", err)
+			nodeMap[n.ID] = nodes[i]
 			continue
 		}
 
@@ -335,6 +351,8 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		nodes[i].PID = pid
 
 		h.storeMonitorPorts(ctx, &nodes[i], containerID)
+		nodeMap[n.ID] = nodes[i]
+		nodesRevived++
 	}
 
 	// 6. Rebuild Links
@@ -344,20 +362,8 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 	}
 
 	for _, l := range links {
-		// Find source and target PIDs from our fresh `nodes` slice
-		var srcNode, tgtNode models.Node
-		foundS, foundT := false, false
-
-		for _, n := range nodes {
-			if n.ID == l.SourceID {
-				srcNode = n
-				foundS = true
-			}
-			if n.ID == l.TargetID {
-				tgtNode = n
-				foundT = true
-			}
-		}
+		srcNode, foundS := nodeMap[l.SourceID]
+		tgtNode, foundT := nodeMap[l.TargetID]
 
 		if foundS && foundT && srcNode.PID > 0 && tgtNode.PID > 0 {
 			if err := h.Network.CreateLink(l, srcNode.PID, tgtNode.PID); err != nil {
@@ -378,12 +384,6 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 	savedConfigs, err := h.Repo.GetInterfaceConfigsByLab(labID)
 	if err != nil {
 		h.Logger.Warn("failed to fetch saved configs", "lab", labID, "error", err)
-	}
-
-	// Build node lookup map for O(1) access
-	nodeMap := make(map[string]models.Node, len(nodes))
-	for _, n := range nodes {
-		nodeMap[n.ID] = n
 	}
 
 	restoredIPs := 0
@@ -416,10 +416,10 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		}
 	}
 
-	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", len(nodes), "ips_restored", restoredIPs, "routes_restored", restoredRoutes)
+	h.Logger.Info("laboratory activated", "id", labID, "nodes_revived", nodesRevived, "ips_restored", restoredIPs, "routes_restored", restoredRoutes)
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "laboratory activated",
-		"nodes_revived":   len(nodes),
+		"nodes_revived":   nodesRevived,
 		"ips_restored":    restoredIPs,
 		"routes_restored": restoredRoutes,
 	})

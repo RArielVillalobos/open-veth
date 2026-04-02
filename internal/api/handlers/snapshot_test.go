@@ -16,6 +16,7 @@ func setupSnapshotRouter(h *Handler) *gin.Engine {
 	api.POST("/laboratories/:id/save-state", h.SaveLabState)
 	api.DELETE("/nodes/:id", h.DeleteNode)
 	api.DELETE("/cleanup", h.HandleCleanup)
+	api.DELETE("/laboratories/:id", h.DeleteLaboratory)
 	return r
 }
 
@@ -120,4 +121,38 @@ func TestHandleCleanup_ClearsDB(t *testing.T) {
 	assert.Empty(t, nodes)
 	labs, _ := repo.ListLaboratories()
 	assert.Empty(t, labs)
+}
+
+// --- DeleteLaboratory snapshot cleanup ---
+
+func TestDeleteLaboratory_NoSnapshots_DeletesLab(t *testing.T) {
+	h, repo := newTestHandler()
+	_ = repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Test Lab"})
+	_ = repo.SaveNode(models.Node{ID: "node-1", Name: "R1", Type: models.ROUTER, LabID: "lab-1"})
+	_ = repo.SaveNode(models.Node{ID: "node-2", Name: "H1", Type: models.HOST, LabID: "lab-1"})
+
+	r := setupSnapshotRouter(h)
+	rec := doRequest(r, "DELETE", "/api/v1/laboratories/lab-1", nil)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	_, found := repo.GetLaboratory("lab-1")
+	assert.False(t, found)
+}
+
+func TestDeleteLaboratory_WithSnapshots_CallsDockerRemove(t *testing.T) {
+	h, repo := newTestHandler()
+	_ = repo.SaveLaboratory(models.Laboratory{ID: "lab-1", Name: "Test Lab"})
+	_ = repo.SaveNode(models.Node{
+		ID:            "node-snap",
+		Name:          "SERVER-1",
+		Type:          models.SERVER,
+		LabID:         "lab-1",
+		SnapshotImage: models.SnapshotImageName("node-snap"),
+	})
+
+	r := setupSnapshotRouter(h)
+	// Manager is nil — reaching RemoveImage panics, confirming the snapshot path is exercised
+	assert.Panics(t, func() {
+		doRequest(r, "DELETE", "/api/v1/laboratories/lab-1", nil)
+	})
 }

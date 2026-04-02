@@ -3,9 +3,11 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +20,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// deleteLinkFailingRepo wraps MemoryRepository and makes DeleteLink always fail.
+// Used to test the error handling path introduced in fix 2.
+type deleteLinkFailingRepo struct {
+	*storage.MemoryRepository
+}
+
+func (r *deleteLinkFailingRepo) DeleteLink(id string) error {
+	return fmt.Errorf("simulated db error")
+}
 
 func init() {
 	gin.SetMode(gin.TestMode)
@@ -1070,5 +1082,71 @@ func TestUploadFile_NoFile(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for missing file, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// =============================================================================
+// Fix 2: DeleteLink DB error handling
+// =============================================================================
+
+// TestDeleteLink_DBError verifies that a DB failure on DeleteLink returns 500
+// and leaves the link in the repository (interfaces were already cleaned up).
+func TestDeleteLink_DBError(t *testing.T) {
+	base := storage.NewMemoryRepository()
+	h := &Handler{
+		Manager: nil,
+		Network: nil,
+		Repo:    &deleteLinkFailingRepo{base},
+		Runtime: NewRuntimeStore(),
+		Logger:  slog.Default(),
+		Config:  &config.Config{},
+	}
+
+	// Link with no node references so cleanupInterface is skipped (no Manager needed)
+	_ = base.SaveLink(models.Link{ID: "l1", LabID: "lab-1"})
+
+	r := gin.New()
+	r.DELETE("/api/v1/links/:id", h.DeleteLink)
+
+	rec := doRequest(r, "DELETE", "/api/v1/links/l1", nil)
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 on DB error, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Link must still be in DB (delete failed, state is consistent)
+	_, found := base.GetLink("l1")
+	if !found {
+		t.Error("link should remain in DB after failed delete")
+	}
+}
+
+// =============================================================================
+// Fix 5: IPv6 link-local filter
+// =============================================================================
+
+// TestIPv6LinkLocalFilter validates the filter used in captureLabState to skip
+// link-local addresses. The old implementation used a string prefix check
+// (addr[:4] == "fe80") which would miss uppercase addresses like "FE80::1".
+func TestIPv6LinkLocalFilter(t *testing.T) {
+	cases := []struct {
+		addr     string
+		filtered bool
+		desc     string
+	}{
+		{"fe80::1", true, "lowercase link-local"},
+		{"FE80::1", true, "uppercase — old string check would miss this"},
+		{"fe80::dead:beef%eth0", false, "zone ID makes ParseIP return nil — not filtered"},
+		{"192.168.1.1", false, "IPv4 private"},
+		{"10.0.0.1", false, "IPv4 class A"},
+		{"::1", false, "IPv6 loopback, not link-local"},
+		{"2001:db8::1", false, "IPv6 documentation prefix"},
+	}
+
+	for _, tc := range cases {
+		ip := net.ParseIP(tc.addr)
+		got := ip != nil && ip.IsLinkLocalUnicast()
+		if got != tc.filtered {
+			t.Errorf("[%s] addr=%q: want filtered=%v, got %v", tc.desc, tc.addr, tc.filtered, got)
+		}
 	}
 }
