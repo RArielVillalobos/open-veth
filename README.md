@@ -77,8 +77,8 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 |------|------------|----------|
 | **HOST** | Alpine Linux | End devices, servers, clients |
 | **ROUTER** | FRRouting | Dynamic routing, NAT, firewalls |
-| **SWITCH** | Linux Bridge | L2 switching, broadcast domains |
-| **HUB** | Linux Bridge (no MAC learning) | L1 repeater, floods all traffic to all ports |
+| **SWITCH** | Linux Bridge + snmpd | Managed L2 switch — terminal access, SNMP (community `public`, port 161), live MAC address table visible in the properties panel |
+| **HUB** | Alpine Linux (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
 | **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
@@ -120,7 +120,7 @@ make up
 > `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
 
 That's it! The command will:
-- Pull node images from Docker Hub (Host, Router, Linux, Server, Monitor, Tester — Switch, Hub, and Cloud reuse the Host image)
+- Pull node images from Docker Hub (Host, Router, Switch, Linux, Server, Monitor, Tester — Hub and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL to open in your browser
 
@@ -210,8 +210,8 @@ graph TD
 
 1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH, CLOUD)
 2. **Links** → `veth` pairs connecting container namespaces
-3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching
-4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames)
+3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching. Managed device with terminal access, SNMP daemon, and a live MAC address table visible in the properties panel
+4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames). Unmanaged — no terminal, no SNMP
 5. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge. On creation, automatically enable IP forwarding and set up `iptables MASQUERADE` so connected lab nodes can reach real internet
 6. **Links** → Can be enabled/disabled at runtime (right-click → Disable/Enable) without deleting them, simulating link failures
 7. **Node power** → Nodes can be powered off and on (right-click → Power Off/On). The backend listens to Docker events so the UI updates even when a node shuts itself down from within (e.g. `systemctl poweroff`)
@@ -337,7 +337,8 @@ The UI updates in real-time even when the node shuts itself down from within —
 | Node power off/on | ✅ | ✅ | ✅ | ❌ |
 | Grafana + Prometheus built-in | ✅ | ❌ | ❌ | ❌ |
 | Load testing node built-in | ✅ | ❌ | ❌ | ❌ |
-| SNMP monitoring | ✅ | ✅ | ✅ | ❌ |
+| SNMP monitoring (router + switch) | ✅ | ✅ | ✅ | ❌ |
+| MAC address table (live) | ✅ | ❌ | ❌ | ❌ |
 
 ---
 

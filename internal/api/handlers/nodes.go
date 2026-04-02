@@ -373,6 +373,31 @@ func (h *Handler) GetNodeInterfaces(c *gin.Context) {
 	c.JSON(http.StatusOK, interfaces)
 }
 
+// GetNodeMacTable returns the MAC address table (bridge FDB) for a switch node
+func (h *Handler) GetNodeMacTable(c *gin.Context) {
+	id := c.Param("id")
+	node, found := h.Repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+	h.hydrateNode(&node)
+
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+		return
+	}
+
+	entries, err := h.Manager.GetNodeMacTable(c.Request.Context(), node.ContainerID)
+	if err != nil {
+		h.Logger.Error("failed to get mac table", "node", node.Name, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, entries)
+}
+
 // GetNodeRoutes returns the routing table for a node
 func (h *Handler) GetNodeRoutes(c *gin.Context) {
 	id := c.Param("id")

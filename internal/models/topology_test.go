@@ -27,7 +27,7 @@ func TestGetImageForType(t *testing.T) {
 	}{
 		{ROUTER, ImgRouter},
 		{HOST, ImgHost},
-		{SWITCH, ImgHost},
+		{SWITCH, ImgSwitch},             // Switch has its own managed image
 		{HUB, ImgHost},                 // Hub uses host image
 		{CLOUD, ImgHost},               // Cloud uses host image
 		{LINUX, ImgLinux},              // Linux uses its own debian image

@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Topology, Node, Link, InterfaceInfo, RouteInfo, Laboratory, LaboratoryCreate, SaveStateResponse, DomainsResponse, TracerouteResponse } from '../../models/topology.model';
+import { Topology, Node, Link, InterfaceInfo, RouteInfo, MacEntry, Laboratory, LaboratoryCreate, SaveStateResponse, DomainsResponse, TracerouteResponse } from '../../models/topology.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -26,6 +26,10 @@ export class TopologyService {
 
   getNodeRoutes(id: string): Observable<RouteInfo[]> {
     return this.http.get<RouteInfo[]>(`${this.apiUrl}/nodes/${id}/routes`);
+  }
+
+  getNodeMacTable(id: string): Observable<MacEntry[]> {
+    return this.http.get<MacEntry[]>(`${this.apiUrl}/nodes/${id}/mactable`);
   }
 
   createNode(node: Node): Observable<Node> {

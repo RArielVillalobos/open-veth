@@ -59,7 +59,7 @@ export class NodePaletteComponent {
       hoverBorder: 'hover:border-amber-500/50',
       category: 'network',
       shortcut: 'S',
-      description: 'Layer 2 switch with MAC learning and broadcast domain support.'
+      description: 'Managed Layer 2 switch with MAC learning. Live MAC address table visible in the properties panel. Supports SNMP monitoring — connect a Monitor node to scrape interface and bridge metrics.'
     },
     { 
       id: 'hub', 

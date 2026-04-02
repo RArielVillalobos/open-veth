@@ -18,7 +18,7 @@
   <ng-container *ngIf="contextMenu.elementType !== 'edge'">
     
     <!-- Primary Actions -->
-    <button *ngIf="contextMenu.elementType !== 'switch' && contextMenu.elementType !== 'hub'"
+    <button *ngIf="contextMenu.elementType !== 'hub'"
             class="context-menu__item context-menu__item--primary"
             [class.context-menu__item--disabled]="isContextNodeStopped"
             [disabled]="isContextNodeStopped"

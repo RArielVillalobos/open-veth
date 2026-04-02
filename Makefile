@@ -67,14 +67,19 @@ pull-images: ## Pull node images from Docker Hub (openveth/*)
 	$(DOCKER_CMD) pull openveth/server:latest
 	$(DOCKER_CMD) pull openveth/monitor:latest
 	$(DOCKER_CMD) pull openveth/tester:latest
+	$(DOCKER_CMD) pull openveth/switch:latest
 
-images: ## Build node images locally (Host, Router/Debian+FRR, Linux, Server, Monitor, Tester)
+images: ## Build node images locally (Host, Router/Debian+FRR, Linux, Server, Monitor, Tester, Switch)
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
 	$(DOCKER_CMD) build -t openveth/linux:latest ./images/linux-node
 	$(DOCKER_CMD) build -t openveth/server:latest ./images/server-node
 	$(DOCKER_CMD) build -t openveth/monitor:latest ./images/monitor-node
 	$(DOCKER_CMD) build -t openveth/tester:latest ./images/tester-node
+	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
+
+switch-image: ## Build only the switch node image (Debian + SNMP + Bridge tools)
+	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
 
 router-image: ## Build only the router node image (Debian + FRRouting + snmpd)
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node

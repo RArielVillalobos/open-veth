@@ -1,7 +1,7 @@
 import { Component, input, output, inject, computed, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { Node, Link, RouteInfo } from '../../../../models/topology.model';
+import { Node, Link, RouteInfo, MacEntry } from '../../../../models/topology.model';
 import { TopologyService } from '../../../../core/services/topology.service';
 import { ToastService } from '../../../../core/services/toast.service';
 
@@ -27,17 +27,22 @@ export class PropertiesPanelComponent {
   // Internal state
   routes = signal<RouteInfo[]>([]);
   loadingRoutes = signal(false);
+  macTable = signal<MacEntry[]>([]);
+  loadingMacTable = signal(false);
   showHelp = signal(false);
   uploading = signal(false);
   uploadResult = signal<{ success: boolean; path: string } | null>(null);
   showConnect = signal(false);
 
 
-  // Whether the selected node is a bridge-based node (switch/hub)
+  // Whether the selected node is a bridge-based node (switch/hub) — used for interface display
   isBridgeNode = computed(() => {
     const t = this.selectedNode()?.type;
     return t === 'switch' || t === 'hub';
   });
+
+  // Hub is unmanaged (no terminal, no routes, no file transfer)
+  isHubNode = computed(() => this.selectedNode()?.type === 'hub');
 
   isMonitorNode = computed(() => this.selectedNode()?.type === 'monitor');
 
@@ -72,11 +77,14 @@ export class PropertiesPanelComponent {
       const node = this.selectedNode();
       // Reset state immediately
       this.routes.set([]);
+      this.macTable.set([]);
       this.uploadResult.set(null);
-      
+
       if (node && node.type !== 'switch' && node.type !== 'hub') {
-        // Use setTimeout to ensure we don't trigger change detection during render
         setTimeout(() => this.loadRoutes(node.id), 0);
+      }
+      if (node?.type === 'switch') {
+        setTimeout(() => this.loadMacTable(node.id), 0);
       }
     });
   }
@@ -101,6 +109,21 @@ export class PropertiesPanelComponent {
       this.toast.error('Failed to load routes: ' + (err.error?.error || err.message || 'unknown error'));
     } finally {
       this.loadingRoutes.set(false);
+    }
+  }
+
+  async loadMacTable(nodeId?: string) {
+    const id = nodeId || this.selectedNode()?.id;
+    if (!id) return;
+
+    this.loadingMacTable.set(true);
+    try {
+      const data = await firstValueFrom(this.service.getNodeMacTable(id));
+      this.macTable.set(data || []);
+    } catch {
+      this.macTable.set([]);
+    } finally {
+      this.loadingMacTable.set(false);
     }
   }
 

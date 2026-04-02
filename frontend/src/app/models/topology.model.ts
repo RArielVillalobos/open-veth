@@ -18,6 +18,12 @@ export interface RouteInfo {
   metric?: number;
 }
 
+export interface MacEntry {
+  mac: string;
+  port: string;
+  type: 'static' | 'dynamic';
+}
+
 export type NodeType = 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'linux' | 'server' | 'monitor' | 'tester';
 
 export interface Node {

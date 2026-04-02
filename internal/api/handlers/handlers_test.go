@@ -82,7 +82,8 @@ func setupRouter(h *Handler) *gin.Engine {
 		api.DELETE("/laboratories/:id/cleanup", h.CleanupLaboratory)
 
 		api.POST("/nodes/:id/traceroute", h.RunTraceroute)
-	api.POST("/nodes/:id/upload", h.UploadFile)
+		api.POST("/nodes/:id/upload", h.UploadFile)
+		api.GET("/nodes/:id/mactable", h.GetNodeMacTable)
 	}
 	return r
 }

@@ -81,6 +81,7 @@ func (s *Server) setupRoutes() {
 		api.DELETE("/nodes/:id", s.handler.DeleteNode)
 		api.GET("/nodes/:id/interfaces", s.handler.GetNodeInterfaces)
 		api.GET("/nodes/:id/routes", s.handler.GetNodeRoutes)
+		api.GET("/nodes/:id/mactable", s.handler.GetNodeMacTable)
 		api.POST("/nodes/:id/stop", s.handler.StopNode)
 		api.POST("/nodes/:id/start", s.handler.StartNode)
 		api.POST("/nodes/:id/traceroute", s.handler.RunTraceroute)

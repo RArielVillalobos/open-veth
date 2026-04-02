@@ -143,6 +143,92 @@ func (m *Manager) GetNodeRoutes(ctx context.Context, containerID string) ([]mode
 	return cleanRoutes, nil
 }
 
+// parseFdbOutput parses the text output of 'bridge fdb show br br0' into MacEntry slice.
+// It skips multicast MACs, self entries, permanent entries, and br0 port entries —
+// only dynamic (learned) and explicit static unicast entries are returned.
+func parseFdbOutput(output string) []models.MacEntry {
+	var entries []models.MacEntry
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		mac := fields[0]
+		// Skip multicast/broadcast MACs
+		if strings.HasPrefix(mac, "01:") || strings.HasPrefix(mac, "33:33:") || mac == "ff:ff:ff:ff:ff:ff" {
+			continue
+		}
+		// fields[1] == "dev", fields[2] == port
+		if fields[1] != "dev" {
+			continue
+		}
+		port := fields[2]
+		// Skip entries on br0 itself
+		if port == "br0" {
+			continue
+		}
+		// Skip "self" entries — per-interface infrastructure entries, not learned MACs
+		isSelf := false
+		for _, f := range fields[3:] {
+			if f == "self" {
+				isSelf = true
+				break
+			}
+		}
+		if isSelf {
+			continue
+		}
+		// Skip "permanent" entries — the port's own MAC registered by the bridge kernel
+		entryType := "dynamic"
+		isPermanent := false
+		for _, f := range fields[3:] {
+			if f == "permanent" {
+				isPermanent = true
+				break
+			}
+			if f == "static" {
+				entryType = "static"
+			}
+		}
+		if isPermanent {
+			continue
+		}
+		entries = append(entries, models.MacEntry{MAC: mac, Port: port, Type: entryType})
+	}
+	return entries
+}
+
+// GetNodeMacTable runs 'bridge fdb show br br0' inside a switch container and returns parsed MAC entries.
+func (m *Manager) GetNodeMacTable(ctx context.Context, containerID string) ([]models.MacEntry, error) {
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"bridge", "fdb", "show", "br", "br0"},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error creating fdb exec: %v", err)
+	}
+
+	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error attaching to fdb exec: %v", err)
+	}
+	defer resp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
+		return nil, err
+	}
+
+	return parseFdbOutput(outBuf.String()), nil
+}
+
 // NewManager creates a new orchestrator instance
 func NewManager(logger *slog.Logger) (*Manager, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())

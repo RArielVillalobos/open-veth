@@ -56,6 +56,7 @@ const (
 	ImgServer  = "openveth/server:latest"
 	ImgMonitor = "openveth/monitor:latest"
 	ImgTester  = "openveth/tester:latest"
+	ImgSwitch  = "openveth/switch:latest"
 )
 
 // GetImageForType returns the official docker image for a given node type
@@ -66,9 +67,9 @@ func GetImageForType(t NodeType) string {
 	case HOST:
 		return ImgHost
 	case SWITCH:
-		return ImgHost // Switch uses the host image to run the bridge
+		return ImgSwitch // Managed switch based on Debian + SNMP
 	case HUB:
-		return ImgHost // Hub uses the host image to run the bridge without MAC learning
+		return ImgHost // Hub remains a simple, unmanaged device using Alpine
 	case CLOUD:
 		return ImgHost // Cloud uses host image, keeps eth0 for internet access
 	case LINUX:
@@ -118,6 +119,13 @@ type InterfaceInfo struct {
 type IPAddress struct {
 	Address string `json:"local"`
 	Prefix  int    `json:"prefixlen"`
+}
+
+// MacEntry represents a single entry in a bridge MAC address table (bridge fdb show)
+type MacEntry struct {
+	MAC    string `json:"mac"`
+	Port   string `json:"port"`
+	Type   string `json:"type"` // "static" | "dynamic"
 }
 
 // RouteInfo maps the output of 'ip -j route'
