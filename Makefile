@@ -63,16 +63,15 @@ deps-ui: ## Install frontend dependencies
 pull-images: ## Pull node images from Docker Hub (openveth/*)
 	$(DOCKER_CMD) pull openveth/host:latest
 	$(DOCKER_CMD) pull openveth/router:latest
-	$(DOCKER_CMD) pull openveth/linux:latest
 	$(DOCKER_CMD) pull openveth/server:latest
 	$(DOCKER_CMD) pull openveth/monitor:latest
 	$(DOCKER_CMD) pull openveth/tester:latest
 	$(DOCKER_CMD) pull openveth/switch:latest
 
-images: ## Build node images locally (Host, Router/Debian+FRR, Linux, Server, Monitor, Tester, Switch)
+images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch)
+	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
-	$(DOCKER_CMD) build -t openveth/linux:latest ./images/linux-node
 	$(DOCKER_CMD) build -t openveth/server:latest ./images/server-node
 	$(DOCKER_CMD) build -t openveth/monitor:latest ./images/monitor-node
 	$(DOCKER_CMD) build -t openveth/tester:latest ./images/tester-node
