@@ -300,15 +300,18 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		CapAdd: caps,
 	}
 
-	// systemd requires /sys/fs/cgroup mounted from the host and cgroupns=host
+	// systemd nodes (SERVER, MONITOR) need:
+	// - seccomp/apparmor unconfined: service sandbox directives (PrivateTmp, ProtectSystem, etc.)
+	//   use mount/UTS namespace syscalls blocked by Docker's default profiles on Linux
+	// - cgroupns=host + /sys/fs/cgroup bind + /run tmpfs: required for systemd as PID 1
 	if node.Type == models.SERVER || node.Type == models.MONITOR {
+		hostConfig.SecurityOpt = []string{"seccomp=unconfined", "apparmor=unconfined"}
 		hostConfig.CgroupnsMode = "host"
-		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
-			Type:     mount.TypeBind,
-			Source:   "/sys/fs/cgroup",
-			Target:   "/sys/fs/cgroup",
-			ReadOnly: false,
-		})
+		hostConfig.Mounts = append(hostConfig.Mounts,
+			mount.Mount{Type: mount.TypeBind, Source: "/sys/fs/cgroup", Target: "/sys/fs/cgroup"},
+			mount.Mount{Type: mount.TypeTmpfs, Target: "/run"},
+			mount.Mount{Type: mount.TypeTmpfs, Target: "/run/lock"},
+		)
 	}
 
 	// MONITOR: expose Grafana (3000) and Prometheus (9090) on dynamic host ports
@@ -422,6 +425,37 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	return resp.ID, nil
 
+}
+
+// WaitForHTTP polls a port inside the container with curl until it returns HTTP 2xx,
+// or until the timeout elapses. Interval between attempts is 5 seconds.
+func (m *Manager) WaitForHTTP(ctx context.Context, containerID string, port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		execConfig := container.ExecOptions{
+			Cmd:          []string{"curl", "-sf", "--max-time", "3", "-o", "/dev/null", fmt.Sprintf("http://localhost:%d", port)},
+			AttachStdout: false,
+			AttachStderr: false,
+		}
+		execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+		if err == nil {
+			resp, err := m.cli.ContainerExecAttach(ctx, execID.ID, container.ExecStartOptions{})
+			if err == nil {
+				resp.Close()
+				inspect, err := m.cli.ContainerExecInspect(ctx, execID.ID)
+				if err == nil && inspect.ExitCode == 0 {
+					return nil
+				}
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return fmt.Errorf("service on port %d not ready after %v", port, timeout)
 }
 
 // WaitForReady polls the container until its network stack is ready (loopback is up).

@@ -1,67 +1,6 @@
-FROM debian:bookworm
+FROM openveth/base:latest
 
-# Install systemd and remove unnecessary units that fail in containers
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    systemd \
-    systemd-sysv \
-    dbus \
-    && rm -rf /var/lib/apt/lists/*
-
-# Remove units that don't make sense in a container
-RUN find /lib/systemd/system/sysinit.target.wants/ -not -name systemd-tmpfiles-setup.service -type f -delete \
-    && rm -f /lib/systemd/system/multi-user.target.wants/* \
-    && rm -f /etc/systemd/system/*.wants/* \
-    && rm -f /lib/systemd/system/local-fs.target.wants/* \
-    && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
-    && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
-    && rm -f /lib/systemd/system/basic.target.wants/* \
-    || true
-
-# Install networking tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    iproute2 \
-    iputils-ping \
-    traceroute \
-    net-tools \
-    tcpdump \
-    curl \
-    wget \
-    iptables \
-    ufw \
-    netcat-openbsd \
-    dnsutils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install scripting and automation tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash \
-    python3 \
-    python3-pip \
-    expect \
-    git \
-    jq \
-    tree \
-    bc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install system administration tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    procps \
-    htop \
-    lsof \
-    strace \
-    sudo \
-    rsyslog \
-    logrotate \
-    less \
-    man-db \
-    manpages \
-    manpages-es \
-    bash-completion \
-    locales \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install services (not enabled — student does it manually)
+# Install server services and admin tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
     nginx \
@@ -71,30 +10,61 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vsftpd \
     nfs-kernel-server \
     nfs-common \
-    vim \
-    nano \
+    rsyslog \
+    logrotate \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure locale
-RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
-    && sed -i '/es_ES.UTF-8/s/^# //g' /etc/locale.gen \
-    && locale-gen
-ENV LANG=es_ES.UTF-8
+# Replace apache2 service file — PrivateTmp=true fails in Docker on Linux (exit 226/NAMESPACE)
+RUN cat > /lib/systemd/system/apache2.service <<'EOF'
+[Unit]
+Description=The Apache HTTP Server
+After=network.target remote-fs.target nss-lookup.target
+Documentation=https://httpd.apache.org/docs/2.4/
 
-# Generate SSH host keys
-RUN ssh-keygen -A
+[Service]
+Type=forking
+Environment=APACHE_STARTED_BY_SYSTEMD=true
+ExecStart=/usr/sbin/apachectl start
+ExecStop=/usr/sbin/apachectl graceful-stop
+ExecReload=/usr/sbin/apachectl graceful
+KillMode=mixed
+Restart=on-abort
+OOMPolicy=continue
 
-# Configure SSH — allow root login
-RUN echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
-RUN echo 'root:openveth' | chpasswd
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Replace chrony service file — many namespace sandbox directives fail in Docker on Linux
+RUN cat > /lib/systemd/system/chrony.service <<'EOF'
+[Unit]
+Description=chrony, an NTP client/server
+Documentation=man:chronyd(8) man:chronyc(1) man:chrony.conf(5)
+After=network.target
+ConditionCapability=CAP_SYS_TIME
+
+[Service]
+Type=forking
+PIDFile=/run/chrony/chronyd.pid
+EnvironmentFile=-/etc/default/chrony
+User=_chrony
+ExecStart=!/usr/sbin/chronyd $DAEMON_OPTS
+RuntimeDirectory=chrony
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=restart
+StateDirectory=chrony
+StateDirectoryMode=0750
+LogsDirectory=chrony
+LogsDirectoryMode=0750
+
+[Install]
+Alias=chronyd.service
+WantedBy=multi-user.target
+EOF
 
 # Disable all services by default — student enables them manually with systemctl
 RUN systemctl disable nginx apache2 dnsmasq chrony vsftpd || true
 
-# Enable only SSH so the student can connect to manage the node
-RUN systemctl enable ssh
-
 EXPOSE 22
 
-# systemd as PID 1
 CMD ["/sbin/init"]

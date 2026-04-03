@@ -124,7 +124,17 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    this.initCytoscape();
+    this.preloadIcons().then(() => this.initCytoscape());
+  }
+
+  private preloadIcons(): Promise<void[]> {
+    const icons = ['router', 'switch', 'host', 'hub', 'cloud', 'linux', 'server', 'monitor', 'tester'];
+    return Promise.all(icons.map(name => new Promise<void>(resolve => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = `assets/icons/${name}.svg`;
+    })));
   }
 
   ngOnDestroy() {

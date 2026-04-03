@@ -1,4 +1,6 @@
-FROM openveth/server:latest
+FROM openveth/base:latest
+
+SHELL ["/bin/bash", "-c"]
 
 # Install Grafana via direct .deb download (avoids apt repo GPG issues in containers)
 ARG GRAFANA_VERSION=10.4.3
@@ -170,8 +172,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Configure Prometheus
 RUN mkdir -p /etc/prometheus /var/lib/prometheus/data
 
-SHELL ["/bin/bash", "-c"]
-
 RUN cat > /etc/prometheus/prometheus.yml <<'EOF'
 global:
   scrape_interval: 15s
@@ -263,6 +263,12 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# Replace the grafana-server service file with a minimal container-compatible version.
+# The official .deb service uses PrivateTmp, ProtectSystem, ProtectProc, etc. which
+# require mount/UTS namespaces — these fail in Docker on Linux (exit 226/NAMESPACE).
+RUN printf '[Unit]\nDescription=Grafana instance\nDocumentation=http://docs.grafana.org\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nEnvironmentFile=/etc/default/grafana-server\nUser=grafana\nGroup=grafana\nType=simple\nRestart=on-failure\nWorkingDirectory=/usr/share/grafana\nRuntimeDirectory=grafana\nRuntimeDirectoryMode=0750\nExecStart=/usr/share/grafana/bin/grafana server --config=${CONF_FILE} --pidfile=${PID_FILE_DIR}/grafana-server.pid --packaging=deb cfg:default.paths.logs=${LOG_DIR} cfg:default.paths.data=${DATA_DIR} cfg:default.paths.plugins=${PLUGINS_DIR} cfg:default.paths.provisioning=${PROVISIONING_CFG_DIR}\nLimitNOFILE=10000\nTimeoutStopSec=20\n\n[Install]\nWantedBy=multi-user.target\n' \
+    > /lib/systemd/system/grafana-server.service
 
 # Enable services — start automatically when the container boots
 RUN systemctl enable grafana-server && \

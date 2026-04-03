@@ -55,7 +55,7 @@ export const TopologyStore = signalStore(
           const labId = store.currentLabId();
           
           // Load labs list and current topology in parallel
-          const [nodes, links, labs] = await firstValueFrom(
+          const [initialNodes, initialLinks, labs] = await firstValueFrom(
             forkJoin([
               service.getNodes(true, labId),
               service.getLinks(labId),
@@ -63,24 +63,34 @@ export const TopologyStore = signalStore(
             ])
           );
 
-          // Find current lab metadata
+          let activeNodes = initialNodes;
+          let activeLinks = initialLinks;
           let currentLab = labs.find(l => l.id === labId);
 
+          // No labs at all (fresh install / nuked DB) — create a default lab automatically
+          if (labs.length === 0) {
+            const newId = 'lab-' + crypto.randomUUID().substring(0, 8);
+            const newLab = await firstValueFrom(service.createLaboratory({ id: newId, name: 'Default Laboratory' }));
+            localStorage.setItem(LAB_ID_KEY, newLab.id);
+            patchState(store, { currentLabId: newLab.id, laboratories: [newLab], isLoading: false,
+              topology: { id: newLab.id, name: newLab.name, nodes: [], links: [] } });
+            await this.loadDomains();
+            return;
+          }
+
           // Fallback: If lab from localStorage doesn't exist anymore, use the first available lab
-          if (!currentLab && labs.length > 0) {
+          if (!currentLab) {
             const firstLab = labs[0];
             patchState(store, { currentLabId: firstLab.id });
             localStorage.setItem(LAB_ID_KEY, firstLab.id);
-            // Re-fetch nodes/links for the fallback lab
             const [fNodes, fLinks] = await firstValueFrom(
-                forkJoin([service.getNodes(false, firstLab.id), service.getLinks(firstLab.id)])
+              forkJoin([service.getNodes(false, firstLab.id), service.getLinks(firstLab.id)])
             );
             currentLab = firstLab;
-            patchState(store, (state) => ({
-                topology: { ...state.topology, nodes: fNodes, links: fLinks }
-            }));
+            activeNodes = fNodes;
+            activeLinks = fLinks;
           }
-          
+
           patchState(store, (state) => ({
             isLoading: false,
             laboratories: labs,
@@ -88,8 +98,8 @@ export const TopologyStore = signalStore(
               ...state.topology,
               id: state.currentLabId,
               name: currentLab?.name || 'Unknown Lab',
-              nodes: nodes || [],
-              links: links || []
+              nodes: activeNodes || [],
+              links: activeLinks || []
             }
           }));
           await this.loadDomains();

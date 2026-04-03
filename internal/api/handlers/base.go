@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"open-veth/internal/config"
 	"open-veth/internal/models"
@@ -58,7 +59,9 @@ func (h *Handler) hydrateNodes(nodes []models.Node) {
 	}
 }
 
-// storeMonitorPorts retrieves and stores the dynamically assigned host ports for a MONITOR node.
+// storeMonitorPorts retrieves the dynamically assigned host ports for a MONITOR node.
+// It stores Prometheus immediately (starts fast) and waits asynchronously for Grafana
+// to be ready before storing its port and broadcasting node:updated.
 func (h *Handler) storeMonitorPorts(ctx context.Context, node *models.Node, containerID string) {
 	if node.Type != models.MONITOR {
 		return
@@ -68,6 +71,42 @@ func (h *Handler) storeMonitorPorts(ctx context.Context, node *models.Node, cont
 		h.Logger.Warn("failed to get monitor ports", "node", node.Name, "error", err)
 		return
 	}
-	h.Runtime.SetServicePorts(node.ID, ports)
-	node.ServicePorts = ports
+
+	// Store Prometheus port immediately so the frontend shows it right away
+	promOnly := map[string]int{}
+	if p, ok := ports["prometheus"]; ok {
+		promOnly["prometheus"] = p
+	}
+	h.Runtime.SetServicePorts(node.ID, promOnly)
+	node.ServicePorts = promOnly
+
+	// Wait for Grafana asynchronously — it takes 30-60s with systemd
+	nodeID := node.ID
+	nodeName := node.Name
+	labID := node.LabID
+	grafanaPort, hasGrafana := ports["grafana"]
+	if !hasGrafana {
+		return
+	}
+	go func() {
+		h.Logger.Info("waiting for grafana to be ready", "node", nodeName)
+		if err := h.Manager.WaitForHTTP(context.Background(), containerID, 3000, 3*time.Minute); err != nil {
+			h.Logger.Warn("grafana did not become ready", "node", nodeName, "error", err)
+			return
+		}
+		h.Logger.Info("grafana ready", "node", nodeName, "port", grafanaPort)
+		current, _ := h.Runtime.Get(nodeID)
+		merged := map[string]int{}
+		for k, v := range current.ServicePorts {
+			merged[k] = v
+		}
+		merged["grafana"] = grafanaPort
+		h.Runtime.SetServicePorts(nodeID, merged)
+		h.EventHub.Broadcast(NetworkEvent{
+			Type:      "node:updated",
+			NodeID:    nodeID,
+			LabID:     labID,
+			Timestamp: time.Now().Unix(),
+		})
+	}()
 }

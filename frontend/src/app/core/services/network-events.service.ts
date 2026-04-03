@@ -110,6 +110,7 @@ export class NetworkEventsService {
         break;
 
       case 'node:created':
+      case 'node:updated':
       case 'link:created':
         this.store.loadTopology();
         break;
