@@ -98,18 +98,6 @@ export class NodePaletteComponent {
       description: 'NAT gateway with automatic IP forwarding and masquerade. Connect your lab nodes to reach real internet.'
     },
     {
-      id: 'linux',
-      label: 'Linux',
-      subtitle: 'Debian',
-      icon: 'linux.svg',
-      placeholder: 'e.g. VM1',
-      accentBorder: 'border-red-500',
-      hoverBorder: 'hover:border-red-500/50',
-      category: 'end',
-      shortcut: 'L',
-      description: 'Debian Linux with bash, python3, cron and apt. Has direct internet access. Ideal for scripting and automation practice.'
-    },
-    {
       id: 'server',
       label: 'Server',
       subtitle: 'Debian + systemd',
@@ -149,7 +137,7 @@ export class NodePaletteComponent {
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, linux: 0, server: 0, monitor: 0, tester: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;

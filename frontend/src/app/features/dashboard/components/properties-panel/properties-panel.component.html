@@ -20,7 +20,6 @@
                'bg-amber-500/10 ring-1 ring-amber-500/30': selectedNode()?.type === 'switch',
                'bg-violet-500/10 ring-1 ring-violet-500/30': selectedNode()?.type === 'hub',
                'bg-sky-500/10 ring-1 ring-sky-500/30': selectedNode()?.type === 'cloud',
-               'bg-red-500/10 ring-1 ring-red-500/30': selectedNode()?.type === 'linux',
                'bg-orange-500/10 ring-1 ring-orange-500/30': selectedNode()?.type === 'server',
                'bg-cyan-500/10 ring-1 ring-cyan-500/30': selectedNode()?.type === 'monitor',
                'bg-rose-500/10 ring-1 ring-rose-500/30': selectedNode()?.type === 'tester'
@@ -453,45 +452,6 @@ ip link set eth1 up</pre>
               </div>
             }
 
-            @if (selectedNode()?.type === 'linux') {
-              <div class="space-y-3">
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Install packages</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">apt</span>
-                  </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">apt-get update
-apt-get install -y &lt;package&gt;</pre>
-                </div>
-
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Run Python script</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Python</span>
-                  </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">python3 script.py</pre>
-                </div>
-
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Schedule cron job</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">cron</span>
-                  </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">crontab -e
-# * * * * * /path/to/script.sh</pre>
-                </div>
-
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Network config</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">iproute2</span>
-                  </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip addr add &lt;IP&gt;/&lt;PREFIX&gt; dev eth1
-ip link set eth1 up
-ip route add default via &lt;GW&gt;</pre>
-                </div>
-              </div>
-            }
 
             @if (selectedNode()?.type === 'monitor') {
               <div class="space-y-3">

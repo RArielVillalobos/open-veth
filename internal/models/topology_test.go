@@ -30,7 +30,6 @@ func TestGetImageForType(t *testing.T) {
 		{SWITCH, ImgSwitch},             // Switch has its own managed image
 		{HUB, ImgHost},                 // Hub uses host image
 		{CLOUD, ImgHost},               // Cloud uses host image
-		{LINUX, ImgLinux},              // Linux uses its own debian image
 		{SERVER, ImgServer},            // Server uses its own debian+systemd image
 		{MONITOR, ImgMonitor},          // Monitor uses its own grafana+prometheus image
 		{TESTER, ImgTester},            // Tester uses its own load-testing image
@@ -46,7 +45,7 @@ func TestGetImageForType(t *testing.T) {
 }
 
 func TestIsValidNodeType(t *testing.T) {
-	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX, SERVER, MONITOR, TESTER}
+	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER}
 	for _, tt := range valid {
 		if !IsValidNodeType(tt) {
 			t.Errorf("IsValidNodeType(%q) = false, want true", tt)

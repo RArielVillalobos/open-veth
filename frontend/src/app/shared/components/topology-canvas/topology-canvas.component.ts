@@ -128,7 +128,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   private preloadIcons(): Promise<void[]> {
-    const icons = ['router', 'switch', 'host', 'hub', 'cloud', 'linux', 'server', 'monitor', 'tester'];
+    const icons = ['router', 'switch', 'host', 'hub', 'cloud', 'server', 'monitor', 'tester'];
     return Promise.all(icons.map(name => new Promise<void>(resolve => {
       const img = new Image();
       img.onload = () => resolve();

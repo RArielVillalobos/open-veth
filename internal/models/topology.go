@@ -11,7 +11,6 @@ const (
 	HUB     NodeType = "hub"     // Uses Linux Bridge without MAC learning (L1 repeater)
 	HOST    NodeType = "host"    // Uses Alpine/Ubuntu image
 	CLOUD   NodeType = "cloud"   // Internet gateway - keeps eth0 connected to Docker bridge
-	LINUX   NodeType = "linux"   // Debian-based node for scripting and general use
 	SERVER  NodeType = "server"  // Debian with systemd — for sysadmin, services and automation labs
 	MONITOR NodeType = "monitor" // Grafana + Prometheus pre-configured — for observability labs
 	TESTER  NodeType = "tester"  // Debian with wrk, k6, siege, iperf3, locust — for load and stress testing
@@ -31,7 +30,7 @@ func NeedsBridge(t NodeType) bool {
 // IsValidNodeType returns true if the given type is a known node type
 func IsValidNodeType(t NodeType) bool {
 	switch t {
-	case ROUTER, SWITCH, HUB, HOST, CLOUD, LINUX, SERVER, MONITOR, TESTER:
+	case ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER:
 		return true
 	}
 	return false
@@ -40,7 +39,7 @@ func IsValidNodeType(t NodeType) bool {
 // KeepEth0 returns true for node types that should NOT rename eth0 to mgmt0.
 // CLOUD nodes keep eth0 to maintain connectivity to Docker bridge (internet access).
 func KeepEth0(t NodeType) bool {
-	return t == CLOUD || t == LINUX || t == SERVER || t == MONITOR || t == TESTER
+	return t == CLOUD || t == SERVER || t == MONITOR || t == TESTER
 }
 
 // SnapshotImageName returns the local Docker image name used to snapshot a node's filesystem.
@@ -52,7 +51,6 @@ func SnapshotImageName(nodeID string) string {
 const (
 	ImgRouter  = "openveth/router:latest"
 	ImgHost    = "openveth/host:latest"
-	ImgLinux   = "openveth/linux:latest"
 	ImgServer  = "openveth/server:latest"
 	ImgMonitor = "openveth/monitor:latest"
 	ImgTester  = "openveth/tester:latest"
@@ -72,8 +70,6 @@ func GetImageForType(t NodeType) string {
 		return ImgHost // Hub remains a simple, unmanaged device using Alpine
 	case CLOUD:
 		return ImgHost // Cloud uses host image, keeps eth0 for internet access
-	case LINUX:
-		return ImgLinux
 	case SERVER:
 		return ImgServer
 	case MONITOR:

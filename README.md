@@ -110,7 +110,6 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **SWITCH** | Linux Bridge + snmpd | Managed L2 switch — terminal access, SNMP (community `public`, port 161), live MAC address table visible in the properties panel |
 | **HUB** | Alpine Linux (no MAC learning) | L1 repeater, floods all traffic to all ports |
 | **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
-| **LINUX** | Debian bookworm-slim | Scripting and automation — bash, python3, cron, apt, git, jq, tree, vim, nano, netcat, dig, man pages (Spanish), bash-completion, sudo, direct internet access |
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
 | **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + snmp_exporter pre-installed and auto-started. Loki is installed but disabled by default — enable with `systemctl enable loki --now`. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
 | **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
@@ -150,7 +149,7 @@ make up
 > `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
 
 That's it! The command will:
-- Pull node images from Docker Hub (Host, Router, Switch, Linux, Server, Monitor, Tester — Hub and Cloud reuse the Host image)
+- Pull node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester — Hub and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL to open in your browser
 
@@ -225,7 +224,6 @@ graph TD
         R[ROUTER - FRR]
         S[SWITCH - Bridge]
         HB[HUB - Repeater]
-        L[LINUX - Debian]
         SRV[SERVER - Debian+systemd]
         MON[MONITOR - Grafana+Prometheus]
         TST[TESTER - wrk/k6/siege/iperf3]

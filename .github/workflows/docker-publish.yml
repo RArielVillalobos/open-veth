@@ -48,8 +48,6 @@ jobs:
             context: ./images/host-node
           - name: router
             context: ./images/router-node
-          - name: linux
-            context: ./images/linux-node
           - name: server
             context: ./images/server-node
           - name: monitor

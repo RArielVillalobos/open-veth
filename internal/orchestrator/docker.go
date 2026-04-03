@@ -373,9 +373,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.setupCloud(ctx, inspect.ID, node.Name)
 			}
 
-			// Re-apply default gateway for LINUX/SERVER nodes (lost on container restart)
-			if node.Type == models.LINUX || node.Type == models.SERVER {
-				m.setupLinuxGateway(ctx, inspect.ID, node.Name)
+			// Re-apply default gateway for SERVER nodes (lost on container restart)
+			if node.Type == models.SERVER {
+				m.setupInternetGateway(ctx, inspect.ID, node.Name)
 			}
 
 			return inspect.ID, nil
@@ -416,9 +416,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.setupCloud(ctx, resp.ID, node.Name)
 	}
 
-	// 9. If node is LINUX or SERVER, restore default gateway for direct internet access
-	if node.Type == models.LINUX || node.Type == models.SERVER {
-		m.setupLinuxGateway(ctx, resp.ID, node.Name)
+	// 9. If node is SERVER, restore default gateway for direct internet access
+	if node.Type == models.SERVER {
+		m.setupInternetGateway(ctx, resp.ID, node.Name)
 	}
 
 	m.logger.Info("node created and started", "name", node.Name, "id", resp.ID[:12])
@@ -541,15 +541,15 @@ func (m *Manager) setupCloud(ctx context.Context, containerID, nodeName string) 
 	}
 }
 
-// setupLinuxGateway restores the default gateway on LINUX nodes after eth0→mgmt0 rename.
+// setupInternetGateway restores the default gateway on SERVER nodes after eth0→mgmt0 rename.
 // The default route is deleted for all non-CLOUD nodes so students configure routing manually,
-// but LINUX nodes need it back to reach the internet for apt-get, pip, etc.
-func (m *Manager) setupLinuxGateway(ctx context.Context, containerID, nodeName string) {
+// but SERVER nodes need it back to reach the internet for apt-get, etc.
+func (m *Manager) setupInternetGateway(ctx context.Context, containerID, nodeName string) {
 	// Docker's default bridge gateway is always the .1 address of the container's subnet.
 	// We detect it by inspecting the container's network settings.
 	inspect, err := m.cli.ContainerInspect(ctx, containerID)
 	if err != nil {
-		m.logger.Warn("setupLinuxGateway: failed to inspect container", "name", nodeName, "error", err)
+		m.logger.Warn("setupInternetGateway: failed to inspect container", "name", nodeName, "error", err)
 		return
 	}
 
@@ -564,7 +564,7 @@ func (m *Manager) setupLinuxGateway(ctx context.Context, containerID, nodeName s
 		}
 	}
 	if gateway == "" {
-		m.logger.Warn("setupLinuxGateway: no gateway found", "name", nodeName)
+		m.logger.Warn("setupInternetGateway: no gateway found", "name", nodeName)
 		return
 	}
 
@@ -574,14 +574,14 @@ func (m *Manager) setupLinuxGateway(ctx context.Context, containerID, nodeName s
 		AttachStderr: false,
 	}
 
-	m.logger.Info("restoring default gateway for linux node", "name", nodeName, "gateway", gateway)
+	m.logger.Info("restoring default gateway", "name", nodeName, "gateway", gateway)
 
 	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
 		if err := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); err != nil {
-			m.logger.Warn("setupLinuxGateway: failed to add default route", "name", nodeName, "error", err)
+			m.logger.Warn("setupInternetGateway: failed to add default route", "name", nodeName, "error", err)
 		}
 	} else {
-		m.logger.Warn("setupLinuxGateway: failed to create exec", "name", nodeName, "error", err)
+		m.logger.Warn("setupInternetGateway: failed to create exec", "name", nodeName, "error", err)
 	}
 }
 

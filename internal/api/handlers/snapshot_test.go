@@ -72,8 +72,8 @@ func TestDeleteNode_WithSnapshot_DeletesFromDB(t *testing.T) {
 	h, repo := newTestHandler()
 	_ = repo.SaveNode(models.Node{
 		ID:            "node-2",
-		Name:          "LINUX-1",
-		Type:          models.LINUX,
+		Name:          "SERVER-1",
+		Type:          models.SERVER,
 		LabID:         "lab-1",
 		SnapshotImage: models.SnapshotImageName("node-2"),
 	})
