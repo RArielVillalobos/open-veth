@@ -15,7 +15,12 @@ help: ## Show this help
 all: help
 
 # --- Quick Start (Docker) ---
-up: pull-images ## Start OpenVeth (auto-detects available ports)
+check-docker:
+	@command -v docker >/dev/null 2>&1 || { echo "Error: Docker is not installed. https://docs.docker.com/get-docker/"; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "Error: Docker daemon is not running. Start Docker and try again."; exit 1; }
+
+
+up: check-docker pull-images ## Start OpenVeth (auto-detects available ports)
 	@$(SCRIPTS_DIR)/find-ports.sh
 	@echo ""
 	@$(COMPOSE_CMD) up -d --build
