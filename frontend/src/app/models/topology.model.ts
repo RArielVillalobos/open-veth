@@ -25,6 +25,7 @@ export interface MacEntry {
 }
 
 export type NodeType = 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'server' | 'monitor' | 'tester';
+export const NODE_TYPES: NodeType[] = ['router', 'switch', 'host', 'hub', 'cloud', 'server', 'monitor', 'tester'];
 
 export interface Node {
   id: string;

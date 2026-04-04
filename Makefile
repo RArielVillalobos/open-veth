@@ -7,7 +7,7 @@ COMPOSE_CMD=docker compose
 FRONTEND_DIR=frontend
 SCRIPTS_DIR=scripts
 
-.PHONY: all up down pull-images images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke help
+.PHONY: all up down pull-images images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke reset-ports help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -98,16 +98,17 @@ fmt: ## Format Go source code
 	$(GO_CMD) fmt ./...
 	@echo "Go code formatted."
 
-clean: down dev-down ## Stop everything and clean artifacts
-	cd $(FRONTEND_DIR) && rm -rf node_modules .angular
-	$(GO_CMD) clean
-	@echo "Cleanup completed."
+clean: ## Free disk space: remove all OpenVeth images, snapshots and build cache
+	-$(DOCKER_CMD) images --format '{{.ID}}' --filter=reference='openveth/*' | xargs -r $(DOCKER_CMD) rmi -f
+	-$(DOCKER_CMD) images --format '{{.ID}}' --filter=reference='openveth-snapshot:*' | xargs -r $(DOCKER_CMD) rmi -f
+	-$(DOCKER_CMD) builder prune -a -f
+	@echo "Disk space freed. Run 'make up' to re-download images."
 
 reset-ports: ## Delete .env to detect new ports on next 'make up'
 	rm -f .env
 	@echo "Port configuration cleared. Run 'make up' to detect new ports."
 
-nuke: ## NUCLEAR: Remove ALL OpenVeth containers and database
+nuke: clean ## NUCLEAR: Remove ALL OpenVeth containers, images and database
 	@echo "Destroying openveth environment..."
 	-$(COMPOSE_CMD) down -v
 	-$(DOCKER_CMD) ps -a -q --filter label=openveth=true | xargs -r $(DOCKER_CMD) rm -f

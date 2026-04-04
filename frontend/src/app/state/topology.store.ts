@@ -1,6 +1,6 @@
 import { signalStore, withState, withMethods, patchState, withHooks } from '@ngrx/signals';
 import { Topology, Node, Link, Laboratory, DomainsResponse } from '../models/topology.model';
-import { inject, effect } from '@angular/core';
+import { inject, effect, untracked } from '@angular/core';
 import { firstValueFrom, forkJoin } from 'rxjs';
 import { TopologyService } from '../core/services/topology.service';
 import { ToastService } from '../core/services/toast.service';
@@ -14,6 +14,7 @@ export interface TopologyState {
   error: string | null;
   domains: DomainsResponse | null;
   activeDomainOverlay: 'broadcast' | 'collision' | null;
+  togglingNodes: string[]; // Node IDs with a pending power toggle
 }
 
 const LAB_ID_KEY = 'openveth_current_lab_id';
@@ -38,7 +39,8 @@ const initialState: TopologyState = {
   isLoading: false,
   error: null,
   domains: null,
-  activeDomainOverlay: null
+  activeDomainOverlay: null,
+  togglingNodes: []
 };
 
 export const TopologyStore = signalStore(
@@ -224,7 +226,9 @@ export const TopologyStore = signalStore(
       async toggleNodePower(id: string) {
         const node = store.topology().nodes.find(n => n.id === id);
         if (!node) return;
+        if (store.togglingNodes().includes(id)) return;
         const shouldStart = node.status === 'stopped';
+        patchState(store, (state) => ({ togglingNodes: [...state.togglingNodes, id] }));
         try {
           const updated = await firstValueFrom(
             shouldStart ? service.startNode(id) : service.stopNode(id)
@@ -239,6 +243,8 @@ export const TopologyStore = signalStore(
         } catch (err: any) {
           const msg = err.error?.error || err.message || 'Error toggling node power';
           toast.error(msg);
+        } finally {
+          patchState(store, (state) => ({ togglingNodes: state.togglingNodes.filter(n => n !== id) }));
         }
       },
 
@@ -252,6 +258,8 @@ export const TopologyStore = signalStore(
       },
 
       async fetchNodeInterfaces(id: string) {
+        const node = untracked(() => store.topology().nodes.find(n => n.id === id));
+        if (node?.status !== 'running') return;
         try {
           const interfaces = await firstValueFrom(service.getNodeInterfaces(id));
           patchState(store, (state) => ({

@@ -30,5 +30,5 @@ RUN echo 'root:openveth' | chpasswd
 
 EXPOSE 22
 
-# Start SSH daemon and keep container alive
-CMD ["/bin/sh", "-c", "/usr/sbin/sshd && sleep infinity"]
+# Run sshd in foreground as PID 1 — responds to SIGTERM immediately
+CMD ["/usr/sbin/sshd", "-D"]

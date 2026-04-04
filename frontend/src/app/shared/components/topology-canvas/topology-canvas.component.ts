@@ -3,9 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import cytoscape from 'cytoscape';
-import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse } from '../../../models/topology.model';
+import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse, NODE_TYPES } from '../../../models/topology.model';
 import { DOMAIN_COLORS } from './domain-colors';
-import { CYTOSCAPE_STYLES } from './cytoscape-styles';
+import { getCytoscapeStyles } from './cytoscape-styles';
 
 @Component({
   selector: 'app-topology-canvas',
@@ -20,6 +20,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   
   nodes = input.required<TopologyNode[]>();
   links = input.required<Link[]>();
+  togglingNodes = input<string[]>([]);
   terminalNode = input<string | null>(null);
   domains = input<DomainsResponse | null>(null);
   activeDomainOverlay = input<'broadcast' | 'collision' | null>(null);
@@ -41,6 +42,8 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private canvasReady = false;
   private resizeObserver!: ResizeObserver;
   private overlayCtx: CanvasRenderingContext2D | null = null;
+  private pulseInterval: ReturnType<typeof setInterval> | null = null;
+  private previousTogglingNodes: string[] = [];
   sourceNodeId: string | null = null;
   
   // Context menu state
@@ -73,6 +76,40 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       if (this.cy) {
         this.updateCanvas();
       }
+    });
+
+    effect(() => {
+      const toggling = this.togglingNodes();
+      if (!this.cy) return;
+
+      if (this.pulseInterval) {
+        clearInterval(this.pulseInterval);
+        this.pulseInterval = null;
+        // Restore only the nodes that were pulsing — avoids clobbering node-stopped opacity
+        this.previousTogglingNodes.forEach(id => {
+          const el = this.cy.getElementById(id);
+          if (!el.empty()) el.removeStyle('opacity border-width border-color border-style');
+        });
+      }
+
+      this.previousTogglingNodes = [...toggling];
+      if (toggling.length === 0) return;
+
+      let bright = true;
+      this.pulseInterval = setInterval(() => {
+        if (!this.cy) return;
+        toggling.forEach(id => {
+          const el = this.cy.getElementById(id);
+          if (el.empty()) return;
+          el.style({
+            'opacity': bright ? 0.9 : 0.3,
+            'border-width': 2,
+            'border-color': '#facc15',
+            'border-style': 'solid',
+          });
+        });
+        bright = !bright;
+      }, 500);
     });
 
     effect(() => {
@@ -124,21 +161,28 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    this.preloadIcons().then(() => this.initCytoscape());
+    this.prerasterizeIcons().then(bg => this.initCytoscape(bg));
   }
 
-  private preloadIcons(): Promise<void[]> {
-    const icons = ['router', 'switch', 'host', 'hub', 'cloud', 'server', 'monitor', 'tester'];
-    return Promise.all(icons.map(name => new Promise<void>(resolve => {
+  private prerasterizeIcons(): Promise<Record<string, string>> {
+    const SIZE = 256;
+    return Promise.all(NODE_TYPES.map(name => new Promise<[string, string]>(resolve => {
       const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => resolve();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, SIZE, SIZE);
+        resolve([name, canvas.toDataURL('image/png')]);
+      };
+      img.onerror = () => resolve([name, `assets/icons/${name}.svg`]);
       img.src = `assets/icons/${name}.svg`;
-    })));
+    }))).then(entries => Object.fromEntries(entries));
   }
 
   ngOnDestroy() {
     this.resizeObserver?.disconnect();
+    if (this.pulseInterval) clearInterval(this.pulseInterval);
     if (this.cy) this.cy.destroy();
   }
 
@@ -183,6 +227,10 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   get isContextNodeStopped(): boolean {
     const node = this.nodes().find(n => n.id === this.contextMenu.elementId);
     return node?.status === 'stopped';
+  }
+
+  get isContextNodeToggling(): boolean {
+    return this.togglingNodes().includes(this.contextMenu.elementId);
   }
 
   triggerOpenSniff(data: {nodeId: string, nodeName: string, iface: string}) {
@@ -243,10 +291,10 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     this.redrawOverlayCanvas();
   }
 
-  private initCytoscape() {
+  private initCytoscape(bg: Record<string, string>) {
     this.cy = cytoscape({
       container: this.container.nativeElement,
-      style: CYTOSCAPE_STYLES,
+      style: getCytoscapeStyles(bg),
       pixelRatio: 'auto',
       minZoom: 0.3,
       maxZoom: 1.5,
@@ -751,7 +799,6 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Highlight newly added nodes
     newNodeIds.forEach(id => {
       const el = this.cy.getElementById(id);
       el.style({ 'border-width': 2, 'border-color': '#60a5fa', 'border-opacity': 1 });

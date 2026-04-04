@@ -180,6 +180,8 @@ make down         # Stop OpenVeth
 make logs         # View container logs
 make status       # Show current ports and container status
 make reset-ports  # Force port re-detection on next start
+make clean        # Free disk space: remove all OpenVeth images, snapshots and build cache
+make nuke         # NUCLEAR: remove everything including containers and database
 ```
 
 ### Development Setup

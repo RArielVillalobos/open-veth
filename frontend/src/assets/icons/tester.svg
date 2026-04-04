@@ -1,16 +1,13 @@
-<svg viewBox="-2 -2 68 68" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="4 4 56 56" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="testerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#f43f5e;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#be123c;stop-opacity:1" />
     </linearGradient>
-    <filter id="testerShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
-    </filter>
   </defs>
 
   <!-- Background panel -->
-  <rect x="6" y="6" width="52" height="52" rx="6" fill="url(#testerGrad)" filter="url(#testerShadow)"/>
+  <rect x="6" y="6" width="52" height="52" rx="6" fill="url(#testerGrad)"/>
 
   <!-- Inner dark gauge area -->
   <rect x="10" y="10" width="44" height="36" rx="3" fill="#4c0519" opacity="0.55"/>

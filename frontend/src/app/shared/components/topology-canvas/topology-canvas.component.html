@@ -48,9 +48,12 @@
     <div class="context-menu__separator"></div>
 
     <!-- Power Control -->
-    <button class="context-menu__item" (click)="onContextMenuAction('power')">
-      <span class="context-menu__icon mono text-xs">{{ isContextNodeStopped ? '▶' : '⏹' }}</span>
-      <span class="context-menu__label">{{ isContextNodeStopped ? 'Power On' : 'Power Off' }}</span>
+    <button class="context-menu__item"
+            [class.context-menu__item--disabled]="isContextNodeToggling"
+            [disabled]="isContextNodeToggling"
+            (click)="onContextMenuAction('power')">
+      <span class="context-menu__icon mono text-xs">{{ isContextNodeToggling ? '⏳' : (isContextNodeStopped ? '▶' : '⏹') }}</span>
+      <span class="context-menu__label">{{ isContextNodeToggling ? (isContextNodeStopped ? 'Starting...' : 'Stopping...') : (isContextNodeStopped ? 'Power On' : 'Power Off') }}</span>
     </button>
 
     <!-- Danger Zone -->

@@ -80,10 +80,10 @@ export class PropertiesPanelComponent {
       this.macTable.set([]);
       this.uploadResult.set(null);
 
-      if (node && node.type !== 'switch' && node.type !== 'hub') {
+      if (node && node.status === 'running' && node.type !== 'switch' && node.type !== 'hub') {
         setTimeout(() => this.loadRoutes(node.id), 0);
       }
-      if (node?.type === 'switch') {
+      if (node?.type === 'switch' && node.status === 'running') {
         setTimeout(() => this.loadMacTable(node.id), 0);
       }
     });

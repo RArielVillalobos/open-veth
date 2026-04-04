@@ -1,12 +1,10 @@
 import cytoscape from 'cytoscape';
 import { DOMAIN_COLORS } from './domain-colors';
 
-// Generate domain overlay styles for broadcast (bd) and collision (cd) domains
 function generateDomainStyles(): cytoscape.StylesheetStyle[] {
   const styles: cytoscape.StylesheetStyle[] = [];
   for (let i = 0; i < DOMAIN_COLORS.length; i++) {
     const color = DOMAIN_COLORS[i];
-    // Broadcast domain - nodes: solid border + semi-transparent background
     styles.push({
       selector: `node.domain-bd-${i}`,
       style: {
@@ -17,7 +15,6 @@ function generateDomainStyles(): cytoscape.StylesheetStyle[] {
         'background-opacity': 0.15,
       }
     });
-    // Broadcast domain - edges: colored line
     styles.push({
       selector: `edge.domain-bd-${i}`,
       style: {
@@ -25,7 +22,6 @@ function generateDomainStyles(): cytoscape.StylesheetStyle[] {
         'width': 4,
       }
     });
-    // Collision domain - nodes: dashed border
     styles.push({
       selector: `node.domain-cd-${i}`,
       style: {
@@ -35,7 +31,6 @@ function generateDomainStyles(): cytoscape.StylesheetStyle[] {
         'border-style': 'dashed',
       }
     });
-    // Collision domain - edges: dashed colored line
     styles.push({
       selector: `edge.domain-cd-${i}`,
       style: {
@@ -48,179 +43,117 @@ function generateDomainStyles(): cytoscape.StylesheetStyle[] {
   return styles;
 }
 
-export const CYTOSCAPE_STYLES: cytoscape.StylesheetStyle[] = [
-  {
-    selector: 'node',
-    style: {
-      'label': 'data(label)',
-      'color': '#e2e8f0',
-      'font-size': '12px',
-      'font-weight': 'bold',
-      'text-valign': 'bottom',
-      'text-wrap': 'wrap',
-      'text-max-width': '150px',
-      'text-margin-y': -2,
-      'width': 52,
-      'height': 52,
-      'shape': 'rectangle',
-      'background-color': 'transparent',
-      'background-opacity': 0,
-      'border-width': 0,
-      'text-outline-color': '#020617',
-      'text-outline-width': 2
-    }
-  },
-  {
-    selector: 'node[type="router"]',
-    style: {
-      'background-image': 'assets/icons/router.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="switch"]',
-    style: {
-      'background-image': 'assets/icons/switch.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="host"]',
-    style: {
-      'background-image': 'assets/icons/host.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="hub"]',
-    style: {
-      'background-image': 'assets/icons/hub.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="cloud"]',
-    style: {
-      'background-image': 'assets/icons/cloud.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="server"]',
-    style: {
-      'background-image': 'assets/icons/server.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="monitor"]',
-    style: {
-      'background-image': 'assets/icons/monitor.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: 'node[type="tester"]',
-    style: {
-      'background-image': 'assets/icons/tester.svg',
-      'background-fit': 'contain',
-      'background-clip': 'none',
-      'width': 52,
-      'height': 52
-    }
-  },
-  {
-    selector: '.terminal-active',
-    style: {
-      'border-width': 2,
-      'border-color': '#34d399',
-      'border-opacity': 0.9,
-    }
-  },
-  {
-    selector: '.selected-source',
-    style: {
-      'border-width': 3,
-      'border-color': '#8b5cf6',
-      'border-style': 'solid',
-      'background-color': '#ede9fe',
-      'background-opacity': 0.6
-    }
-  },
-  {
-    selector: 'edge',
-    style: {
-      'width': 3,
-      'line-color': '#94a3b8',
-      'curve-style': 'bezier',
-      'source-label': 'data(source_int)',
-      'target-label': 'data(target_int)',
-      'source-text-offset': 32,
-      'target-text-offset': 32,
-      'font-size': '10px',
-      'font-family': 'JetBrains Mono, monospace',
-      'color': '#cbd5e1',
-      'text-wrap': 'wrap',
-      'text-background-opacity': 0.85,
-      'text-background-color': '#0f172a',
-      'text-background-padding': '3px',
-      'text-background-shape': 'roundrectangle'
-    }
-  },
-  // Disabled link style
-  {
-    selector: 'edge.link-disabled',
-    style: {
-      'line-color': '#475569',
-      'line-style': 'dashed',
-      'opacity': 0.4,
-    }
-  },
-  // Stopped node style
-  {
-    selector: 'node.node-stopped',
-    style: {
-      'opacity': 0.4,
-    }
-  },
-  // Traceroute path highlight
-  {
-    selector: 'node.traceroute-path',
-    style: {
-      'border-width': 3,
-      'border-color': '#22c55e',
-      'border-opacity': 1,
-      'background-color': '#22c55e',
-      'background-opacity': 0.15,
-    }
-  },
-  {
-    selector: 'edge.traceroute-path',
-    style: {
-      'line-color': '#22c55e',
-      'width': 4,
-    }
-  },
-  ...generateDomainStyles()
-];
+function nodeImageStyle(url: string): cytoscape.StylesheetStyle['style'] {
+  return {
+    'background-image': url,
+    'background-fit': 'contain',
+    'background-clip': 'none',
+    'width': 52,
+    'height': 52,
+  };
+}
+
+export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.StylesheetStyle[] {
+  const icon = (name: string) => bg[name] || `assets/icons/${name}.svg`;
+  return [
+    {
+      selector: 'node',
+      style: {
+        'label': 'data(label)',
+        'color': '#e2e8f0',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-valign': 'bottom',
+        'text-wrap': 'wrap',
+        'text-max-width': '150px',
+        'text-margin-y': -2,
+        'width': 52,
+        'height': 52,
+        'shape': 'rectangle',
+        'background-color': 'transparent',
+        'background-opacity': 0,
+        'border-width': 0,
+        'text-outline-color': '#020617',
+        'text-outline-width': 2
+      }
+    },
+    { selector: 'node[type="router"]',  style: nodeImageStyle(icon('router'))  },
+    { selector: 'node[type="switch"]',  style: nodeImageStyle(icon('switch'))  },
+    { selector: 'node[type="host"]',    style: nodeImageStyle(icon('host'))    },
+    { selector: 'node[type="hub"]',     style: nodeImageStyle(icon('hub'))     },
+    { selector: 'node[type="cloud"]',   style: nodeImageStyle(icon('cloud'))   },
+    { selector: 'node[type="server"]',  style: nodeImageStyle(icon('server'))  },
+    { selector: 'node[type="monitor"]', style: nodeImageStyle(icon('monitor')) },
+    { selector: 'node[type="tester"]',  style: nodeImageStyle(icon('tester'))  },
+    {
+      selector: '.terminal-active',
+      style: {
+        'border-width': 2,
+        'border-color': '#34d399',
+        'border-opacity': 0.9,
+      }
+    },
+    {
+      selector: '.selected-source',
+      style: {
+        'border-width': 3,
+        'border-color': '#8b5cf6',
+        'border-style': 'solid',
+        'background-color': '#ede9fe',
+        'background-opacity': 0.6
+      }
+    },
+    {
+      selector: 'edge',
+      style: {
+        'width': 3,
+        'line-color': '#94a3b8',
+        'curve-style': 'bezier',
+        'source-label': 'data(source_int)',
+        'target-label': 'data(target_int)',
+        'source-text-offset': 32,
+        'target-text-offset': 32,
+        'font-size': '10px',
+        'font-family': 'JetBrains Mono, monospace',
+        'color': '#cbd5e1',
+        'text-wrap': 'wrap',
+        'text-background-opacity': 0.85,
+        'text-background-color': '#0f172a',
+        'text-background-padding': '3px',
+        'text-background-shape': 'roundrectangle'
+      }
+    },
+    {
+      selector: 'edge.link-disabled',
+      style: {
+        'line-color': '#475569',
+        'line-style': 'dashed',
+        'opacity': 0.4,
+      }
+    },
+    {
+      selector: 'node.node-stopped',
+      style: {
+        'opacity': 0.4,
+      }
+    },
+    {
+      selector: 'node.traceroute-path',
+      style: {
+        'border-width': 3,
+        'border-color': '#22c55e',
+        'border-opacity': 1,
+        'background-color': '#22c55e',
+        'background-opacity': 0.15,
+      }
+    },
+    {
+      selector: 'edge.traceroute-path',
+      style: {
+        'line-color': '#22c55e',
+        'width': 4,
+      }
+    },
+    ...generateDomainStyles()
+  ];
+}
