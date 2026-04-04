@@ -109,6 +109,8 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'width': 3,
         'line-color': '#94a3b8',
         'curve-style': 'bezier',
+        'label': 'data(subnet)',
+        'text-rotation': 'autorotate',
         'source-label': 'data(source_int)',
         'target-label': 'data(target_int)',
         'source-text-offset': 32,
@@ -154,6 +156,17 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'width': 4,
       }
     },
-    ...generateDomainStyles()
+    ...generateDomainStyles(),
+  ...generateSubnetStyles()
   ];
+}
+
+function generateSubnetStyles(): cytoscape.StylesheetStyle[] {
+  return DOMAIN_COLORS.map((color, i) => ({
+    selector: `edge.subnet-${i}`,
+    style: {
+      'line-color': color,
+      'width': 4,
+    }
+  }));
 }

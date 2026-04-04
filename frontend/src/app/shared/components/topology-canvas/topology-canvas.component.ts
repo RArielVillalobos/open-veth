@@ -5,6 +5,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import cytoscape from 'cytoscape';
 import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse, NODE_TYPES } from '../../../models/topology.model';
 import { DOMAIN_COLORS } from './domain-colors';
+import { parseNetworkAddress } from '../../utils/network-utils';
 import { getCytoscapeStyles } from './cytoscape-styles';
 
 @Component({
@@ -632,6 +633,41 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     ctx.closePath();
   }
 
+  private applySubnetColors(nodeIfaceIPs: Map<string, Map<string, string>>): void {
+    this.cy.edges().forEach(edge => {
+      [...edge.classes()].filter(c => c.startsWith('subnet-')).forEach(c => edge.removeClass(c));
+      edge.removeData('subnet');
+    });
+
+    const networkCache = new Map<string, string>();
+    nodeIfaceIPs.forEach(ifaceMap => {
+      ifaceMap.forEach((ipWithPrefix) => {
+        const net = parseNetworkAddress(ipWithPrefix);
+        if (net) networkCache.set(ipWithPrefix, net);
+      });
+    });
+
+    const allSubnets = new Set(networkCache.values());
+    if (allSubnets.size < 2) return;
+
+    const subnetColorIndex = new Map<string, number>();
+    [...allSubnets].forEach((subnet, i) => subnetColorIndex.set(subnet, i % DOMAIN_COLORS.length));
+
+    this.links().forEach(link => {
+      const srcIP = nodeIfaceIPs.get(link.source)?.get(link.source_int);
+      if (!srcIP) return;
+      const net = networkCache.get(srcIP);
+      if (!net) return;
+      const colorIndex = subnetColorIndex.get(net);
+      if (colorIndex === undefined) return;
+      const edge = this.cy.getElementById(link.id);
+      if (!edge.empty()) {
+        edge.addClass(`subnet-${colorIndex}`);
+        edge.data('subnet', net);
+      }
+    });
+  }
+
   private drawExpandedHull(ctx: CanvasRenderingContext2D, hull: { x: number; y: number }[], padding: number): void {
     // Expand hull outward and draw with rounded corners
     const n = hull.length;
@@ -680,22 +716,23 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     const nodes = this.nodes();
     const newNodeIds: string[] = [];
 
-    this.cy.batch(() => {
-      // Build a lookup: nodeId -> { ifaceName -> ip }
-      const nodeIfaceIPs = new Map<string, Map<string, string>>();
-      nodes.forEach(node => {
-        const ifaceMap = new Map<string, string>();
-        if (node.interfaces) {
-          for (const iface of node.interfaces) {
-            if (iface.ifname === 'lo' || iface.ifname === 'mgmt0') continue;
-            const ipv4 = iface.addr_info?.find(a => !a.local.includes(':'));
-            if (ipv4) {
-              ifaceMap.set(iface.ifname, `${ipv4.local}/${ipv4.prefixlen}`);
-            }
+    // Build a lookup: nodeId -> { ifaceName -> ip }
+    const nodeIfaceIPs = new Map<string, Map<string, string>>();
+    nodes.forEach(node => {
+      const ifaceMap = new Map<string, string>();
+      if (node.interfaces) {
+        for (const iface of node.interfaces) {
+          if (iface.ifname === 'lo' || iface.ifname === 'mgmt0') continue;
+          const ipv4 = iface.addr_info?.find(a => !a.local.includes(':'));
+          if (ipv4) {
+            ifaceMap.set(iface.ifname, `${ipv4.local}/${ipv4.prefixlen}`);
           }
         }
-        nodeIfaceIPs.set(node.id, ifaceMap);
-      });
+      }
+      nodeIfaceIPs.set(node.id, ifaceMap);
+    });
+
+    this.cy.batch(() => {
 
       // 1. Add/Update Nodes
       nodes.forEach(node => {
@@ -789,6 +826,8 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           this.cy.remove(ele);
         }
       });
+
+      this.applySubnetColors(nodeIfaceIPs);
     });
 
     if (!this.canvasReady) {
