@@ -4,6 +4,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { UIStore } from '../../../state/ui.store';
 import { TerminalStore } from '../../../state/terminal.store';
+import { TopologyStore } from '../../../state/topology.store';
 import { environment } from '../../../../environments/environment';
 import { TerminalSession } from '../../../models/terminal.model';
 
@@ -17,10 +18,11 @@ import { TerminalSession } from '../../../models/terminal.model';
 export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
   readonly ui = inject(UIStore);
   readonly terminalStore = inject(TerminalStore);
+  private readonly topologyStore = inject(TopologyStore);
 
   @ViewChildren('termContainer') termContainers!: QueryList<ElementRef>;
 
-  private terminals = new Map<string, { term: Terminal, fit: FitAddon, socket: WebSocket, resizeObserver: ResizeObserver }>();
+  private terminals = new Map<string, { term: Terminal, fit: FitAddon, socket: WebSocket, resizeObserver: ResizeObserver, refreshTimer: ReturnType<typeof setTimeout> | null }>();
 
   constructor() {
     // Reaccionar a cambios en la lista de nodos activos
@@ -49,6 +51,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.terminals.forEach(t => {
+      if (t.refreshTimer) clearTimeout(t.refreshTimer);
       t.resizeObserver.disconnect();
       t.socket.close();
       t.term.dispose();
@@ -89,6 +92,7 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     // 1. Eliminar terminales cerradas
     for (const [id, instance] of this.terminals) {
       if (!activeIds.includes(id)) {
+        if (instance.refreshTimer) clearTimeout(instance.refreshTimer);
         instance.resizeObserver.disconnect();
         instance.socket.close();
         instance.term.dispose();
@@ -170,6 +174,13 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
 
     term.onData(data => {
       if (socket.readyState === WebSocket.OPEN) socket.send(data);
+      if (data === '\r') {
+        const entry = this.terminals.get(nodeId);
+        if (entry) {
+          if (entry.refreshTimer) clearTimeout(entry.refreshTimer);
+          entry.refreshTimer = setTimeout(() => this.topologyStore.fetchNodeInterfaces(nodeId), 1500);
+        }
+      }
     });
 
     socket.onclose = () => term.writeln('\r\n\x1b[31m✖ Connection closed.\x1b[0m');
@@ -181,6 +192,6 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     });
     resizeObserver.observe(container);
 
-    this.terminals.set(nodeId, { term, fit: fitAddon, socket, resizeObserver });
+    this.terminals.set(nodeId, { term, fit: fitAddon, socket, resizeObserver, refreshTimer: null });
   }
 }
