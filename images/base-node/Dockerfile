@@ -14,6 +14,7 @@ RUN find /lib/systemd/system/sysinit.target.wants/ -not -name systemd-tmpfiles-s
     && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
     && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
     && rm -f /lib/systemd/system/basic.target.wants/* \
+    && ln -sf /lib/systemd/system/systemd-user-sessions.service /lib/systemd/system/multi-user.target.wants/systemd-user-sessions.service \
     || true
 
 # Install networking tools

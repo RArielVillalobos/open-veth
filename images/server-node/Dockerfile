@@ -63,7 +63,7 @@ WantedBy=multi-user.target
 EOF
 
 # Disable all services by default — student enables them manually with systemctl
-RUN systemctl disable nginx apache2 dnsmasq chrony vsftpd || true
+RUN systemctl disable nginx apache2 dnsmasq chrony vsftpd nfs-kernel-server rsyslog || true
 
 EXPOSE 22
 
