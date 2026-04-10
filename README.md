@@ -1,6 +1,6 @@
 # OpenVeth
 
-**OpenVeth** is a web-based network emulator powered by real Linux kernel networking (namespaces, veth pairs, bridges) and Docker. Design topologies visually, access node terminals in the browser, capture packets live, benchmark services under load, and built-in observability — no VMs, no cost.
+**OpenVeth** is a web-based network emulator that uses real Linux kernel networking — not simulations. Design topologies visually, access node terminals in the browser, capture packets live, and run observability labs with Grafana and Prometheus. Runs on any machine with Docker.
 
 ![Backend](https://img.shields.io/badge/Backend-Go_1.23-00ADD8?logo=go)
 ![Frontend](https://img.shields.io/badge/Frontend-Angular_21-DD0031?logo=angular)
@@ -209,33 +209,6 @@ cd frontend && npm install && npm start
 
 OpenVeth translates your visual topology into real Linux kernel networking structures.
 
-```mermaid
-graph TD
-    Browser[Browser] <-->|HTTP / WebSocket| Frontend[Angular + Cytoscape.js]
-    Frontend <-->|REST API| Backend[Go + Gin]
-
-    Backend --> Docker[Docker SDK]
-    Backend --> Netlink[Netlink API]
-    Backend --> DB[(SQLite / PostgreSQL)]
-
-    Docker --> Containers
-    Netlink --> Veth[Veth Pairs]
-
-    subgraph Containers [Network Nodes]
-        H[HOST - Alpine]
-        R[ROUTER - FRR]
-        S[SWITCH - Bridge]
-        HB[HUB - Repeater]
-        SRV[SERVER - Debian+systemd]
-        MON[MONITOR - Grafana+Prometheus]
-        TST[TESTER - wrk/k6/siege/iperf3]
-    end
-
-    Veth -.->|connects| Containers
-
-    C[CLOUD - Internet GW] -.->|Docker bridge| Internet((Internet))
-```
-
 ### How it works
 
 1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH, CLOUD)
@@ -348,29 +321,33 @@ The UI updates in real-time even when the node shuts itself down from within —
 
 ---
 
-## Why OpenVeth?
-
-| Feature | OpenVeth | GNS3 | EVE-NG | Packet Tracer |
-|---------|:--------:|:----:|:------:|:-------------:|
-| Real Linux networking | ✅ | ✅ | ✅ | ❌ |
-| Web-based UI | ✅ | ❌ | ✅ | ❌ |
-| Low resource usage | ✅ | ❌ | ❌ | ✅ |
-| No VMs required | ✅ | ❌ | ❌ | ✅ |
-| Free & Open Source | ✅ | ✅ | ⚠️ | ❌ |
-| FRRouting support | ✅ | ✅ | ✅ | ❌ |
-| Live packet capture | ✅ | ✅ | ✅ | ❌ |
-| SSH between nodes | ✅ | ✅ | ✅ | ❌ |
-| L2 switching / L1 hub | ✅ | ✅ | ✅ | ✅ |
-| Internet connectivity | ✅ | ✅ | ✅ | ❌ |
-| Broadcast/collision domain overlay | ✅ | ❌ | ❌ | ❌ |
-| Visual traceroute | ✅ | ❌ | ❌ | ❌ |
-| Node power off/on | ✅ | ✅ | ✅ | ❌ |
-| Grafana + Prometheus built-in | ✅ | ❌ | ❌ | ❌ |
-| Load testing node built-in | ✅ | ❌ | ❌ | ❌ |
-| SNMP monitoring (router + switch) | ✅ | ✅ | ✅ | ❌ |
-| MAC address table (live) | ✅ | ❌ | ❌ | ❌ |
-
 ---
+
+## Capabilities
+
+| Feature | |
+|---------|:---:|
+| Real Linux kernel networking (no simulation) | ✅ |
+| Web-based visual topology builder | ✅ |
+| Integrated terminals (bash, vtysh) | ✅ |
+| Live packet capture | ✅ |
+| Dynamic routing (OSPF, BGP, IS-IS, Static) | ✅ |
+| SSH between nodes | ✅ |
+| L2 switching / L1 hub | ✅ |
+| Internet connectivity via Cloud node | ✅ |
+| Broadcast & collision domain overlay | ✅ |
+| Visual traceroute | ✅ |
+| Route highlight — hover a route, see the cable | ✅ |
+| Node power off/on | ✅ |
+| Link enable/disable (simulate failures) | ✅ |
+| Grafana + Prometheus built-in (Monitor node) | ✅ |
+| Load testing built-in (wrk, k6, iperf3) | ✅ |
+| SNMP monitoring (router + switch) | ✅ |
+| MAC address table (live) | ✅ |
+| Filesystem snapshots (docker commit) | ✅ |
+| Export/import topologies as YAML | ✅ |
+| No VMs required | ✅ |
+| Free & Open Source (AGPLv3) | ✅ |
 
 ---
 
