@@ -1,4 +1,10 @@
-/** 10 distinct colors for domain visualization. */
+/**
+ * 10 distinct colors for domain/subnet visualization.
+ * RESERVED — do not add: ROUTE_HIGHLIGHT_COLOR or ROUTE_HIGHLIGHT_STATIC_COLOR.
+ */
+export const ROUTE_HIGHLIGHT_COLOR = '#FFD700';
+export const ROUTE_HIGHLIGHT_STATIC_COLOR = '#ffffff';
+
 export const DOMAIN_COLORS = [
   '#3b82f6', // blue
   '#ef4444', // red

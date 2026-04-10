@@ -195,7 +195,8 @@
           (openCapture)="onOpenCapture($any($event))"
           (deleteNode)="onDeleteNode($event)"
           (deleteLink)="onDeleteLink($event)"
-          (close)="onNodeSelected(null)">
+          (close)="onNodeSelected(null)"
+          (routeHover)="canvasComponent.highlightRoute($event)">
       </app-properties-panel>
   </div>
 

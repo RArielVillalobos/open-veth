@@ -6,6 +6,7 @@ import cytoscape from 'cytoscape';
 import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse, NODE_TYPES } from '../../../models/topology.model';
 import { DOMAIN_COLORS } from './domain-colors';
 import { parseNetworkAddress } from '../../utils/network-utils';
+import { edgeMatchesSubnet, edgeMatchesGateway } from '../../utils/route-highlight.utils';
 import { getCytoscapeStyles } from './cytoscape-styles';
 
 @Component({
@@ -40,6 +41,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   nodePowerToggle = output<string>();
 
   private cy!: cytoscape.Core;
+  private hasActiveHighlight = false;
   private canvasReady = false;
   private resizeObserver!: ResizeObserver;
   private overlayCtx: CanvasRenderingContext2D | null = null;
@@ -266,6 +268,35 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   fitToView() {
     if (this.cy) {
       this.cy.fit(undefined, 50);
+    }
+  }
+
+  highlightRoute(info: { subnet: string | null; gateway: string | null } | null): void {
+    if (!this.cy) return;
+    if (this.hasActiveHighlight) {
+      this.cy.edges().removeClass('route-highlight route-highlight-static');
+      this.hasActiveHighlight = false;
+    }
+    if (!info) return;
+
+    if (info.subnet) {
+      this.cy.edges().filter(e =>
+        edgeMatchesSubnet(
+          (e.data('source_int') as string) || '',
+          (e.data('target_int') as string) || '',
+          info.subnet!
+        )
+      ).addClass('route-highlight');
+      this.hasActiveHighlight = true;
+    } else if (info.gateway) {
+      this.cy.edges().filter(e =>
+        edgeMatchesGateway(
+          (e.data('source_int') as string) || '',
+          (e.data('target_int') as string) || '',
+          info.gateway!
+        )
+      ).addClass('route-highlight-static');
+      this.hasActiveHighlight = true;
     }
   }
 

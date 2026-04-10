@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { Node, Link, RouteInfo, MacEntry } from '../../../../models/topology.model';
 import { TopologyService } from '../../../../core/services/topology.service';
 import { ToastService } from '../../../../core/services/toast.service';
+import { ROUTE_HIGHLIGHT_COLOR, ROUTE_HIGHLIGHT_STATIC_COLOR } from '../../../../shared/components/topology-canvas/domain-colors';
 
 @Component({
   selector: 'app-properties-panel',
@@ -20,6 +21,10 @@ export class PropertiesPanelComponent {
   deleteNode = output<string>();
   deleteLink = output<string>();
   close = output<void>();
+  routeHover = output<{ subnet: string | null; gateway: string | null } | null>();
+
+  readonly routeHighlightColor = ROUTE_HIGHLIGHT_COLOR;
+  readonly routeHighlightStaticColor = ROUTE_HIGHLIGHT_STATIC_COLOR;
 
   private service = inject(TopologyService);
   private toast = inject(ToastService);
@@ -158,6 +163,18 @@ export class PropertiesPanelComponent {
     if (!addrInfo || addrInfo.length === 0) return 'No IP';
     const ipv4 = addrInfo.find((a: any) => !a.local.includes(':'));
     return ipv4 ? `${ipv4.local}/${ipv4.prefixlen}` : 'No IPv4';
+  }
+
+  onRouteMouseEnter(r: RouteInfo): void {
+    if (r.dst === 'default') return;
+    this.routeHover.emit({
+      subnet: r.protocol === 'kernel' ? r.dst : null,
+      gateway: r.gateway || null
+    });
+  }
+
+  onRouteMouseLeave(): void {
+    this.routeHover.emit(null);
   }
 
   getNetwork(addrInfo: any[] | undefined): string | null {

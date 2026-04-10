@@ -1,5 +1,5 @@
 import cytoscape from 'cytoscape';
-import { DOMAIN_COLORS } from './domain-colors';
+import { DOMAIN_COLORS, ROUTE_HIGHLIGHT_COLOR, ROUTE_HIGHLIGHT_STATIC_COLOR } from './domain-colors';
 
 function generateDomainStyles(): cytoscape.StylesheetStyle[] {
   const styles: cytoscape.StylesheetStyle[] = [];
@@ -157,7 +157,23 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       }
     },
     ...generateDomainStyles(),
-  ...generateSubnetStyles()
+  ...generateSubnetStyles(),
+    {
+      selector: 'edge.route-highlight',
+      style: {
+        'line-color': ROUTE_HIGHLIGHT_COLOR,
+        'width': 6,
+        'opacity': 1,
+      }
+    },
+    {
+      selector: 'edge.route-highlight-static',
+      style: {
+        'line-color': ROUTE_HIGHLIGHT_STATIC_COLOR,
+        'width': 6,
+        'opacity': 1,
+      }
+    },
   ];
 }
 
