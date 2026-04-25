@@ -19,6 +19,29 @@
 
 ---
 
+## 📚 Documentation & Labs
+
+Step-by-step hands-on labs for learning networking, routing, and services:
+
+👉 **[https://RArielVillalobos.github.io/openveth-labs/](https://RArielVillalobos.github.io/openveth-labs/)**
+
+Covers networking fundamentals: connectivity, ARP, subnetting, routing, DHCP, DNS, firewall, NAT.
+
+---
+
+## Why real containers?
+
+OpenVeth uses real Linux containers, not simulations.
+
+- **Real commands:** `iproute2`, `iptables`, `tcpdump`, `systemctl` — the same tools you use in production.
+- **Real packet capture:** `tcpdump` on every cable, seeing actual frames.
+- **Real services:** run nginx, sshd, nfs, or whatever you install.
+- **Real failures:** when something breaks, it breaks for the same reasons it breaks in production.
+
+If you want to understand why a network fails, you need to break a real one first.
+
+---
+
 ## Use Cases
 
 - **Networking Courses**: Hands-on labs for CCNA, Network+, Linux networking — routing, switching, VLANs, NAT
