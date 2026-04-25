@@ -23,7 +23,7 @@
 
 Step-by-step hands-on labs for learning networking, routing, and services:
 
-👉 **[https://RArielVillalobos.github.io/openveth-labs/](https://RArielVillalobos.github.io/openveth-labs/)**
+👉 **[https://RArielVillalobos.github.io/open-veth-labs/](https://RArielVillalobos.github.io/openveth-labs/)**
 
 Covers networking fundamentals: connectivity, ARP, subnetting, routing, DHCP, DNS, firewall, NAT.
 
