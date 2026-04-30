@@ -1,30 +1,41 @@
-<svg viewBox="4 4 56 56" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="4 4 56 56" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Switch</title>
   <defs>
-    <linearGradient id="switchGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="ov-switchGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
     </linearGradient>
   </defs>
-  
+
   <!-- Main body with gradient -->
-  <rect x="4" y="8" width="56" height="48" rx="8" fill="url(#switchGrad)"/>
-  
+  <rect x="6" y="10" width="52" height="44" rx="6" fill="url(#ov-switchGrad)"/>
+
   <!-- Inner highlight line -->
-  <rect x="8" y="12" width="48" height="40" rx="6" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-  
-  <!-- Switch ports/lights -->
-  <g fill="white" opacity="0.9">
-    <circle cx="18" cy="32" r="4"/>
-    <circle cx="28" cy="32" r="4"/>
-    <circle cx="36" cy="32" r="4"/>
-    <circle cx="46" cy="32" r="4"/>
+  <rect x="9" y="13" width="46" height="38" rx="4" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+
+  <!-- Port row background -->
+  <rect x="12" y="24" width="40" height="18" rx="3" fill="rgba(0,0,0,0.15)"/>
+
+  <!-- Switch ports (RJ45 style) -->
+  <g fill="#fef3c7">
+    <rect x="15" y="29" width="5" height="8" rx="1"/>
+    <rect x="22" y="29" width="5" height="8" rx="1"/>
+    <rect x="29" y="29" width="5" height="8" rx="1"/>
+    <rect x="36" y="29" width="5" height="8" rx="1"/>
+    <rect x="43" y="29" width="5" height="8" rx="1"/>
   </g>
-  
-  <!-- Bidirectional arrows -->
-  <g fill="white" opacity="0.6">
-    <path d="M6 22 L12 19 V25 Z"/>
-    <path d="M58 22 L52 19 V25 Z"/>
-    <path d="M6 42 L12 39 V45 Z"/>
-    <path d="M58 42 L52 39 V45 Z"/>
+
+  <!-- Port LEDs -->
+  <g>
+    <circle cx="17.5" cy="26.5" r="1.2" fill="#4ade80"/>
+    <circle cx="24.5" cy="26.5" r="1.2" fill="#4ade80"/>
+    <circle cx="31.5" cy="26.5" r="1.2" fill="#fbbf24"/>
+    <circle cx="38.5" cy="26.5" r="1.2" fill="#4ade80"/>
+    <circle cx="45.5" cy="26.5" r="1.2" fill="#94a3b8" opacity="0.6"/>
   </g>
+
+  <!-- Bottom label bar -->
+  <rect x="15" y="46" width="34" height="4" rx="1" fill="rgba(0,0,0,0.2)"/>
+  <rect x="17" y="47" width="8" height="2" rx="0.5" fill="rgba(255,255,255,0.5)"/>
+  <rect x="27" y="47" width="4" height="2" rx="0.5" fill="rgba(255,255,255,0.3)"/>
 </svg>

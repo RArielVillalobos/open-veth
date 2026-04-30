@@ -6,6 +6,7 @@ import cytoscape from 'cytoscape';
 import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse, NODE_TYPES } from '../../../models/topology.model';
 import { DOMAIN_COLORS } from './domain-colors';
 import { parseNetworkAddress } from '../../utils/network-utils';
+import { resolveSubnetColors } from '../../utils/subnet-colors.utils';
 import { edgeMatchesSubnet, edgeMatchesGateway } from '../../utils/route-highlight.utils';
 import { getCytoscapeStyles } from './cytoscape-styles';
 
@@ -670,31 +671,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       edge.removeData('subnet');
     });
 
-    const networkCache = new Map<string, string>();
-    nodeIfaceIPs.forEach(ifaceMap => {
-      ifaceMap.forEach((ipWithPrefix) => {
-        const net = parseNetworkAddress(ipWithPrefix);
-        if (net) networkCache.set(ipWithPrefix, net);
-      });
-    });
-
-    const allSubnets = new Set(networkCache.values());
-    if (allSubnets.size < 2) return;
-
-    const subnetColorIndex = new Map<string, number>();
-    [...allSubnets].forEach((subnet, i) => subnetColorIndex.set(subnet, i % DOMAIN_COLORS.length));
-
-    this.links().forEach(link => {
-      const srcIP = nodeIfaceIPs.get(link.source)?.get(link.source_int);
-      if (!srcIP) return;
-      const net = networkCache.get(srcIP);
-      if (!net) return;
-      const colorIndex = subnetColorIndex.get(net);
-      if (colorIndex === undefined) return;
-      const edge = this.cy.getElementById(link.id);
+    const colorMap = resolveSubnetColors(this.links(), nodeIfaceIPs);
+    colorMap.forEach((info, linkId) => {
+      const edge = this.cy.getElementById(linkId);
       if (!edge.empty()) {
-        edge.addClass(`subnet-${colorIndex}`);
-        edge.data('subnet', net);
+        edge.addClass(`subnet-${info.colorIndex}`);
+        edge.data('subnet', info.subnet);
       }
     });
   }

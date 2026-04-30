@@ -910,7 +910,7 @@ func (m *Manager) ConfigureRoute(ctx context.Context, containerID, dst, gateway,
 		return fmt.Errorf("configure route rejected: %v", err)
 	}
 
-	cmd := []string{"ip", "route", "add", dst, "via", gateway, "dev", dev}
+	cmd := []string{"ip", "route", "replace", dst, "via", gateway, "dev", dev}
 	execConfig := container.ExecOptions{
 		Cmd:          cmd,
 		AttachStdout: true,
