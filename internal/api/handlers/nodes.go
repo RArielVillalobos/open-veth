@@ -75,6 +75,7 @@ func (h *Handler) CreateNode(c *gin.Context) {
 	}
 
 	// Persist config (gorm:"-" fields are NOT saved)
+	node.Status = models.NodeStatusRunning
 	if err := h.Repo.SaveNode(node); err != nil {
 		h.Logger.Error("failed to save node to DB, cleaning up container", "name", node.Name, "error", err)
 		_ = h.Manager.DeleteNode(c.Request.Context(), node.Name)

@@ -121,6 +121,12 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 
 // ReconcileState ensures Docker matches the Database state (The Janitor)
 func (h *Handler) ReconcileState(ctx context.Context) error {
+	h.reconciling.Store(true)
+	defer h.reconciling.Store(false)
+
+	h.labOpMu.Lock()
+	defer h.labOpMu.Unlock()
+
 	h.Logger.Info("running startup reconciliation")
 
 	// 1. Gather state from Docker and DB

@@ -123,11 +123,28 @@ func (h *Handler) SaveLabState(c *gin.Context) {
 	}
 	h.hydrateNodes(nodes)
 
-	configs, routeConfigs, hasRunning := h.captureLabState(ctx, labID, nodes)
+	// Detect early if there are any running containers. If none, return 409
+	// before checking Manager, so tests without Docker get the right error.
+	// Use Status (persisted by the Docker watcher) rather than ContainerID,
+	// because stopped containers retain their ContainerID in RuntimeStore.
+	hasRunning := false
+	for _, node := range nodes {
+		if node.Status == models.NodeStatusRunning {
+			hasRunning = true
+			break
+		}
+	}
 	if !hasRunning {
 		c.JSON(http.StatusConflict, gin.H{"error": "laboratory has no running containers; activate it first"})
 		return
 	}
+
+	if h.Manager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "server not fully initialized"})
+		return
+	}
+
+	configs, routeConfigs, _ := h.captureLabState(ctx, labID, nodes)
 
 	if err := h.Repo.SaveInterfaceConfigs(labID, configs); err != nil {
 		h.Logger.Error("failed to save interface configs", "lab", labID, "error", err)
@@ -318,6 +335,12 @@ func (h *Handler) runActivation(ctx context.Context, labID string) {
 			h.BroadcastLabActivationFailed(labID, "internal error during activation")
 		}
 	}()
+
+	if h.Manager == nil || h.Network == nil {
+		h.Logger.Error("cannot activate laboratory: manager or network not initialized", "lab", labID)
+		h.BroadcastLabActivationFailed(labID, "server not fully initialized")
+		return
+	}
 
 	// 1. Save current active lab state before destroying containers
 	if err := h.saveAllLabsStateLocked(ctx); err != nil {

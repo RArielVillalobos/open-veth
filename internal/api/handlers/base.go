@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"open-veth/internal/config"
@@ -26,6 +27,10 @@ type Handler struct {
 	// or rebuild labs. Prevents the auto-save goroutine from reading
 	// stale containers while ActivateLaboratory is mid-nuke.
 	labOpMu sync.Mutex
+
+	// reconciling is set while ReconcileState is rebuilding containers.
+	// The Docker watcher ignores events during this window.
+	reconciling atomic.Bool
 }
 
 // NewHandler creates a new handler with all dependencies
@@ -39,6 +44,11 @@ func NewHandler(mgr *orchestrator.Manager, repo storage.Repository, logger *slog
 		Config:   cfg,
 		EventHub: NewNetworkEventHub(),
 	}
+}
+
+// IsReconciling returns true if ReconcileState is currently rebuilding containers.
+func (h *Handler) IsReconciling() bool {
+	return h.reconciling.Load()
 }
 
 // hydrateNode populates runtime state (ContainerID, PID, ServicePorts) from the in-memory RuntimeStore

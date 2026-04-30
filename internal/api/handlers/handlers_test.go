@@ -80,10 +80,18 @@ func setupRouter(h *Handler) *gin.Engine {
 		api.GET("/sniff", h.HandleSniff)
 
 		api.DELETE("/laboratories/:id/cleanup", h.CleanupLaboratory)
+		api.POST("/laboratories/:id/activate", h.ActivateLaboratory)
+		api.POST("/laboratories/:id/save-state", h.SaveLabState)
 
+		api.GET("/nodes/:id/interfaces", h.GetNodeInterfaces)
+		api.GET("/nodes/:id/routes", h.GetNodeRoutes)
+		api.POST("/nodes/:id/stop", h.StopNode)
+		api.POST("/nodes/:id/start", h.StartNode)
 		api.POST("/nodes/:id/traceroute", h.RunTraceroute)
 		api.POST("/nodes/:id/upload", h.UploadFile)
 		api.GET("/nodes/:id/mactable", h.GetNodeMacTable)
+
+		api.DELETE("/system/cleanup", h.HandleCleanup)
 	}
 	return r
 }
