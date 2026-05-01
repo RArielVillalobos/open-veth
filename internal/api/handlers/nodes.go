@@ -50,9 +50,9 @@ func (h *Handler) CreateNode(c *gin.Context) {
 		return
 	}
 
-	// Default LabID if not provided
 	if node.LabID == "" {
-		node.LabID = "lab-1"
+		c.JSON(http.StatusBadRequest, gin.H{"error": "lab_id is required"})
+		return
 	}
 
 	// SECURITY: Override user-provided image with official image

@@ -36,9 +36,9 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		return
 	}
 
-	// Default LabID if not provided
 	if link.LabID == "" {
-		link.LabID = "lab-1"
+		c.JSON(http.StatusBadRequest, gin.H{"error": "lab_id is required"})
+		return
 	}
 
 	// New links are always enabled
