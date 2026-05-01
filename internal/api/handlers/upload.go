@@ -15,14 +15,8 @@ import (
 func (h *Handler) UploadFile(c *gin.Context) {
 	nodeID := c.Param("id")
 
-	node, found := h.Repo.GetNode(nodeID)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+	node, ok := h.getRunningNode(c, nodeID)
+	if !ok {
 		return
 	}
 

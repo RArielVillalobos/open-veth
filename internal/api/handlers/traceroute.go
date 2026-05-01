@@ -30,15 +30,8 @@ type TracerouteResponse struct {
 // RunTraceroute executes traceroute from a node and resolves hops to topology elements
 func (h *Handler) RunTraceroute(c *gin.Context) {
 	id := c.Param("id")
-	node, found := h.Repo.GetNode(id)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+	node, ok := h.getRunningNode(c, id)
+	if !ok {
 		return
 	}
 

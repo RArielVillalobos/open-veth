@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"open-veth/internal/models"
 	"open-veth/internal/orchestrator"
 	"open-veth/internal/storage"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Handler contains shared dependencies for all handlers
@@ -67,6 +70,22 @@ func (h *Handler) hydrateNodes(nodes []models.Node) {
 	for i := range nodes {
 		h.hydrateNode(&nodes[i])
 	}
+}
+
+// getRunningNode fetches and hydrates a node by ID. Writes a 404 if not found
+// or a 503 if the node has no running container. Returns (node, false) on error.
+func (h *Handler) getRunningNode(c *gin.Context, id string) (models.Node, bool) {
+	node, found := h.Repo.GetNode(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return models.Node{}, false
+	}
+	h.hydrateNode(&node)
+	if node.ContainerID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+		return models.Node{}, false
+	}
+	return node, true
 }
 
 // storeMonitorPorts retrieves the dynamically assigned host ports for a MONITOR node.

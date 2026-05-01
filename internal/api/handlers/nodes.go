@@ -202,15 +202,8 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 // StopNode stops a running node container without deleting it
 func (h *Handler) StopNode(c *gin.Context) {
 	id := c.Param("id")
-	node, found := h.Repo.GetNode(id)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node has no container"})
+	node, ok := h.getRunningNode(c, id)
+	if !ok {
 		return
 	}
 
@@ -234,15 +227,8 @@ func (h *Handler) StopNode(c *gin.Context) {
 // StartNode starts a stopped node container
 func (h *Handler) StartNode(c *gin.Context) {
 	id := c.Param("id")
-	node, found := h.Repo.GetNode(id)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node has no container"})
+	node, ok := h.getRunningNode(c, id)
+	if !ok {
 		return
 	}
 
@@ -352,15 +338,8 @@ func (h *Handler) StartNode(c *gin.Context) {
 // GetNodeInterfaces returns live interface information for a node
 func (h *Handler) GetNodeInterfaces(c *gin.Context) {
 	id := c.Param("id")
-	node, found := h.Repo.GetNode(id)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+	node, ok := h.getRunningNode(c, id)
+	if !ok {
 		return
 	}
 
@@ -377,15 +356,8 @@ func (h *Handler) GetNodeInterfaces(c *gin.Context) {
 // GetNodeMacTable returns the MAC address table (bridge FDB) for a switch node
 func (h *Handler) GetNodeMacTable(c *gin.Context) {
 	id := c.Param("id")
-	node, found := h.Repo.GetNode(id)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+	node, ok := h.getRunningNode(c, id)
+	if !ok {
 		return
 	}
 
@@ -402,15 +374,8 @@ func (h *Handler) GetNodeMacTable(c *gin.Context) {
 // GetNodeRoutes returns the routing table for a node
 func (h *Handler) GetNodeRoutes(c *gin.Context) {
 	id := c.Param("id")
-	node, found := h.Repo.GetNode(id)
-	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-	h.hydrateNode(&node)
-
-	if node.ContainerID == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "node is not running"})
+	node, ok := h.getRunningNode(c, id)
+	if !ok {
 		return
 	}
 
