@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -125,40 +126,92 @@ func (h *Handler) HandleImport(c *gin.Context) {
 
 	labID := c.DefaultQuery("lab_id", "lab-1")
 
-	// Validate node types before touching any state
-	for _, n := range imported.Nodes {
-		if !models.IsValidNodeType(n.Type) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unknown node type: %q", n.Type)})
-			return
-		}
+	// 2. Validate payload before verifying lab existence so that malformed
+	// YAML returns 400 even when the lab does not exist.
+	if err := h.validateImport(imported); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	// Validate link references (all source/target names must exist in the node list)
-	nodeNames := make(map[string]bool, len(imported.Nodes))
-	for _, n := range imported.Nodes {
-		nodeNames[n.Name] = true
-	}
-	for _, l := range imported.Links {
-		if !nodeNames[l.Source] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("link references unknown node: %q", l.Source)})
-			return
-		}
-		if !nodeNames[l.Target] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("link references unknown node: %q", l.Target)})
-			return
-		}
-	}
-
-	// Verify the lab exists before touching anything
 	if _, ok := h.Repo.GetLaboratory(labID); !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("laboratory %q not found", labID)})
 		return
 	}
 
+	h.labOpMu.Lock()
+	defer h.labOpMu.Unlock()
+
 	h.Logger.Info("importing topology", "name", imported.Name, "nodes", len(imported.Nodes), "links", len(imported.Links))
 
-	// 2. Cleanup current state (Containers and DB)
 	ctx := c.Request.Context()
+	if err := h.cleanupImportState(ctx, labID, imported.Name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Recreate Nodes
+	nameToID, nodeErrors := h.importNodes(ctx, labID, imported.Nodes)
+
+	// 4. Recreate Links
+	linkErrors := h.importLinks(ctx, labID, imported.Links, nameToID)
+
+	// 5. Apply configs
+	ifaceConfigs, routeConfigs, configErrors := h.applyNodeConfigs(ctx, labID, imported.Nodes, nameToID)
+
+	if len(ifaceConfigs) > 0 {
+		if err := h.Repo.SaveInterfaceConfigs(labID, ifaceConfigs); err != nil {
+			h.Logger.Warn("failed to persist interface configs during import", "error", err)
+		}
+	}
+	if len(routeConfigs) > 0 {
+		if err := h.Repo.SaveRouteConfigs(labID, routeConfigs); err != nil {
+			h.Logger.Warn("failed to persist route configs during import", "error", err)
+		}
+	}
+
+	var errors []string
+	errors = append(errors, nodeErrors...)
+	errors = append(errors, linkErrors...)
+	errors = append(errors, configErrors...)
+
+	status := http.StatusOK
+	if len(errors) > 0 {
+		status = http.StatusMultiStatus
+	}
+
+	h.Logger.Info("import completed", "nodes", len(imported.Nodes), "links", len(imported.Links), "errors", len(errors))
+
+	c.JSON(status, gin.H{
+		"message": "import process completed",
+		"nodes":   len(imported.Nodes),
+		"links":   len(imported.Links),
+		"errors":  errors,
+	})
+}
+
+// validateImport checks node types and link references before mutating any state.
+func (h *Handler) validateImport(imported models.LabExport) error {
+	nodeNames := make(map[string]bool, len(imported.Nodes))
+	for _, n := range imported.Nodes {
+		if !models.IsValidNodeType(n.Type) {
+			return fmt.Errorf("unknown node type: %q", n.Type)
+		}
+		nodeNames[n.Name] = true
+	}
+	for _, l := range imported.Links {
+		if !nodeNames[l.Source] {
+			return fmt.Errorf("link references unknown node: %q", l.Source)
+		}
+		if !nodeNames[l.Target] {
+			return fmt.Errorf("link references unknown node: %q", l.Target)
+		}
+	}
+
+	return nil
+}
+
+// cleanupImportState removes existing containers and recreates the lab record.
+func (h *Handler) cleanupImportState(ctx context.Context, labID string, newName string) error {
 	existingNodes, _ := h.Repo.ListNodesByLab(labID)
 	for _, n := range existingNodes {
 		if err := h.Manager.DeleteNode(ctx, n.Name); err != nil {
@@ -167,24 +220,26 @@ func (h *Handler) HandleImport(c *gin.Context) {
 		h.Runtime.Delete(n.ID)
 	}
 
-	// Capture existing lab before deleting so we can restore on failure
 	existingLab, _ := h.Repo.GetLaboratory(labID)
 	if err := h.Repo.DeleteLaboratory(labID); err != nil {
 		h.Logger.Warn("failed to delete old lab during import", "lab", labID, "error", err)
 	}
-	if err := h.Repo.SaveLaboratory(models.Laboratory{ID: labID, Name: imported.Name}); err != nil {
+	if err := h.Repo.SaveLaboratory(models.Laboratory{ID: labID, Name: newName}); err != nil {
 		h.Logger.Error("failed to create lab during import", "lab", labID, "error", err)
-		// Best-effort restore so the lab isn't left in a deleted state
 		_ = h.Repo.SaveLaboratory(existingLab)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create laboratory"})
-		return
+		return fmt.Errorf("failed to create laboratory")
 	}
 
-	// 3. Recreate Nodes — generate fresh IDs, build name→ID map
-	var errors []string
-	nameToID := make(map[string]string, len(imported.Nodes))
+	return nil
+}
 
-	for _, n := range imported.Nodes {
+// importNodes creates containers for the given node exports and persists them.
+// It returns a name→ID map and a slice of error messages.
+func (h *Handler) importNodes(ctx context.Context, labID string, nodes []models.NodeExport) (map[string]string, []string) {
+	nameToID := make(map[string]string, len(nodes))
+	var errors []string
+
+	for _, n := range nodes {
 		nodeModel := models.Node{
 			ID:    randID("node-"),
 			LabID: labID,
@@ -211,17 +266,26 @@ func (h *Handler) HandleImport(c *gin.Context) {
 		nodeModel.PID = pid
 		if err := h.Repo.SaveNode(nodeModel); err != nil {
 			h.Logger.Error("import node save failed", "node", n.Name, "error", err)
+			_ = h.Manager.DeleteNode(ctx, nodeModel.Name)
+			h.Runtime.Delete(nodeModel.ID)
 			errors = append(errors, fmt.Sprintf("Failed to save node %s: %v", n.Name, err))
 			continue
 		}
 		nameToID[n.Name] = nodeModel.ID
 	}
 
-	// 4. Recreate Links — resolve source/target names to IDs
-	for _, l := range imported.Links {
-		sourceID, okS := nameToID[l.Source]
-		targetID, okT := nameToID[l.Target]
-		if !okS || !okT {
+	return nameToID, errors
+}
+
+// importLinks creates veth pairs for the given link exports.
+// It expects nameToID to contain valid mappings for every referenced node.
+func (h *Handler) importLinks(ctx context.Context, labID string, links []models.LinkExport, nameToID map[string]string) []string {
+	var errors []string
+
+	for _, l := range links {
+		sourceID, hasSource := nameToID[l.Source]
+		targetID, hasTarget := nameToID[l.Target]
+		if !hasSource || !hasTarget {
 			errors = append(errors, fmt.Sprintf("Link %s→%s skipped: one or both nodes failed to create", l.Source, l.Target))
 			continue
 		}
@@ -236,44 +300,52 @@ func (h *Handler) HandleImport(c *gin.Context) {
 			Enabled:   l.Enabled,
 		}
 
-		source, okS := h.Repo.GetNode(sourceID)
-		target, okT := h.Repo.GetNode(targetID)
-		if okS {
+		source, sourceFound := h.Repo.GetNode(sourceID)
+		target, targetFound := h.Repo.GetNode(targetID)
+		if sourceFound {
 			h.hydrateNode(&source)
 		}
-		if okT {
+		if targetFound {
 			h.hydrateNode(&target)
 		}
 
-		if okS && okT {
-			if err := h.Network.CreateLink(linkModel, source.PID, target.PID); err != nil {
-				h.Logger.Warn("import link failed", "source", l.Source, "target", l.Target, "error", err)
-				errors = append(errors, fmt.Sprintf("Failed to create link %s→%s: %v", l.Source, l.Target, err))
-			} else {
-				if models.NeedsBridge(source.Type) {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt, source.Type)
-				}
-				if models.NeedsBridge(target.Type) {
-					_ = h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt, target.Type)
-				}
-				if err := h.Repo.SaveLink(linkModel); err != nil {
-					h.Logger.Error("import link save failed", "source", l.Source, "target", l.Target, "error", err)
-					errors = append(errors, fmt.Sprintf("Failed to save link %s→%s: %v", l.Source, l.Target, err))
-				}
-			}
-		} else {
+		if !sourceFound || !targetFound {
 			errors = append(errors, fmt.Sprintf("Link %s→%s skipped: source or target not found in repo", l.Source, l.Target))
+			continue
+		}
+
+		if err := h.Network.CreateLink(linkModel, source.PID, target.PID); err != nil {
+			h.Logger.Warn("import link failed", "source", l.Source, "target", l.Target, "error", err)
+			errors = append(errors, fmt.Sprintf("Failed to create link %s→%s: %v", l.Source, l.Target, err))
+			continue
+		}
+
+		if models.NeedsBridge(source.Type) {
+			_ = h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt, source.Type)
+		}
+		if models.NeedsBridge(target.Type) {
+			_ = h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt, target.Type)
+		}
+		if err := h.Repo.SaveLink(linkModel); err != nil {
+			h.Logger.Error("import link save failed", "source", l.Source, "target", l.Target, "error", err)
+			errors = append(errors, fmt.Sprintf("Failed to save link %s→%s: %v", l.Source, l.Target, err))
 		}
 	}
 
-	// 5. Apply and persist interface/route configs
+	return errors
+}
+
+// applyNodeConfigs pushes interface and route configurations into running
+// containers and returns the config slices for persistence.
+func (h *Handler) applyNodeConfigs(ctx context.Context, labID string, nodes []models.NodeExport, nameToID map[string]string) ([]models.InterfaceConfig, []models.RouteConfig, []string) {
 	var ifaceConfigs []models.InterfaceConfig
 	var routeConfigs []models.RouteConfig
+	var errors []string
 
-	for _, n := range imported.Nodes {
+	for _, n := range nodes {
 		nodeID, ok := nameToID[n.Name]
 		if !ok {
-			continue // node failed to create
+			continue
 		}
 		node, ok := h.Repo.GetNode(nodeID)
 		if !ok {
@@ -313,28 +385,5 @@ func (h *Handler) HandleImport(c *gin.Context) {
 		}
 	}
 
-	if len(ifaceConfigs) > 0 {
-		if err := h.Repo.SaveInterfaceConfigs(labID, ifaceConfigs); err != nil {
-			h.Logger.Warn("failed to persist interface configs during import", "error", err)
-		}
-	}
-	if len(routeConfigs) > 0 {
-		if err := h.Repo.SaveRouteConfigs(labID, routeConfigs); err != nil {
-			h.Logger.Warn("failed to persist route configs during import", "error", err)
-		}
-	}
-
-	status := http.StatusOK
-	if len(errors) > 0 {
-		status = http.StatusMultiStatus
-	}
-
-	h.Logger.Info("import completed", "nodes", len(imported.Nodes), "links", len(imported.Links), "errors", len(errors))
-
-	c.JSON(status, gin.H{
-		"message": "import process completed",
-		"nodes":   len(imported.Nodes),
-		"links":   len(imported.Links),
-		"errors":  errors,
-	})
+	return ifaceConfigs, routeConfigs, errors
 }

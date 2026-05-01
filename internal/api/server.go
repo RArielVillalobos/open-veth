@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"open-veth/internal/api/handlers"
@@ -175,10 +176,16 @@ func (s *Server) StartEventHub() {
 
 // StartDockerWatcher listens to Docker container events and propagates node
 // lifecycle changes (die/start) to connected WebSocket clients.
+// Events for the same container are debounced (300 ms) to avoid storms when
+// many containers change state in rapid succession.
 func (s *Server) StartDockerWatcher(ctx context.Context) {
 	go func() {
 		s.logger.Info("starting docker event watcher")
-		s.handler.Manager.WatchEvents(ctx, func(ev orchestrator.ContainerEvent) {
+
+		var debounceMu sync.Mutex
+		debouncers := make(map[string]*time.Timer)
+
+		processEvent := func(ev orchestrator.ContainerEvent) {
 			if s.handler.IsReconciling() {
 				return
 			}
@@ -191,36 +198,48 @@ func (s *Server) StartDockerWatcher(ctx context.Context) {
 			if !ok {
 				return
 			}
-			// Run DB write + broadcast in a goroutine so the event loop is not blocked
-			go func(n models.Node, action string) {
-				inspect, err := s.handler.Manager.GetDockerClient().ContainerInspect(context.Background(), ev.ContainerID)
-				isRunning := err == nil && inspect.State.Running
 
-				switch action {
-				case "die":
-					if isRunning {
-						s.logger.Debug("stale die event ignored", "container", ev.ContainerID[:min(12, len(ev.ContainerID))])
-						return
-					}
-					n.Status = models.NodeStatusStopped
-					if err := s.handler.Repo.SaveNode(n); err != nil {
-						s.logger.Warn("failed to persist node stopped status", "node", n.Name, "error", err)
-					}
-					s.handler.BroadcastNodeStopped(n.ID, n.LabID)
-					s.logger.Info("node stopped (external)", "name", n.Name)
-				case "start":
-					if !isRunning {
-						s.logger.Debug("stale start event ignored", "container", ev.ContainerID[:min(12, len(ev.ContainerID))])
-						return
-					}
-					n.Status = models.NodeStatusRunning
-					if err := s.handler.Repo.SaveNode(n); err != nil {
-						s.logger.Warn("failed to persist node running status", "node", n.Name, "error", err)
-					}
-					s.handler.BroadcastNodeStarted(n.ID, n.LabID)
-					s.logger.Info("node started (external)", "name", n.Name)
+			inspect, err := s.handler.Manager.GetDockerClient().ContainerInspect(context.Background(), ev.ContainerID)
+			isRunning := err == nil && inspect.State.Running
+
+			switch ev.Action {
+			case "die":
+				if isRunning {
+					s.logger.Debug("stale die event ignored", "container", ev.ContainerID[:min(12, len(ev.ContainerID))])
+					return
 				}
-			}(dbNode, ev.Action)
+				dbNode.Status = models.NodeStatusStopped
+				if err := s.handler.Repo.SaveNode(dbNode); err != nil {
+					s.logger.Warn("failed to persist node stopped status", "node", dbNode.Name, "error", err)
+				}
+				s.handler.BroadcastNodeStopped(dbNode.ID, dbNode.LabID)
+				s.logger.Info("node stopped (external)", "name", dbNode.Name)
+			case "start":
+				if !isRunning {
+					s.logger.Debug("stale start event ignored", "container", ev.ContainerID[:min(12, len(ev.ContainerID))])
+					return
+				}
+				dbNode.Status = models.NodeStatusRunning
+				if err := s.handler.Repo.SaveNode(dbNode); err != nil {
+					s.logger.Warn("failed to persist node running status", "node", dbNode.Name, "error", err)
+				}
+				s.handler.BroadcastNodeStarted(dbNode.ID, dbNode.LabID)
+				s.logger.Info("node started (external)", "name", dbNode.Name)
+			}
+		}
+
+		s.handler.Manager.WatchEvents(ctx, func(ev orchestrator.ContainerEvent) {
+			debounceMu.Lock()
+			if t, ok := debouncers[ev.ContainerID]; ok {
+				t.Stop()
+			}
+			debouncers[ev.ContainerID] = time.AfterFunc(300*time.Millisecond, func() {
+				debounceMu.Lock()
+				delete(debouncers, ev.ContainerID)
+				debounceMu.Unlock()
+				processEvent(ev)
+			})
+			debounceMu.Unlock()
 		})
 	}()
 }

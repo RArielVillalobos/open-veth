@@ -39,6 +39,10 @@ frontend/bazel-out/
 Thumbs.db
 desktop.ini
 
+# Frontend test artifacts
+frontend/test-results/
+frontend/playwright-report/
+
 # Databases
 *.db
 *.db-journal
