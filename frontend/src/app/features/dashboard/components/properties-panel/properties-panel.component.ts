@@ -38,6 +38,7 @@ export class PropertiesPanelComponent {
   uploading = signal(false);
   uploadResult = signal<{ success: boolean; path: string } | null>(null);
   showConnect = signal(false);
+  showInterfaces = signal(false);
 
 
   // Whether the selected node is a bridge-based node (switch/hub) — used for interface display
