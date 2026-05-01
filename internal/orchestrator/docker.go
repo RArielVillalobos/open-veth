@@ -361,9 +361,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.setupBridge(ctx, inspect.ID, node.Name, node.Type)
 			}
 
-		// Rename Docker bridge interface and remove default route for all nodes
-		m.renameMgmtInterface(ctx, inspect.ID, node.Name)
-		m.deleteDefaultRoute(ctx, inspect.ID)
+			// Rename Docker bridge interface and remove default route for all nodes
+			m.renameMgmtInterface(ctx, inspect.ID, node.Name)
+			m.deleteDefaultRoute(ctx, inspect.ID)
 
 			// Re-apply NAT rules (lost on container restart)
 			if node.Type == models.CLOUD {
