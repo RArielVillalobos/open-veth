@@ -421,7 +421,7 @@ func TestCreateLinkDuplicate(t *testing.T) {
 	w := doRequest(r, "POST", "/api/v1/links", models.Link{
 		ID: "link-new99", LabID: "lab-1",
 		SourceID: "n1", TargetID: "n2",
-		SourceInt: "eth1", TargetInt: "eth1",
+		SourceInt: "eth0", TargetInt: "eth0",
 	})
 	if w.Code != http.StatusConflict {
 		t.Errorf("expected 409 for duplicate link, got %d: %s", w.Code, w.Body.String())
@@ -431,7 +431,7 @@ func TestCreateLinkDuplicate(t *testing.T) {
 	w = doRequest(r, "POST", "/api/v1/links", models.Link{
 		ID: "link-new99", LabID: "lab-1",
 		SourceID: "n2", TargetID: "n1",
-		SourceInt: "eth1", TargetInt: "eth1",
+		SourceInt: "eth0", TargetInt: "eth0",
 	})
 	if w.Code != http.StatusConflict {
 		t.Errorf("expected 409 for reverse duplicate, got %d: %s", w.Code, w.Body.String())
@@ -969,7 +969,7 @@ func TestToggleLink_InvalidBody(t *testing.T) {
 	repo.SaveLink(models.Link{
 		ID: "link-12345", LabID: "lab-1",
 		SourceID: "n1", TargetID: "n2",
-		SourceInt: "eth1", TargetInt: "eth1",
+		SourceInt: "eth0", TargetInt: "eth0",
 		Enabled: true,
 	})
 
@@ -989,7 +989,7 @@ func TestToggleLink_DisableAndEnable(t *testing.T) {
 	repo.SaveLink(models.Link{
 		ID: "link-12345", LabID: "lab-1",
 		SourceID: "n1", TargetID: "n2",
-		SourceInt: "eth1", TargetInt: "eth1",
+		SourceInt: "eth0", TargetInt: "eth0",
 		Enabled: true,
 	})
 

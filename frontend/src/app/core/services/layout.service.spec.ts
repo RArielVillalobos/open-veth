@@ -58,36 +58,36 @@ describe('LayoutService', () => {
   });
 
   describe('getNextInterface', () => {
-    it('should return eth1 when no links exist for node', () => {
-      expect(service.getNextInterface('node-1', [])).toBe('eth1');
+    it('should return eth0 when no links exist for node', () => {
+      expect(service.getNextInterface('node-1', [])).toBe('eth0');
     });
 
-    it('should return eth2 when eth1 is in use', () => {
-      const links = [createMockLink({ source: 'node-1', source_int: 'eth1' })];
-      expect(service.getNextInterface('node-1', links)).toBe('eth2');
+    it('should return eth1 when eth0 is in use', () => {
+      const links = [createMockLink({ source: 'node-1', source_int: 'eth0' })];
+      expect(service.getNextInterface('node-1', links)).toBe('eth1');
     });
 
     it('should fill gaps in numbering', () => {
       const links = [
-        createMockLink({ id: 'l1', source: 'node-1', source_int: 'eth1' }),
-        createMockLink({ id: 'l2', source: 'node-1', source_int: 'eth3' }),
+        createMockLink({ id: 'l1', source: 'node-1', source_int: 'eth0' }),
+        createMockLink({ id: 'l2', source: 'node-1', source_int: 'eth2' }),
       ];
-      expect(service.getNextInterface('node-1', links)).toBe('eth2');
+      expect(service.getNextInterface('node-1', links)).toBe('eth1');
     });
 
     it('should count both source and target links', () => {
       const links = [
-        createMockLink({ id: 'l1', source: 'node-1', source_int: 'eth1' }),
-        createMockLink({ id: 'l2', source: 'node-2', target: 'node-1', target_int: 'eth2' }),
+        createMockLink({ id: 'l1', source: 'node-1', source_int: 'eth0' }),
+        createMockLink({ id: 'l2', source: 'node-2', target: 'node-1', target_int: 'eth1' }),
       ];
-      expect(service.getNextInterface('node-1', links)).toBe('eth3');
+      expect(service.getNextInterface('node-1', links)).toBe('eth2');
     });
 
     it('should handle interface names with IP suffix', () => {
       const links = [
-        createMockLink({ id: 'l1', source: 'node-1', source_int: 'eth1\n10.0.0.1/24' }),
+        createMockLink({ id: 'l1', source: 'node-1', source_int: 'eth0\n10.0.0.1/24' }),
       ];
-      expect(service.getNextInterface('node-1', links)).toBe('eth2');
+      expect(service.getNextInterface('node-1', links)).toBe('eth1');
     });
   });
 });

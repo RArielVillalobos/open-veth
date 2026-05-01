@@ -337,12 +337,12 @@ func TestIntegrationActivateLaboratory(t *testing.T) {
 	repo.SaveLink(models.Link{
 		ID: "link-1", LabID: lid,
 		SourceID: n1ID, TargetID: n2ID,
-		SourceInt: "eth1", TargetInt: "eth1",
+		SourceInt: "eth0", TargetInt: "eth0",
 		Enabled: true,
 	})
 	repo.SaveInterfaceConfigs(lid, []models.InterfaceConfig{
-		{LabID: lid, NodeID: n1ID, Interface: "eth1", Address: "10.0.0.1/24"},
-		{LabID: lid, NodeID: n2ID, Interface: "eth1", Address: "10.0.0.2/24"},
+		{LabID: lid, NodeID: n1ID, Interface: "eth0", Address: "10.0.0.1/24"},
+		{LabID: lid, NodeID: n2ID, Interface: "eth0", Address: "10.0.0.2/24"},
 	})
 
 	// Activate lab (async)
@@ -391,7 +391,7 @@ func TestIntegrationActivateLaboratory(t *testing.T) {
 
 	var foundIP1, foundIP2 bool
 	for _, iface := range ifaces1 {
-		if iface.Name == "eth1" {
+		if iface.Name == "eth0" {
 			for _, addr := range iface.IPAddresses {
 				if strings.HasPrefix(addr.Address, "10.0.0.1") {
 					foundIP1 = true
@@ -401,7 +401,7 @@ func TestIntegrationActivateLaboratory(t *testing.T) {
 		}
 	}
 	for _, iface := range ifaces2 {
-		if iface.Name == "eth1" {
+		if iface.Name == "eth0" {
 			for _, addr := range iface.IPAddresses {
 				if strings.HasPrefix(addr.Address, "10.0.0.2") {
 					foundIP2 = true
@@ -411,10 +411,10 @@ func TestIntegrationActivateLaboratory(t *testing.T) {
 		}
 	}
 	if !foundIP1 {
-		t.Error("host1 eth1 does not have expected IP 10.0.0.1/24")
+		t.Error("host1 eth0 does not have expected IP 10.0.0.1/24")
 	}
 	if !foundIP2 {
-		t.Error("host2 eth1 does not have expected IP 10.0.0.2/24")
+		t.Error("host2 eth0 does not have expected IP 10.0.0.2/24")
 	}
 
 	// Verify connectivity: ping from host1 to host2

@@ -248,7 +248,7 @@ func (h *Handler) StartNode(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	// Use CreateNode which handles all post-restart setup:
-	// WaitForReady, eth0→mgmt0 rename, bridge init, cloud NAT, linux gateway
+	// WaitForReady, eth0→docker0 rename, bridge init, cloud NAT, linux gateway
 	if _, err := h.Manager.CreateNode(ctx, node); err != nil {
 		h.Logger.Error("failed to start node", "name", node.Name, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

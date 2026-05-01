@@ -735,7 +735,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       const ifaceMap = new Map<string, string>();
       if (node.interfaces) {
         for (const iface of node.interfaces) {
-          if (iface.ifname === 'lo' || iface.ifname === 'mgmt0') continue;
+          if (iface.ifname === 'docker0') continue;
           const ipv4 = iface.addr_info?.find(a => !a.local.includes(':'));
           if (ipv4) {
             ifaceMap.set(iface.ifname, `${ipv4.local}/${ipv4.prefixlen}`);
@@ -787,7 +787,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           return;
         }
 
-        // Build edge labels: "eth1\n10.0.1.1/24" or just "eth1" if no IP
+        // Build edge labels: "eth0\n10.0.1.1/24" or just "eth0" if no IP
         const srcIP = nodeIfaceIPs.get(link.source)?.get(link.source_int);
         const tgtIP = nodeIfaceIPs.get(link.target)?.get(link.target_int);
         const srcLabel = srcIP ? `${link.source_int}\n${srcIP}` : link.source_int;

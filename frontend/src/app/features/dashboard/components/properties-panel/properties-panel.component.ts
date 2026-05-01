@@ -67,12 +67,12 @@ export class PropertiesPanelComponent {
     return !!(n && n.interfaces && n.interfaces.length > 0);
   });
 
-  // Count active interfaces (excluding lo, mgmt0, and br0 for bridge nodes)
+  // Count active interfaces (excluding docker0 and br0 for bridge nodes)
   activeInterfaceCount = computed(() => {
     const n = this.selectedNode();
     if (!n || !n.interfaces) return 0;
     return n.interfaces.filter(i =>
-      i.ifname !== 'lo' && i.ifname !== 'mgmt0' && !(this.isBridgeNode() && i.ifname === 'br0')
+      i.ifname !== 'docker0' && !(this.isBridgeNode() && i.ifname === 'br0')
     ).length;
   });
 

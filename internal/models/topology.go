@@ -36,10 +36,10 @@ func IsValidNodeType(t NodeType) bool {
 	return false
 }
 
-// KeepEth0 returns true for node types that should NOT rename eth0 to mgmt0.
-// CLOUD nodes keep eth0 to maintain connectivity to Docker bridge (internet access).
+// KeepEth0 is deprecated: all node types now rename eth0 to docker0.
+// Docker bridge connectivity is maintained via docker0.
 func KeepEth0(t NodeType) bool {
-	return t == CLOUD || t == SERVER || t == MONITOR || t == TESTER
+	return false
 }
 
 // SnapshotImageName returns the local Docker image name used to snapshot a node's filesystem.

@@ -238,7 +238,7 @@ OpenVeth translates your visual topology into real Linux kernel networking struc
 2. **Links** → `veth` pairs connecting container namespaces
 3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching. Managed device with terminal access, SNMP daemon, and a live MAC address table visible in the properties panel
 4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames). Unmanaged — no terminal, no SNMP
-5. **CLOUD nodes** → Keep `eth0` connected to the Docker bridge. On creation, automatically enable IP forwarding and set up `iptables MASQUERADE` so connected lab nodes can reach real internet
+5. **CLOUD nodes** → Keep `docker0` connected to the Docker bridge. On creation, automatically enable IP forwarding and set up `iptables MASQUERADE` so connected lab nodes can reach real internet
 6. **Links** → Can be enabled/disabled at runtime (right-click → Disable/Enable) without deleting them, simulating link failures
 7. **Node power** → Nodes can be powered off and on (right-click → Power Off/On). The backend listens to Docker events so the UI updates even when a node shuts itself down from within (e.g. `systemctl poweroff`)
 8. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
@@ -259,24 +259,24 @@ HOST ── ROUTER ── CLOUD ── Internet
 
 On **CLOUD** (terminal):
 ```bash
-ip addr add 10.0.2.2/30 dev eth1
-ip link set eth1 up
+ip addr add 10.0.2.2/30 dev eth0
+ip link set eth0 up
 ip route add 10.0.1.0/30 via 10.0.2.1   # return route per lab subnet
 ```
 
 On **ROUTER** (terminal):
 ```bash
-ip addr add 10.0.1.1/30 dev eth1
-ip addr add 10.0.2.1/30 dev eth2
-ip link set eth1 up && ip link set eth2 up
+ip addr add 10.0.1.1/30 dev eth0
+ip addr add 10.0.2.1/30 dev eth1
+ip link set eth0 up && ip link set eth1 up
 ip route add default via 10.0.2.2
 sysctl -w net.ipv4.ip_forward=1
 ```
 
 On **HOST** (terminal):
 ```bash
-ip addr add 10.0.1.2/30 dev eth1
-ip link set eth1 up
+ip addr add 10.0.1.2/30 dev eth0
+ip link set eth0 up
 ip route add default via 10.0.1.1
 ping 8.8.8.8   # should work
 ```
@@ -293,30 +293,30 @@ nodes:
     x: 200
     y: 150
     interfaces:
-      - interface: eth1
+      - interface: eth0
         address: 10.0.1.1/30
-      - interface: eth2
+      - interface: eth1
         address: 10.0.2.1/30
     routes:
       - dst: 10.0.3.0/24
         gateway: 10.0.2.2
-        dev: eth2
+        dev: eth1
   - name: HOST-1
     type: host
     x: 400
     y: 150
     interfaces:
-      - interface: eth1
+      - interface: eth0
         address: 10.0.1.2/30
     routes:
       - dst: 0.0.0.0/0
         gateway: 10.0.1.1
-        dev: eth1
+        dev: eth0
 links:
   - source: R1
     target: HOST-1
-    source_int: eth1
-    target_int: eth1
+    source_int: eth0
+    target_int: eth0
     enabled: true
 ```
 

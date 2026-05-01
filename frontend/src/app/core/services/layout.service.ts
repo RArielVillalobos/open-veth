@@ -54,7 +54,7 @@ export class LayoutService {
   }
 
   /**
-   * Calculates a robust dynamic interface name (e.g., eth1, eth2) for a node
+   * Calculates a robust dynamic interface name (e.g., eth0, eth1) for a node
    */
   getNextInterface(nodeId: string, links: Link[]): string {
     const usedNames = links
@@ -63,14 +63,14 @@ export class LayoutService {
 
     const usedNumbers = usedNames
       .map(name => {
-        // Handle cases where label might include IP (e.g. "eth1\n10.0.0.1/24")
+        // Handle cases where label might include IP (e.g. "eth0\n10.0.0.1/24")
         const cleanName = name.split('\n')[0];
         return parseInt(cleanName.replace('eth', ''), 10);
       })
       .filter(n => !isNaN(n))
       .sort((a, b) => a - b);
 
-    let nextNum = 1;
+    let nextNum = 0;
     for (const num of usedNumbers) {
       if (num === nextNum) {
         nextNum++;

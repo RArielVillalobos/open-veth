@@ -208,7 +208,7 @@ func (h *Handler) captureLabState(ctx context.Context, labID string, nodes []mod
 		}
 
 		for _, iface := range ifaces {
-			if iface.Name == "lo" || iface.Name == "mgmt0" {
+			if iface.Name == "lo" || iface.Name == "docker0" {
 				continue
 			}
 			for _, addr := range iface.IPAddresses {

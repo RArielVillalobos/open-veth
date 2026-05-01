@@ -132,10 +132,10 @@ func (m *Manager) GetNodeRoutes(ctx context.Context, containerID string) ([]mode
 		return nil, fmt.Errorf("error parsing routes: %v", err)
 	}
 
-	// Filter out mgmt0 routes (internal docker network)
+	// Filter out docker0 routes (internal docker network)
 	var cleanRoutes []models.RouteInfo
 	for _, r := range routes {
-		if r.Dev != "mgmt0" {
+		if r.Dev != "docker0" {
 			cleanRoutes = append(cleanRoutes, r)
 		}
 	}
@@ -361,12 +361,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 				m.setupBridge(ctx, inspect.ID, node.Name, node.Type)
 			}
 
-			// Ensure Management Interface is renamed (idempotent check)
-			// CLOUD nodes keep eth0 to maintain Docker bridge connectivity
-			if !models.KeepEth0(node.Type) {
-				m.renameMgmtInterface(ctx, inspect.ID, node.Name)
-				m.deleteDefaultRoute(ctx, inspect.ID)
-			}
+		// Rename Docker bridge interface and remove default route for all nodes
+		m.renameMgmtInterface(ctx, inspect.ID, node.Name)
+		m.deleteDefaultRoute(ctx, inspect.ID)
 
 			// Re-apply NAT rules (lost on container restart)
 			if node.Type == models.CLOUD {
@@ -399,12 +396,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.logger.Warn("container not ready after start", "name", node.Name, "error", err)
 	}
 
-	// 6. Rename eth0 -> mgmt0 to avoid confusion with lab interfaces
-	// CLOUD nodes keep eth0 to maintain Docker bridge connectivity (internet access)
-	if !models.KeepEth0(node.Type) {
-		m.renameMgmtInterface(ctx, resp.ID, node.Name)
-		m.deleteDefaultRoute(ctx, resp.ID)
-	}
+	// 6. Rename eth0 -> docker0 to free eth0 for lab data interfaces
+	m.renameMgmtInterface(ctx, resp.ID, node.Name)
+	m.deleteDefaultRoute(ctx, resp.ID)
 
 	// 7. If node needs a bridge, initialize 'br0'
 	if models.NeedsBridge(node.Type) {
@@ -483,10 +477,10 @@ func (m *Manager) WaitForReady(ctx context.Context, containerID string) error {
 	return fmt.Errorf("container %s not ready after 2.5s", shortID)
 }
 
-// renameMgmtInterface attempts to rename eth0 to mgmt0. It's safe to call multiple times.
+// renameMgmtInterface attempts to rename eth0 to docker0. It's safe to call multiple times.
 func (m *Manager) renameMgmtInterface(ctx context.Context, containerID, nodeName string) {
 	execConfig := container.ExecOptions{
-		Cmd:          []string{"ip", "link", "set", "dev", "eth0", "name", "mgmt0"},
+		Cmd:          []string{"ip", "link", "set", "dev", "eth0", "name", "docker0"},
 		AttachStdout: false,
 		AttachStderr: false,
 	}
@@ -495,7 +489,7 @@ func (m *Manager) renameMgmtInterface(ctx context.Context, containerID, nodeName
 		_ = m.cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
 	} else {
 		// This might fail if eth0 doesn't exist (already renamed), which is fine.
-		// fmt.Printf("Debug: Renaming eth0->mgmt0 attempt on %s: %v\n", nodeName, err)
+		// fmt.Printf("Debug: Renaming eth0->docker0 attempt on %s: %v\n", nodeName, err)
 	}
 }
 
@@ -516,12 +510,12 @@ func (m *Manager) deleteDefaultRoute(ctx context.Context, containerID string) {
 
 // setupCloud configures a CLOUD node as a NAT gateway.
 // It enables IP forwarding and sets up masquerade so connected lab nodes
-// can reach the internet through the CLOUD's eth0 (Docker bridge) interface.
+// can reach the internet through the CLOUD's docker0 (Docker bridge) interface.
 // The iptables check (-C) prevents duplicate rules on container restart.
 func (m *Manager) setupCloud(ctx context.Context, containerID, nodeName string) {
 	setupCmd := "sysctl -w net.ipv4.ip_forward=1 && " +
-		"iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || " +
-		"iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+		"iptables -t nat -C POSTROUTING -o docker0 -j MASQUERADE 2>/dev/null || " +
+		"iptables -t nat -A POSTROUTING -o docker0 -j MASQUERADE"
 
 	execConfig := container.ExecOptions{
 		Cmd:          []string{"sh", "-c", setupCmd},
@@ -541,8 +535,8 @@ func (m *Manager) setupCloud(ctx context.Context, containerID, nodeName string) 
 	}
 }
 
-// setupInternetGateway restores the default gateway on SERVER nodes after eth0→mgmt0 rename.
-// The default route is deleted for all non-CLOUD nodes so students configure routing manually,
+// setupInternetGateway restores the default gateway on SERVER nodes after eth0→docker0 rename.
+// The default route is deleted for all nodes so students configure routing manually,
 // but SERVER nodes need it back to reach the internet for apt-get, etc.
 func (m *Manager) setupInternetGateway(ctx context.Context, containerID, nodeName string) {
 	// Docker's default bridge gateway is always the .1 address of the container's subnet.
@@ -569,7 +563,7 @@ func (m *Manager) setupInternetGateway(ctx context.Context, containerID, nodeNam
 	}
 
 	execConfig := container.ExecOptions{
-		Cmd:          []string{"ip", "route", "add", "default", "via", gateway, "dev", "mgmt0"},
+		Cmd:          []string{"ip", "route", "add", "default", "via", gateway, "dev", "docker0"},
 		AttachStdout: false,
 		AttachStderr: false,
 	}

@@ -17,8 +17,8 @@ export function createMockLink(overrides: Partial<Link> = {}): Link {
     id: 'link-1',
     source: 'node-1',
     target: 'node-2',
-    source_int: 'eth1',
-    target_int: 'eth1',
+    source_int: 'eth0',
+    target_int: 'eth0',
     ...overrides,
   };
 }
@@ -35,7 +35,7 @@ export function createMockLaboratory(overrides: Partial<Laboratory> = {}): Labor
 
 export function createMockInterface(overrides: Partial<InterfaceInfo> = {}): InterfaceInfo {
   return {
-    ifname: 'eth1',
+    ifname: 'eth0',
     addr_info: [{ local: '10.0.0.1', prefixlen: 24 }],
     ...overrides,
   };
@@ -44,7 +44,7 @@ export function createMockInterface(overrides: Partial<InterfaceInfo> = {}): Int
 export function createMockRoute(overrides: Partial<RouteInfo> = {}): RouteInfo {
   return {
     dst: '10.0.0.0/24',
-    dev: 'eth1',
+    dev: 'eth0',
     protocol: 'kernel',
     scope: 'link',
     ...overrides,

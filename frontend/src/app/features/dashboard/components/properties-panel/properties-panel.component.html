@@ -196,13 +196,16 @@
             </span>
           }
         </div>
+        <div class="text-[10px] text-slate-600 italic">
+          Docker bridge interface (docker0) is hidden. Use ifconfig inside the node to see all interfaces.
+        </div>
 
         @if (hasInterfaces()) {
           <div class="bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
             <table class="w-full text-sm text-left">
               <tbody class="divide-y divide-slate-800/50">
                 @for (iface of selectedNode()?.interfaces; track iface.ifname) {
-                  @if (iface.ifname !== 'lo' && iface.ifname !== 'mgmt0' && !(isBridgeNode() && iface.ifname === 'br0')) {
+                  @if (iface.ifname !== 'docker0' && !(isBridgeNode() && iface.ifname === 'br0')) {
                     <tr class="hover:bg-slate-900/50 transition-colors">
                       <td class="p-3 font-mono text-slate-400 border-r border-slate-800/50 w-20">
                         <span class="px-2 py-1 rounded bg-slate-800/50 text-xs">{{ iface.ifname }}</span>
@@ -388,7 +391,7 @@
                     <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Setup</span>
                   </div>
                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">
-echo "interface=eth1" > /etc/dnsmasq.conf
+                  echo "interface=eth0" > /etc/dnsmasq.conf
 echo "dhcp-range=192.168.1.50,192.168.1.100,12h" >> /etc/dnsmasq.conf
 dnsmasq --no-daemon</pre>
                 </div>
@@ -398,7 +401,7 @@ dnsmasq --no-daemon</pre>
                     <span class="text-[10px] text-slate-400 font-medium">NAT / Internet</span>
                     <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Routing</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">iptables -t nat -A POSTROUTING -o mgmt0 -j MASQUERADE</pre>
+                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">iptables -t nat -A POSTROUTING -o docker0 -j MASQUERADE</pre>
                 </div>
 
                 <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
@@ -418,7 +421,7 @@ dnsmasq --no-daemon</pre>
                     <span class="text-[10px] text-slate-400 font-medium">DHCP Client</span>
                     <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Network</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">udhcpc -i eth1</pre>
+                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">udhcpc -i eth0</pre>
                 </div>
 
                 <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
@@ -448,8 +451,8 @@ dnsmasq --no-daemon</pre>
                     <span class="text-[10px] text-slate-400 font-medium">Assign lab interface IP</span>
                     <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Setup</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip addr add &lt;IP&gt;/&lt;PREFIX&gt; dev eth1
-ip link set eth1 up</pre>
+                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip addr add &lt;IP&gt;/&lt;PREFIX&gt; dev eth0
+ip link set eth0 up</pre>
                 </div>
 
                 <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">

@@ -8,16 +8,16 @@ function makeLink(id: string, source: string, target: string, source_int: string
 
 describe('resolveSubnetColors', () => {
   it('returns empty map when there is only one subnet', () => {
-    const links = [makeLink('l1', 'pc1', 'sw1', 'eth1', 'eth1')];
+    const links = [makeLink('l1', 'pc1', 'sw1', 'eth0', 'eth0')];
     const nodeIfaceIPs = new Map<string, Map<string, string>>([
-      ['pc1', new Map([['eth1', '192.168.1.10/24']])],
-      ['sw1', new Map([['eth1', '192.168.1.1/24']])],
+      ['pc1', new Map([['eth0', '192.168.1.10/24']])],
+      ['sw1', new Map([['eth0', '192.168.1.1/24']])],
     ]);
     expect(resolveSubnetColors(links, nodeIfaceIPs).size).toBe(0);
   });
 
   it('returns empty map when no node has an IP', () => {
-    const links = [makeLink('l1', 'sw1', 'srv1', 'eth1', 'eth1')];
+    const links = [makeLink('l1', 'sw1', 'srv1', 'eth0', 'eth0')];
     const nodeIfaceIPs = new Map<string, Map<string, string>>([
       ['sw1', new Map()],
       ['srv1', new Map()],
@@ -26,11 +26,11 @@ describe('resolveSubnetColors', () => {
   });
 
   it('colors a link using the source IP when available', () => {
-    const links = [makeLink('l1', 'pc1', 'sw1', 'eth1', 'eth1')];
+    const links = [makeLink('l1', 'pc1', 'sw1', 'eth0', 'eth0')];
     const nodeIfaceIPs = new Map<string, Map<string, string>>([
-      ['pc1', new Map([['eth1', '192.168.1.10/24']])],
+      ['pc1', new Map([['eth0', '192.168.1.10/24']])],
       ['sw1', new Map()],
-      ['srv1', new Map([['eth1', '10.0.0.20/24']])],
+      ['srv1', new Map([['eth0', '10.0.0.20/24']])],
     ]);
     const result = resolveSubnetColors(links, nodeIfaceIPs);
     expect(result.get('l1')).toEqual({ subnet: '192.168.1.0/24', colorIndex: 0 });
@@ -38,15 +38,15 @@ describe('resolveSubnetColors', () => {
 
   it('colors a link using the target IP when source has no IP (switch in the middle)', () => {
     const links = [
-      makeLink('l1', 'pc1', 'sw1', 'eth1', 'eth1'),
-      makeLink('l2', 'sw1', 'srv1', 'eth2', 'eth1'),
-      makeLink('l3', 'r1', 'sw2', 'eth1', 'eth1'),
+      makeLink('l1', 'pc1', 'sw1', 'eth0', 'eth0'),
+      makeLink('l2', 'sw1', 'srv1', 'eth1', 'eth0'),
+      makeLink('l3', 'r1', 'sw2', 'eth0', 'eth0'),
     ];
     const nodeIfaceIPs = new Map<string, Map<string, string>>([
-      ['pc1', new Map([['eth1', '192.168.1.10/24']])],
+      ['pc1', new Map([['eth0', '192.168.1.10/24']])],
       ['sw1', new Map()], // switch has no IP on access ports
-      ['srv1', new Map([['eth1', '192.168.1.20/24']])],
-      ['r1', new Map([['eth1', '10.0.0.1/24']])],
+      ['srv1', new Map([['eth0', '192.168.1.20/24']])],
+      ['r1', new Map([['eth0', '10.0.0.1/24']])],
       ['sw2', new Map()],
     ]);
     const result = resolveSubnetColors(links, nodeIfaceIPs);
@@ -60,13 +60,13 @@ describe('resolveSubnetColors', () => {
 
   it('assigns different color indexes for different subnets', () => {
     const links = [
-      makeLink('l1', 'pc1', 'sw1', 'eth1', 'eth1'),
-      makeLink('l2', 'r1', 'sw2', 'eth1', 'eth1'),
+      makeLink('l1', 'pc1', 'sw1', 'eth0', 'eth0'),
+      makeLink('l2', 'r1', 'sw2', 'eth0', 'eth0'),
     ];
     const nodeIfaceIPs = new Map<string, Map<string, string>>([
-      ['pc1', new Map([['eth1', '192.168.1.10/24']])],
+      ['pc1', new Map([['eth0', '192.168.1.10/24']])],
       ['sw1', new Map()],
-      ['r1', new Map([['eth1', '10.0.0.1/24']])],
+      ['r1', new Map([['eth0', '10.0.0.1/24']])],
       ['sw2', new Map()],
     ]);
     const result = resolveSubnetColors(links, nodeIfaceIPs);
@@ -77,15 +77,15 @@ describe('resolveSubnetColors', () => {
 
   it('skips links where neither source nor target have an IP', () => {
     const links = [
-      makeLink('l1', 'pc1', 'sw1', 'eth1', 'eth1'),
-      makeLink('l2', 'sw1', 'sw2', 'eth2', 'eth1'),
-      makeLink('l3', 'r1', 'sw3', 'eth1', 'eth1'),
+      makeLink('l1', 'pc1', 'sw1', 'eth0', 'eth0'),
+      makeLink('l2', 'sw1', 'sw2', 'eth1', 'eth0'),
+      makeLink('l3', 'r1', 'sw3', 'eth0', 'eth0'),
     ];
     const nodeIfaceIPs = new Map<string, Map<string, string>>([
-      ['pc1', new Map([['eth1', '192.168.1.10/24']])],
+      ['pc1', new Map([['eth0', '192.168.1.10/24']])],
       ['sw1', new Map()],
       ['sw2', new Map()],
-      ['r1', new Map([['eth1', '10.0.0.1/24']])],
+      ['r1', new Map([['eth0', '10.0.0.1/24']])],
       ['sw3', new Map()],
     ]);
     const result = resolveSubnetColors(links, nodeIfaceIPs);

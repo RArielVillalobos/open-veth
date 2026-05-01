@@ -4,7 +4,7 @@ import "testing"
 
 func TestValidateInterfaceName(t *testing.T) {
 	valid := []string{
-		"eth0", "eth1", "br0", "mgmt0", "lo",
+		"eth0", "eth1", "br0", "docker0", "lo",
 		"veth12345", "bond0", "wlan0",
 		"eth0.100",        // VLAN sub-interface
 		"br-custom",       // dashes allowed

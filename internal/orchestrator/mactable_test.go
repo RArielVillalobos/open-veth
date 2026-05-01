@@ -5,7 +5,7 @@ import (
 )
 
 func TestParseFdbOutput_DynamicEntry(t *testing.T) {
-	output := `0e:72:9a:9f:82:13 dev eth1 master br0`
+	output := `0e:72:9a:9f:82:13 dev eth0 master br0`
 
 	entries := parseFdbOutput(output)
 
@@ -15,8 +15,8 @@ func TestParseFdbOutput_DynamicEntry(t *testing.T) {
 	if entries[0].MAC != "0e:72:9a:9f:82:13" {
 		t.Errorf("MAC = %q, want %q", entries[0].MAC, "0e:72:9a:9f:82:13")
 	}
-	if entries[0].Port != "eth1" {
-		t.Errorf("Port = %q, want %q", entries[0].Port, "eth1")
+	if entries[0].Port != "eth0" {
+		t.Errorf("Port = %q, want %q", entries[0].Port, "eth0")
 	}
 	if entries[0].Type != "dynamic" {
 		t.Errorf("Type = %q, want %q", entries[0].Type, "dynamic")
@@ -92,11 +92,11 @@ func TestParseFdbOutput_SkipsBr0Port(t *testing.T) {
 
 func TestParseFdbOutput_RealWorldOutput(t *testing.T) {
 	// Realistic output from a switch with one connected server (eth1)
-	output := `0e:72:9a:9f:82:13 dev eth1 master br0
-02:83:67:ad:bd:e7 dev eth1 master br0 permanent
-02:83:67:ad:bd:e7 dev eth1 self permanent
-33:33:00:00:00:01 dev eth1 self permanent
-33:33:ff:ad:bd:e7 dev eth1 self permanent`
+	output := `0e:72:9a:9f:82:13 dev eth0 master br0
+02:83:67:ad:bd:e7 dev eth0 master br0 permanent
+02:83:67:ad:bd:e7 dev eth0 self permanent
+33:33:00:00:00:01 dev eth0 self permanent
+33:33:ff:ad:bd:e7 dev eth0 self permanent`
 
 	entries := parseFdbOutput(output)
 
@@ -107,8 +107,8 @@ func TestParseFdbOutput_RealWorldOutput(t *testing.T) {
 	if entries[0].MAC != "0e:72:9a:9f:82:13" {
 		t.Errorf("MAC = %q, want %q", entries[0].MAC, "0e:72:9a:9f:82:13")
 	}
-	if entries[0].Port != "eth1" {
-		t.Errorf("Port = %q, want %q", entries[0].Port, "eth1")
+	if entries[0].Port != "eth0" {
+		t.Errorf("Port = %q, want %q", entries[0].Port, "eth0")
 	}
 	if entries[0].Type != "dynamic" {
 		t.Errorf("Type = %q, want %q", entries[0].Type, "dynamic")
@@ -116,9 +116,9 @@ func TestParseFdbOutput_RealWorldOutput(t *testing.T) {
 }
 
 func TestParseFdbOutput_MultiplePortsMultipleMACs(t *testing.T) {
-	output := `0e:72:9a:9f:82:13 dev eth1 master br0
-aa:bb:cc:dd:ee:01 dev eth2 master br0
-aa:bb:cc:dd:ee:02 dev eth2 master br0`
+	output := `0e:72:9a:9f:82:13 dev eth0 master br0
+aa:bb:cc:dd:ee:01 dev eth1 master br0
+aa:bb:cc:dd:ee:02 dev eth1 master br0`
 
 	entries := parseFdbOutput(output)
 
@@ -126,8 +126,8 @@ aa:bb:cc:dd:ee:02 dev eth2 master br0`
 		t.Fatalf("expected 3 entries, got %d", len(entries))
 	}
 
-	if entries[1].Port != "eth2" || entries[2].Port != "eth2" {
-		t.Errorf("expected eth2 for entries 1 and 2, got %q, %q", entries[1].Port, entries[2].Port)
+	if entries[1].Port != "eth1" || entries[2].Port != "eth1" {
+		t.Errorf("expected eth1 for entries 1 and 2, got %q, %q", entries[1].Port, entries[2].Port)
 	}
 }
 

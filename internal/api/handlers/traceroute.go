@@ -75,7 +75,7 @@ func (h *Handler) RunTraceroute(c *gin.Context) {
 			continue
 		}
 		for _, iface := range ifaces {
-			if iface.Name == "lo" || iface.Name == "mgmt0" {
+			if iface.Name == "lo" || iface.Name == "docker0" {
 				continue
 			}
 			for _, addr := range iface.IPAddresses {

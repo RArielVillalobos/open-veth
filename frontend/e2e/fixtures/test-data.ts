@@ -53,8 +53,8 @@ export const MOCK_ALL_TYPES_NODES = [
 
 export const MOCK_CLOUD_INTERFACES = [
   { ifname: 'lo', addr_info: [{ local: '127.0.0.1', prefixlen: 8 }] },
-  { ifname: 'eth0', addr_info: [{ local: '172.17.0.8', prefixlen: 16 }] },
-  { ifname: 'eth1', addr_info: [{ local: '10.0.0.254', prefixlen: 24 }] },
+  { ifname: 'docker0', addr_info: [{ local: '172.17.0.8', prefixlen: 16 }] },
+  { ifname: 'eth0', addr_info: [{ local: '10.0.0.254', prefixlen: 24 }] },
 ];
 
 export const MOCK_LINKS = [
@@ -62,21 +62,21 @@ export const MOCK_LINKS = [
     id: 'link-1',
     source: 'node-r1',
     target: 'node-pc1',
-    source_int: 'eth1',
-    target_int: 'eth1',
+    source_int: 'eth0',
+    target_int: 'eth0',
     lab_id: 'lab-e2e-1',
   },
 ];
 
 export const MOCK_INTERFACES = [
   { ifname: 'lo', addr_info: [{ local: '127.0.0.1', prefixlen: 8 }] },
-  { ifname: 'mgmt0', addr_info: [{ local: '172.17.0.2', prefixlen: 16 }] },
-  { ifname: 'eth1', addr_info: [{ local: '10.0.0.1', prefixlen: 24 }] },
+  { ifname: 'docker0', addr_info: [{ local: '172.17.0.2', prefixlen: 16 }] },
+  { ifname: 'eth0', addr_info: [{ local: '10.0.0.1', prefixlen: 24 }] },
 ];
 
 export const MOCK_ROUTES = [
-  { dst: '10.0.0.0/24', dev: 'eth1', protocol: 'kernel', scope: 'link' },
-  { dst: 'default', dev: 'mgmt0', protocol: 'kernel', scope: 'global', gateway: '172.17.0.1' },
+  { dst: '10.0.0.0/24', dev: 'eth0', protocol: 'kernel', scope: 'link' },
+  { dst: 'default', dev: 'docker0', protocol: 'kernel', scope: 'global', gateway: '172.17.0.1' },
 ];
 
 export const MOCK_TOPOLOGY_YAML = `name: Imported Lab
