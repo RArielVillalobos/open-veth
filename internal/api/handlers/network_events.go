@@ -63,7 +63,6 @@ func (h *NetworkEventHub) Run() {
 			h.mu.Unlock()
 
 		case event := <-h.broadcast:
-			// Copy client list to avoid holding the lock during writes
 			h.mu.RLock()
 			clients := make([]*websocket.Conn, 0, len(h.clients))
 			for c := range h.clients {
@@ -71,10 +70,22 @@ func (h *NetworkEventHub) Run() {
 			}
 			h.mu.RUnlock()
 
+			var failed []*websocket.Conn
 			for _, client := range clients {
 				if err := client.WriteJSON(event); err != nil {
-					h.unregister <- client
+					failed = append(failed, client)
 				}
+			}
+
+			if len(failed) > 0 {
+				h.mu.Lock()
+				for _, client := range failed {
+					if _, ok := h.clients[client]; ok {
+						delete(h.clients, client)
+						client.Close()
+					}
+				}
+				h.mu.Unlock()
 			}
 		}
 	}
