@@ -387,7 +387,7 @@ func (h *Handler) runActivation(ctx context.Context, labID string) {
 		h.Runtime.Set(n.ID, containerID, pid)
 		nodes[i].ContainerID = containerID
 		nodes[i].PID = pid
-		h.storeMonitorPorts(ctx, &nodes[i], containerID)
+		h.storeServicePorts(ctx, &nodes[i], containerID)
 		nodeMap[n.ID] = nodes[i]
 		nodesRevived++
 	}

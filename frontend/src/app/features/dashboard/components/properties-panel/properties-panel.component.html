@@ -22,7 +22,8 @@
                'bg-sky-500/10 ring-1 ring-sky-500/30': selectedNode()?.type === 'cloud',
                'bg-orange-500/10 ring-1 ring-orange-500/30': selectedNode()?.type === 'server',
                'bg-cyan-500/10 ring-1 ring-cyan-500/30': selectedNode()?.type === 'monitor',
-               'bg-rose-500/10 ring-1 ring-rose-500/30': selectedNode()?.type === 'tester'
+               'bg-rose-500/10 ring-1 ring-rose-500/30': selectedNode()?.type === 'tester',
+               'bg-indigo-500/10 ring-1 ring-indigo-500/30': selectedNode()?.type === 'haproxy'
              }">
           <img [src]="'assets/icons/' + selectedNode()?.type + '.svg'" 
                class="w-8 h-8"
@@ -93,6 +94,27 @@
               <span class="font-mono">/etc/prometheus/prometheus.yml</span>
             </p>
           </div>
+        </div>
+      }
+
+      <!-- HAProxy Node: Stats quick access -->
+      @if (isHAProxyNode()) {
+        <div class="space-y-2">
+          @if (haproxyStatsUrl()) {
+            <a [href]="haproxyStatsUrl()!" target="_blank"
+               class="flex items-center justify-between gap-2 w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-sm py-2.5 px-4 rounded-lg border border-indigo-500/30 transition-all">
+              <div class="flex items-center gap-2">
+                <span class="text-base">⚖️</span>
+                <span class="font-medium">Open Stats</span>
+              </div>
+              <span class="text-[10px] font-mono text-indigo-300/70">:{{ selectedNode()?.service_ports?.['stats'] }}</span>
+            </a>
+          } @else {
+            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-500 text-sm py-2.5 px-4 rounded-lg border border-slate-700/50">
+              <span class="text-base">⚖️</span>
+              <span>Stats — starting...</span>
+            </div>
+          }
         </div>
       }
 
@@ -518,6 +540,26 @@ docker cp node_exporter &lt;node_id&gt;:/usr/local/bin/
                     <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">no restart</span>
                   </div>
                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">systemctl reload prometheus</pre>
+                </div>
+              </div>
+            }
+
+            @if (selectedNode()?.type === 'haproxy') {
+              <div class="space-y-3">
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">Reload config</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">no downtime</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)</pre>
+                </div>
+
+                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                  <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 font-medium">Edit config</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">vi</span>
+                  </div>
+                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">vi /etc/haproxy/haproxy.cfg</pre>
                 </div>
               </div>
             }

@@ -1,0 +1,36 @@
+<svg viewBox="4 4 56 56" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>HAProxy</title>
+  <defs>
+    <linearGradient id="ov-haproxyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background card -->
+  <rect x="6" y="10" width="52" height="44" rx="6" fill="url(#ov-haproxyGrad)"/>
+  <rect x="9" y="13" width="46" height="38" rx="4" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+
+  <!-- Incoming line -->
+  <line x1="11" y1="32" x2="21" y2="32" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
+  <!-- Incoming arrowhead — tip lands on distribution bar -->
+  <path d="M20,29 L25,32 L20,35 Z" fill="white" opacity="0.95"/>
+
+  <!-- Distribution bar (vertical) -->
+  <line x1="25" y1="22" x2="25" y2="42" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Three output lines -->
+  <line x1="26" y1="22" x2="34" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
+  <line x1="26" y1="32" x2="34" y2="32" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
+  <line x1="26" y1="42" x2="34" y2="42" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Output arrowheads -->
+  <path d="M33,19 L39,22 L33,25 Z" fill="white" opacity="0.95"/>
+  <path d="M33,29 L39,32 L33,35 Z" fill="white" opacity="0.95"/>
+  <path d="M33,39 L39,42 L33,45 Z" fill="white" opacity="0.95"/>
+
+  <!-- Backend nodes -->
+  <circle cx="46" cy="22" r="3.5" fill="#a5b4fc"/>
+  <circle cx="46" cy="32" r="3.5" fill="#a5b4fc"/>
+  <circle cx="46" cy="42" r="3.5" fill="#a5b4fc"/>
+</svg>

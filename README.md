@@ -50,6 +50,7 @@ If you want to understand why a network fails, you need to break a real one firs
 - **System Administration**: Practice service management with systemd, configure nginx, apache2, dnsmasq, NFS, vsftpd — everything runs on real Debian with real `systemctl`
 - **Observability**: Deploy a Monitor node with Grafana + Prometheus pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` and build your own dashboards from scratch
 - **Load & Stress Testing**: Generate HTTP load with `wrk` or `k6`, measure throughput with `iperf3`, simulate degraded links with `tc netem` — all from a dedicated Tester node
+- **Load Balancing**: Deploy an HAProxy node to distribute traffic across multiple backends. Stats page auto-starts on a dynamic port, accessible directly from the node panel
 - **Security**: Practice iptables rules, NAT, port forwarding and firewall policies in an isolated environment
 
 ---
@@ -136,6 +137,7 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
 | **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + snmp_exporter pre-installed and auto-started. Loki is installed but disabled by default — enable with `systemctl enable loki --now`. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
 | **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
+| **HAPROXY** | Alpine Linux + HAProxy | Load balancer — HAProxy pre-configured with stats page on port 8404 (auto-mapped). Edit `/etc/haproxy/haproxy.cfg` and reload with `haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)` |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
@@ -172,7 +174,7 @@ make up
 > `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
 
 That's it! The command will:
-- Pull node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester — Hub and Cloud reuse the Host image)
+- Pull node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester, HAProxy — Hub and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL to open in your browser
 
@@ -365,6 +367,7 @@ The UI updates in real-time even when the node shuts itself down from within —
 | Link enable/disable (simulate failures) | ✅ |
 | Grafana + Prometheus built-in (Monitor node) | ✅ |
 | Load testing built-in (wrk, k6, iperf3) | ✅ |
+| HAProxy load balancer node | ✅ |
 | SNMP monitoring (router + switch) | ✅ |
 | MAC address table (live) | ✅ |
 | Filesystem snapshots (docker commit) | ✅ |

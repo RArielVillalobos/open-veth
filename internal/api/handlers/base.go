@@ -88,11 +88,26 @@ func (h *Handler) getRunningNode(c *gin.Context, id string) (models.Node, bool) 
 	return node, true
 }
 
-// storeMonitorPorts retrieves the dynamically assigned host ports for a MONITOR node.
-// It stores Prometheus immediately (starts fast) and waits asynchronously for Grafana
-// to be ready before storing its port and broadcasting node:updated.
-func (h *Handler) storeMonitorPorts(ctx context.Context, node *models.Node, containerID string) {
-	if node.Type != models.MONITOR {
+// storeServicePorts retrieves the dynamically assigned host ports for nodes that
+// expose services (MONITOR and HAPROXY). For MONITOR it stores Prometheus
+// immediately and waits async for Grafana. For HAPROXY it stores the stats port.
+func (h *Handler) storeServicePorts(ctx context.Context, node *models.Node, containerID string) {
+	if node.Type != models.MONITOR && node.Type != models.HAPROXY {
+		return
+	}
+
+	if node.Type == models.HAPROXY {
+		ports, err := h.Manager.GetServicePorts(ctx, containerID)
+		if err != nil {
+			h.Logger.Warn("failed to get haproxy ports", "node", node.Name, "error", err)
+			return
+		}
+		if statsPort, ok := ports["stats"]; ok {
+			servicePorts := map[string]int{"stats": statsPort}
+			h.Runtime.SetServicePorts(node.ID, servicePorts)
+			node.ServicePorts = servicePorts
+			h.Logger.Info("haproxy stats ready", "node", node.Name, "port", statsPort)
+		}
 		return
 	}
 	ports, err := h.Manager.GetServicePorts(ctx, containerID)

@@ -89,7 +89,7 @@ func (h *Handler) CreateNode(c *gin.Context) {
 	node.PID = pid
 
 	// For MONITOR nodes, retrieve and store the dynamically assigned host ports
-	h.storeMonitorPorts(c.Request.Context(), &node, containerID)
+	h.storeServicePorts(c.Request.Context(), &node, containerID)
 
 	h.Logger.Info("node created", "name", node.Name, "container_id", containerID[:12])
 

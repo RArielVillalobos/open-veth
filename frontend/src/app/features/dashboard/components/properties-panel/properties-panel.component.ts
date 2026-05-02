@@ -52,6 +52,8 @@ export class PropertiesPanelComponent {
 
   isMonitorNode = computed(() => this.selectedNode()?.type === 'monitor');
 
+  isHAProxyNode = computed(() => this.selectedNode()?.type === 'haproxy');
+
   grafanaUrl = computed(() => {
     const port = this.selectedNode()?.service_ports?.['grafana'];
     return port ? `http://localhost:${port}` : null;
@@ -60,6 +62,11 @@ export class PropertiesPanelComponent {
   prometheusUrl = computed(() => {
     const port = this.selectedNode()?.service_ports?.['prometheus'];
     return port ? `http://localhost:${port}` : null;
+  });
+
+  haproxyStatsUrl = computed(() => {
+    const port = this.selectedNode()?.service_ports?.['stats'];
+    return port ? `http://localhost:${port}/stats` : null;
   });
 
   // Safe check for interfaces to use in template

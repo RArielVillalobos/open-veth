@@ -85,6 +85,16 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		}
 	}
 
+	// HAPROXY: expose stats page (8404) on a dynamic host port
+	if node.Type == models.HAPROXY {
+		config.ExposedPorts = nat.PortSet{
+			"8404/tcp": struct{}{},
+		}
+		hostConfig.PortBindings = nat.PortMap{
+			"8404/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
+		}
+	}
+
 	// 3. Create container (Conflict handling)
 	resp, err := m.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, node.Name)
 	if err != nil {

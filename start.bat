@@ -39,37 +39,70 @@ docker rm -f openveth-backend openveth-frontend >nul 2>&1
 echo.
 
 REM --- 4. Pull images ---
-echo [1/7] Pulling image: host...
+echo [1/8] Pulling image: host...
 docker pull openveth/host:latest
-if %errorlevel% neq 0 ( echo ERROR pulling host & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo Pull failed, building host locally...
+    docker build -t openveth/host:latest ./images/host-node
+    if !errorlevel! neq 0 ( echo ERROR building host & pause & exit /b 1 )
+)
 
 echo.
-echo [2/7] Pulling image: router...
+echo [2/8] Pulling image: router...
 docker pull openveth/router:latest
-if %errorlevel% neq 0 ( echo ERROR pulling router & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo Pull failed, building router locally...
+    docker build -t openveth/router:latest ./images/router-node
+    if !errorlevel! neq 0 ( echo ERROR building router & pause & exit /b 1 )
+)
 
 echo.
-echo [3/7] Pulling image: switch...
+echo [3/8] Pulling image: switch...
 docker pull openveth/switch:latest
-if %errorlevel% neq 0 ( echo ERROR pulling switch & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo Pull failed, building switch locally...
+    docker build -t openveth/switch:latest ./images/switch-node
+    if !errorlevel! neq 0 ( echo ERROR building switch & pause & exit /b 1 )
+)
 
 echo.
-echo [4/7] Pulling image: server...
+echo [4/8] Pulling image: server...
 docker pull openveth/server:latest
-if %errorlevel% neq 0 ( echo ERROR pulling server & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo Pull failed, building server locally...
+    docker build -t openveth/server:latest ./images/server-node
+    if !errorlevel! neq 0 ( echo ERROR building server & pause & exit /b 1 )
+)
 
 echo.
-echo [5/7] Pulling image: monitor...
+echo [5/8] Pulling image: monitor...
 docker pull openveth/monitor:latest
-if %errorlevel% neq 0 ( echo ERROR pulling monitor & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo Pull failed, building monitor locally...
+    docker build -t openveth/monitor:latest ./images/monitor-node
+    if !errorlevel! neq 0 ( echo ERROR building monitor & pause & exit /b 1 )
+)
 
 echo.
-echo [6/7] Pulling image: tester...
+echo [6/8] Pulling image: tester...
 docker pull openveth/tester:latest
-if %errorlevel% neq 0 ( echo ERROR pulling tester & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo Pull failed, building tester locally...
+    docker build -t openveth/tester:latest ./images/tester-node
+    if !errorlevel! neq 0 ( echo ERROR building tester & pause & exit /b 1 )
+)
 
 echo.
-echo [7/7] Starting OpenVeth...
+echo [7/8] Pulling image: haproxy...
+docker pull openveth/haproxy:latest
+if %errorlevel% neq 0 (
+    echo Pull failed, building haproxy locally...
+    docker build -t openveth/haproxy:latest ./images/haproxy-node
+    if !errorlevel! neq 0 ( echo ERROR building haproxy & pause & exit /b 1 )
+)
+
+echo.
+echo [8/8] Starting OpenVeth...
 docker compose up -d --build
 if %errorlevel% neq 0 ( echo ERROR starting OpenVeth & pause & exit /b 1 )
 

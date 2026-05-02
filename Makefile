@@ -72,8 +72,9 @@ pull-images: ## Pull node images from Docker Hub (openveth/*)
 	$(DOCKER_CMD) pull openveth/monitor:latest
 	$(DOCKER_CMD) pull openveth/tester:latest
 	$(DOCKER_CMD) pull openveth/switch:latest
+	$(DOCKER_CMD) pull openveth/haproxy:latest
 
-images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch)
+images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch, HAProxy)
 	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
@@ -81,6 +82,7 @@ images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, 
 	$(DOCKER_CMD) build -t openveth/monitor:latest ./images/monitor-node
 	$(DOCKER_CMD) build -t openveth/tester:latest ./images/tester-node
 	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
+	$(DOCKER_CMD) build -t openveth/haproxy:latest ./images/haproxy-node
 
 switch-image: ## Build only the switch node image (Debian + SNMP + Bridge tools)
 	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
@@ -93,6 +95,9 @@ monitor-image: ## Build only the monitor node image (Grafana + Prometheus + snmp
 
 tester-image: ## Build only the tester node image (wrk, k6, siege, iperf3, locust...)
 	$(DOCKER_CMD) build -t openveth/tester:latest ./images/tester-node
+
+haproxy-image: ## Build only the haproxy node image (Alpine + HAProxy)
+	$(DOCKER_CMD) build -t openveth/haproxy:latest ./images/haproxy-node
 
 # --- Testing ---
 test-go: ## Run Go tests

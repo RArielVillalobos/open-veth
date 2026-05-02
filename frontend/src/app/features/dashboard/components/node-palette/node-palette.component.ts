@@ -133,11 +133,23 @@ export class NodePaletteComponent {
       shortcut: 'T',
       description: 'Debian with wrk, k6, siege, ab, iperf3, hping3, vegeta, stress-ng and locust. Ideal for HTTP load testing, network throughput measurement and system stress testing.'
     },
+    {
+      id: 'haproxy',
+      label: 'HAProxy',
+      subtitle: 'Load Balancer',
+      icon: 'haproxy.svg',
+      placeholder: 'e.g. LB1',
+      accentBorder: 'border-indigo-500',
+      hoverBorder: 'hover:border-indigo-500/50',
+      category: 'end',
+      shortcut: 'B',
+      description: 'Alpine + HAProxy. Stats page auto-starts on a dynamic port. Configure frontends and backends in /etc/haproxy/haproxy.cfg and reload with: haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)'
+    },
   ];
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0, haproxy: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;

@@ -6,7 +6,7 @@ import "sync"
 type RuntimeState struct {
 	ContainerID  string
 	PID          int
-	ServicePorts map[string]int // only populated for MONITOR nodes
+	ServicePorts map[string]int // populated for MONITOR (grafana, prometheus) and HAPROXY (stats)
 }
 
 // RuntimeStore is a thread-safe in-memory store for node runtime state.

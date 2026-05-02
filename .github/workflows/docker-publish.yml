@@ -54,6 +54,8 @@ jobs:
             context: ./images/monitor-node
           - name: tester
             context: ./images/tester-node
+          - name: haproxy
+            context: ./images/haproxy-node
 
     steps:
       - name: Checkout

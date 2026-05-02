@@ -33,6 +33,7 @@ func TestGetImageForType(t *testing.T) {
 		{SERVER, ImgServer},            // Server uses its own debian+systemd image
 		{MONITOR, ImgMonitor},          // Monitor uses its own grafana+prometheus image
 		{TESTER, ImgTester},            // Tester uses its own load-testing image
+		{HAPROXY, ImgHAProxy},          // HAProxy uses its own Alpine+HAProxy image
 		{NodeType("unknown"), ImgHost}, // default fallback
 	}
 
@@ -45,7 +46,7 @@ func TestGetImageForType(t *testing.T) {
 }
 
 func TestIsValidNodeType(t *testing.T) {
-	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER}
+	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY}
 	for _, tt := range valid {
 		if !IsValidNodeType(tt) {
 			t.Errorf("IsValidNodeType(%q) = false, want true", tt)
