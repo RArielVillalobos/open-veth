@@ -285,10 +285,14 @@ func (h *Handler) restoreLinks(ctx context.Context, nodeMap map[string]models.No
 		restored++
 
 		if models.NeedsBridge(src.Type) {
-			_ = h.Manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt, src.Type)
+			if err := h.Manager.AttachInterfaceToBridge(ctx, src.ContainerID, l.SourceInt, src.Type); err != nil {
+				h.Logger.Error("failed to attach interface to bridge", "interface", l.SourceInt, "node", src.Name, "type", src.Type, "error", err)
+			}
 		}
 		if models.NeedsBridge(tgt.Type) {
-			_ = h.Manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt, tgt.Type)
+			if err := h.Manager.AttachInterfaceToBridge(ctx, tgt.ContainerID, l.TargetInt, tgt.Type); err != nil {
+				h.Logger.Error("failed to attach interface to bridge", "interface", l.TargetInt, "node", tgt.Name, "type", tgt.Type, "error", err)
+			}
 		}
 	}
 	return

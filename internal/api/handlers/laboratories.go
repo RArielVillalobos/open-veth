@@ -404,10 +404,14 @@ func (h *Handler) runActivation(ctx context.Context, labID string) {
 					h.Logger.Error("failed to revive link", "link", l.ID, "error", err)
 				} else {
 					if models.NeedsBridge(srcNode.Type) {
-						_ = h.Manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt, srcNode.Type)
+						if err := h.Manager.AttachInterfaceToBridge(ctx, srcNode.ContainerID, l.SourceInt, srcNode.Type); err != nil {
+							h.Logger.Error("failed to attach interface to bridge", "interface", l.SourceInt, "node", srcNode.Name, "type", srcNode.Type, "error", err)
+						}
 					}
 					if models.NeedsBridge(tgtNode.Type) {
-						_ = h.Manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt, tgtNode.Type)
+						if err := h.Manager.AttachInterfaceToBridge(ctx, tgtNode.ContainerID, l.TargetInt, tgtNode.Type); err != nil {
+							h.Logger.Error("failed to attach interface to bridge", "interface", l.TargetInt, "node", tgtNode.Name, "type", tgtNode.Type, "error", err)
+						}
 					}
 				}
 			}

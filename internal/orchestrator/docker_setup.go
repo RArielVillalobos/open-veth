@@ -110,7 +110,9 @@ func (m *Manager) setupInternetGateway(ctx context.Context, containerID, nodeNam
 
 // setupBridge initializes the bridge interface (br0) inside a switch or hub container.
 // For HUB nodes, ageing_time is set to 0 to disable MAC learning (L1 flood behavior).
-func (m *Manager) setupBridge(ctx context.Context, containerID, nodeName string, nodeType models.NodeType) {
+// Returns an error if the bridge could not be created — callers must not treat this
+// as fire-and-forget, since a failed bridge leaves every attached port isolated.
+func (m *Manager) setupBridge(ctx context.Context, containerID, nodeName string, nodeType models.NodeType) error {
 	setupCmd := "ip link add name br0 type bridge; ip link set dev br0 up"
 	if nodeType == models.HUB {
 		setupCmd = "ip link add name br0 type bridge; ip link set dev br0 type bridge ageing_time 0 forward_delay 0; ip link set dev br0 up"
@@ -125,13 +127,17 @@ func (m *Manager) setupBridge(ctx context.Context, containerID, nodeName string,
 
 	m.logger.Info("initializing bridge", "name", nodeName, "type", nodeType)
 
-	if execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig); err == nil {
-		if errStart := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); errStart != nil {
-			m.logger.Error("failed to start bridge setup", "name", nodeName, "error", errStart)
-		}
-	} else {
-		m.logger.Error("failed to create bridge setup exec", "name", nodeName, "error", err)
+	execID, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create bridge setup exec: %v", err)
 	}
+	if err := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); err != nil {
+		return fmt.Errorf("failed to start bridge setup: %v", err)
+	}
+	if inspect, err := m.cli.ContainerExecInspect(ctx, execID.ID); err == nil && inspect.ExitCode != 0 {
+		return fmt.Errorf("bridge setup exited with code %d", inspect.ExitCode)
+	}
+	return nil
 }
 
 // AttachInterfaceToBridge connects a network interface to the main bridge (br0) inside a container.
@@ -155,6 +161,9 @@ func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID strin
 	}
 	if err := m.cli.ContainerExecStart(ctx, execID.ID, container.ExecStartOptions{}); err != nil {
 		return fmt.Errorf("failed to start exec for bridge attach: %v", err)
+	}
+	if inspect, err := m.cli.ContainerExecInspect(ctx, execID.ID); err == nil && inspect.ExitCode != 0 {
+		return fmt.Errorf("attach %s to br0 exited with code %d (is br0 up?)", ifaceName, inspect.ExitCode)
 	}
 
 	// Step 2: Configure hub interface: disable MAC learning, explicitly enable flood
@@ -190,6 +199,9 @@ func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID strin
 	}
 	if err := m.cli.ContainerExecStart(ctx, execID2.ID, container.ExecStartOptions{}); err != nil {
 		return fmt.Errorf("failed to start exec for interface up: %v", err)
+	}
+	if inspect, err := m.cli.ContainerExecInspect(ctx, execID2.ID); err == nil && inspect.ExitCode != 0 {
+		return fmt.Errorf("bringing up %s exited with code %d", ifaceName, inspect.ExitCode)
 	}
 
 	return nil

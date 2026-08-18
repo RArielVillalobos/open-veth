@@ -321,10 +321,16 @@ func (h *Handler) importLinks(ctx context.Context, labID string, links []models.
 		}
 
 		if models.NeedsBridge(source.Type) {
-			_ = h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt, source.Type)
+			if err := h.Manager.AttachInterfaceToBridge(ctx, source.ContainerID, linkModel.SourceInt, source.Type); err != nil {
+				h.Logger.Error("failed to attach interface to bridge", "interface", linkModel.SourceInt, "node", source.Name, "type", source.Type, "error", err)
+				errors = append(errors, fmt.Sprintf("Link %s→%s: %s did not attach to the bridge, connectivity may be broken", l.Source, l.Target, source.Name))
+			}
 		}
 		if models.NeedsBridge(target.Type) {
-			_ = h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt, target.Type)
+			if err := h.Manager.AttachInterfaceToBridge(ctx, target.ContainerID, linkModel.TargetInt, target.Type); err != nil {
+				h.Logger.Error("failed to attach interface to bridge", "interface", linkModel.TargetInt, "node", target.Name, "type", target.Type, "error", err)
+				errors = append(errors, fmt.Sprintf("Link %s→%s: %s did not attach to the bridge, connectivity may be broken", l.Source, l.Target, target.Name))
+			}
 		}
 		if err := h.Repo.SaveLink(linkModel); err != nil {
 			h.Logger.Error("import link save failed", "source", l.Source, "target", l.Target, "error", err)

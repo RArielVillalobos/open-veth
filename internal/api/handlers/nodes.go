@@ -286,11 +286,15 @@ func (h *Handler) StartNode(c *gin.Context) {
 
 			// Bridge attachment for powered-on node
 			if models.NeedsBridge(node.Type) {
-				_ = h.Manager.AttachInterfaceToBridge(ctx, node.ContainerID, nodeIface, node.Type)
+				if err := h.Manager.AttachInterfaceToBridge(ctx, node.ContainerID, nodeIface, node.Type); err != nil {
+					h.Logger.Error("failed to attach interface to bridge", "interface", nodeIface, "node", node.Name, "type", node.Type, "error", err)
+				}
 			}
 			// Bridge attachment for peer (e.g. peer is SWITCH/HUB)
 			if models.NeedsBridge(peerNode.Type) {
-				_ = h.Manager.AttachInterfaceToBridge(ctx, peerNode.ContainerID, peerIface, peerNode.Type)
+				if err := h.Manager.AttachInterfaceToBridge(ctx, peerNode.ContainerID, peerIface, peerNode.Type); err != nil {
+					h.Logger.Error("failed to attach interface to bridge", "interface", peerIface, "node", peerNode.Name, "type", peerNode.Type, "error", err)
+				}
 			}
 
 			// Restore peer's IP on this interface (its veth end was also recreated)

@@ -119,7 +119,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			}
 
 			if models.NeedsBridge(node.Type) {
-				m.setupBridge(ctx, inspect.ID, node.Name, node.Type)
+				if err := m.setupBridge(ctx, inspect.ID, node.Name, node.Type); err != nil {
+					m.logger.Error("bridge setup failed", "name", node.Name, "error", err)
+				}
 			}
 
 			m.renameMgmtInterface(ctx, inspect.ID, node.Name)
@@ -154,7 +156,9 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 
 	// 7. If node needs a bridge, initialize 'br0'
 	if models.NeedsBridge(node.Type) {
-		m.setupBridge(ctx, resp.ID, node.Name, node.Type)
+		if err := m.setupBridge(ctx, resp.ID, node.Name, node.Type); err != nil {
+			m.logger.Error("bridge setup failed", "name", node.Name, "error", err)
+		}
 	}
 
 	// 8. If node is CLOUD, enable IP forwarding and NAT masquerade
