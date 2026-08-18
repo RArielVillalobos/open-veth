@@ -6,11 +6,8 @@
     <!-- Header -->
     <div class="p-5 border-b border-slate-800 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-indigo-950 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <img src="assets/logo.svg" alt="OpenVeth logo" class="w-6 h-6"/>
-        </div>
         <div>
-          <h2 class="text-lg font-bold text-white tracking-tight">OpenVeth</h2>
+          <h2 class="text-lg font-bold text-white tracking-tight">Open<span class="text-signal-300">Veth</span></h2>
           <p class="text-[10px] text-slate-500">Network Emulator</p>
         </div>
       </div>
@@ -28,15 +25,15 @@
     <div class="p-5 flex flex-col gap-3">
       <button
         (click)="createLab.emit(); close.emit()"
-        class="flex items-center gap-3 p-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 group text-left border border-indigo-500">
-        <div class="bg-white/20 p-2 rounded-lg group-hover:scale-110 transition-transform">
+        class="flex items-center gap-3 p-4 rounded-xl bg-signal-500 hover:bg-signal-300 text-slate-950 transition-all group text-left">
+        <div class="bg-slate-950/15 p-2 rounded-lg group-hover:scale-110 transition-transform">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </div>
         <div>
           <span class="block font-semibold">New Topology</span>
-          <span class="text-xs text-indigo-200/70">Start with empty canvas</span>
+          <span class="text-xs text-slate-950/60">Start with empty canvas</span>
         </div>
       </button>
 

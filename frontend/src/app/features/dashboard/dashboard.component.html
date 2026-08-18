@@ -5,28 +5,24 @@
     <!-- Left: Brand & Lab Selector -->
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2">
-        <img src="assets/logo.svg" alt="OpenVeth logo" class="w-7 h-7"/>
-        <span class="font-bold text-slate-100 tracking-tight">OpenVeth</span>
+        <span class="font-bold text-slate-100 tracking-tight">Open<span class="text-signal-300">Veth</span></span>
       </div>
       
       <div class="h-6 w-px bg-slate-700 mx-1"></div>
       
       <button (click)="onRename()"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800 transition-all group"
+              class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-signal-500/50 hover:bg-slate-800 transition-all group"
               title="Manage Laboratories (Ctrl+L)">
         <span class="text-sm font-medium text-slate-200">{{ store.topology().name }}</span>
-        <svg class="w-3 h-3 text-slate-500 group-hover:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3 h-3 text-slate-500 group-hover:text-signal-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
       </button>
 
       <!-- Save Status Indicator -->
-      <div class="flex items-center gap-1.5 text-xs" [class.text-emerald-400]="!store.isLoading()" [class.text-amber-400]="store.isLoading()">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" [class.bg-emerald-400]="!store.isLoading()" [class.bg-amber-400]="store.isLoading()"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2" [class.bg-emerald-500]="!store.isLoading()" [class.bg-amber-500]="store.isLoading()"></span>
-        </span>
-        <span class="font-medium">{{ store.isLoading() ? 'Saving...' : 'Saved' }}</span>
+      <div class="flex items-center gap-1.5 text-xs font-mono" [class.text-up-400]="!store.isLoading()" [class.text-pending-400]="store.isLoading()">
+        <span class="h-2 w-2 rounded-full transition-colors" [class.bg-up-500]="!store.isLoading()" [class.bg-pending-500]="store.isLoading()"></span>
+        <span class="font-medium">{{ store.isLoading() ? 'saving...' : 'saved' }}</span>
       </div>
     </div>
 
@@ -69,7 +65,7 @@
         <button (click)="store.setDomainOverlay('broadcast')"
                 class="h-8 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all"
                 [class]="store.activeDomainOverlay() === 'broadcast'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-signal-500 text-slate-950 font-semibold'
                   : 'hover:bg-slate-700 text-slate-300 hover:text-slate-100'"
                 title="Broadcast Domains">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,7 +77,7 @@
         <button (click)="store.setDomainOverlay('collision')"
                 class="h-8 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all"
                 [class]="store.activeDomainOverlay() === 'collision'
-                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/25'
+                  ? 'bg-pending-500 text-slate-950 font-semibold'
                   : 'hover:bg-slate-700 text-slate-300 hover:text-slate-100'"
                 title="Collision Domains">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,8 +101,8 @@
           Export
         </button>
 
-        <button (click)="fileInput.click()" 
-                class="h-8 px-3 flex items-center gap-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white transition-all text-xs font-medium shadow-lg shadow-indigo-500/25"
+        <button (click)="fileInput.click()"
+                class="h-8 px-3 flex items-center gap-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-signal-500/50 text-slate-200 transition-all text-xs font-medium"
                 title="Import Lab (Ctrl+I)">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -180,7 +176,7 @@
                class="border-t border-slate-700 bg-slate-900 shrink-0 z-10 overflow-hidden flex flex-col"
                [style.height.px]="terminalHeight()">
             <!-- Drag handle -->
-            <div class="h-2 bg-slate-700 hover:bg-blue-500 cursor-ns-resize shrink-0 transition-colors"
+            <div class="h-2 bg-slate-700 hover:bg-signal-500 cursor-ns-resize shrink-0 transition-colors"
                  (mousedown)="onResizeStart($event)"
                  (dblclick)="terminalHeight.set(DEFAULT_TERMINAL_HEIGHT)"></div>
             <app-terminal-panel class="flex-1 min-h-0"></app-terminal-panel>

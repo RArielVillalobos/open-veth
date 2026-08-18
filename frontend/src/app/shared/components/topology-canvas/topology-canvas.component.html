@@ -1,6 +1,10 @@
 <div class="canvas-overlay">
   <div *ngIf="sourceNodeId" class="linking-indicator">
-    🔗 Linking from: <strong>{{ getNodeName(sourceNodeId) }}</strong> (Click another node to connect)
+    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="8" cy="12" r="3" stroke-width="2"/><circle cx="16" cy="12" r="3" stroke-width="2"/>
+      <path stroke-linecap="round" stroke-width="2" d="M11 12h2"/>
+    </svg>
+    Linking from: <strong>{{ getNodeName(sourceNodeId) }}</strong> (Click another node to connect)
     <button (click)="cancelLinking()">Cancel</button>
   </div>
 </div>
@@ -41,7 +45,9 @@
 
     <!-- Properties -->
     <button class="context-menu__item" (click)="onContextMenuAction('properties')">
-      <span class="context-menu__icon">⚡</span>
+      <span class="context-menu__icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </span>
       <span class="context-menu__label">Properties</span>
     </button>
 
@@ -52,17 +58,27 @@
             [class.context-menu__item--disabled]="isContextNodeToggling"
             [disabled]="isContextNodeToggling"
             (click)="onContextMenuAction('power')">
-      <span class="context-menu__icon mono text-xs">{{ isContextNodeToggling ? '⏳' : (isContextNodeStopped ? '▶' : '⏹') }}</span>
+      <span class="context-menu__icon">
+        @if (isContextNodeToggling) {
+          <svg class="animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        } @else if (isContextNodeStopped) {
+          <svg fill="currentColor" viewBox="0 0 24 24"><polygon points="7,4 20,12 7,20"/></svg>
+        } @else {
+          <svg fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+        }
+      </span>
       <span class="context-menu__label">{{ isContextNodeToggling ? (isContextNodeStopped ? 'Starting...' : 'Stopping...') : (isContextNodeStopped ? 'Power On' : 'Power Off') }}</span>
     </button>
 
     <!-- Danger Zone -->
     <button class="context-menu__item context-menu__item--danger"
             (click)="onContextMenuAction('delete')">
-      <span class="context-menu__icon">🗑</span>
+      <span class="context-menu__icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </span>
       <span class="context-menu__label">Delete Node</span>
     </button>
-    
+
   </ng-container>
   
   <!-- EDGE/LINK MENU -->
@@ -78,13 +94,17 @@
     <div class="context-menu__section-header">Packet Capture</div>
 
     <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.sourceNode)">
-      <span class="context-menu__icon">📡</span>
+      <span class="context-menu__icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0"/></svg>
+      </span>
       <span class="context-menu__label">Sniff {{ contextMenu.sourceNode.nodeName }}</span>
       <span class="context-menu__meta">{{ contextMenu.sourceNode.iface }}</span>
     </button>
 
     <button class="context-menu__item" (click)="triggerOpenSniff(contextMenu.targetNode)">
-      <span class="context-menu__icon">📡</span>
+      <span class="context-menu__icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0"/></svg>
+      </span>
       <span class="context-menu__label">Sniff {{ contextMenu.targetNode.nodeName }}</span>
       <span class="context-menu__meta">{{ contextMenu.targetNode.iface }}</span>
     </button>
@@ -93,7 +113,9 @@
 
     <button class="context-menu__item context-menu__item--danger"
             (click)="onContextMenuAction('delete')">
-      <span class="context-menu__icon">🗑</span>
+      <span class="context-menu__icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </span>
       <span class="context-menu__label">Delete Link</span>
     </button>
 

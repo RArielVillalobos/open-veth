@@ -5,6 +5,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import cytoscape from 'cytoscape';
 import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse, NODE_TYPES } from '../../../models/topology.model';
 import { DOMAIN_COLORS } from './domain-colors';
+import { SIGNAL, PENDING, UP_600 } from './theme-colors';
 import { parseNetworkAddress } from '../../utils/network-utils';
 import { resolveSubnetColors } from '../../utils/subnet-colors.utils';
 import { edgeMatchesSubnet, edgeMatchesGateway } from '../../utils/route-highlight.utils';
@@ -108,7 +109,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           el.style({
             'opacity': bright ? 0.9 : 0.3,
             'border-width': 2,
-            'border-color': '#facc15',
+            'border-color': PENDING,
             'border-style': 'solid',
           });
         });
@@ -564,7 +565,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       // Circle background
       ctx.beginPath();
       ctx.arc(bx, by, radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#16a34a';
+      ctx.fillStyle = UP_600;
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
@@ -853,7 +854,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
     newNodeIds.forEach(id => {
       const el = this.cy.getElementById(id);
-      el.style({ 'border-width': 2, 'border-color': '#60a5fa', 'border-opacity': 1 });
+      el.style({ 'border-width': 2, 'border-color': SIGNAL, 'border-opacity': 1 });
       el.animate({
         style: { 'border-opacity': 0 },
         duration: 1500,

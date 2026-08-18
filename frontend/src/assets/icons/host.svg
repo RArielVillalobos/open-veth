@@ -2,8 +2,8 @@
   <title>Host</title>
   <defs>
     <linearGradient id="ov-hostGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#1d9f76;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#148564;stop-opacity:1" />
     </linearGradient>
   </defs>
 

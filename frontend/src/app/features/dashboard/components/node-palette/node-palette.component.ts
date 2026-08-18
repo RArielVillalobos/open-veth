@@ -162,9 +162,6 @@ export class NodePaletteComponent {
   networkDevices = computed(() => this.nodeTypeConfigs.filter(nt => nt.category === 'network'));
   endDevices = computed(() => this.nodeTypeConfigs.filter(nt => nt.category === 'end'));
   
-  // Keyboard shortcuts for footer
-  shortcuts = computed(() => this.nodeTypeConfigs.map(nt => ({ key: nt.shortcut, label: nt.label })));
-
   nameError = computed(() => {
     const name = this.nameValue().trim();
     if (!name) return '';
@@ -182,14 +179,21 @@ export class NodePaletteComponent {
     const base = 'w-full px-3 py-1.5 text-sm bg-slate-800 border rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1';
     return this.nameError()
       ? `${base} border-red-500 focus:ring-red-500`
-      : `${base} border-slate-600 focus:ring-blue-500`;
+      : `${base} border-slate-600 focus:ring-signal-500`;
   });
+
+  collapsed = signal(false);
+
+  toggleCollapsed() {
+    this.collapsed.update(v => !v);
+  }
 
   startNaming(type: NodeType) {
     if (this.pendingType() === type) {
       this.cancelNaming();
       return;
     }
+    this.collapsed.set(false);
     this.pendingType.set(type);
     this.nameCtrl.reset();
     afterNextRender(() => {

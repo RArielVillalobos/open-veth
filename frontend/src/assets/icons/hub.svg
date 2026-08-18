@@ -2,8 +2,8 @@
   <title>Hub</title>
   <defs>
     <linearGradient id="ov-hubGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6b7280;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#4b5563;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#616a76;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#495460;stop-opacity:1" />
     </linearGradient>
   </defs>
 

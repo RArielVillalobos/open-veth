@@ -1,5 +1,6 @@
 import cytoscape from 'cytoscape';
 import { DOMAIN_COLORS, ROUTE_HIGHLIGHT_COLOR, ROUTE_HIGHLIGHT_STATIC_COLOR } from './domain-colors';
+import { GROUND, SURFACE, INK, INK_FAINT, UP } from './theme-colors';
 
 function generateDomainStyles(): cytoscape.StylesheetStyle[] {
   const styles: cytoscape.StylesheetStyle[] = [];
@@ -60,7 +61,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       selector: 'node',
       style: {
         'label': 'data(label)',
-        'color': '#e2e8f0',
+        'color': INK,
         'font-size': '12px',
         'font-weight': 'bold',
         'text-valign': 'bottom',
@@ -73,7 +74,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'background-color': 'transparent',
         'background-opacity': 0,
         'border-width': 0,
-        'text-outline-color': '#020617',
+        'text-outline-color': GROUND,
         'text-outline-width': 2
       }
     },
@@ -90,7 +91,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       selector: '.terminal-active',
       style: {
         'border-width': 2,
-        'border-color': '#34d399',
+        'border-color': UP,
         'border-opacity': 0.9,
       }
     },
@@ -108,7 +109,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       selector: 'edge',
       style: {
         'width': 4,
-        'line-color': '#94a3b8',
+        'line-color': INK_FAINT,
         'curve-style': 'bezier',
         'label': 'data(subnet)',
         'text-rotation': 'autorotate',
@@ -118,11 +119,11 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'target-text-offset': 55,
         'text-margin-y': 4,
         'font-size': '13px',
-        'font-family': 'JetBrains Mono, monospace',
-        'color': '#e2e8f0',
+        'font-family': '"IBM Plex Mono", monospace',
+        'color': INK,
         'text-wrap': 'wrap',
         'text-background-opacity': 0.9,
-        'text-background-color': '#0f172a',
+        'text-background-color': SURFACE,
         'text-background-padding': '5px',
         'text-background-shape': 'roundrectangle'
       }
@@ -130,7 +131,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
     {
       selector: 'edge.link-disabled',
       style: {
-        'line-color': '#475569',
+        'line-color': INK_FAINT,
         'line-style': 'dashed',
         'opacity': 0.4,
       }
@@ -145,16 +146,16 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       selector: 'node.traceroute-path',
       style: {
         'border-width': 3,
-        'border-color': '#22c55e',
+        'border-color': UP,
         'border-opacity': 1,
-        'background-color': '#22c55e',
+        'background-color': UP,
         'background-opacity': 0.15,
       }
     },
     {
       selector: 'edge.traceroute-path',
       style: {
-        'line-color': '#22c55e',
+        'line-color': UP,
         'width': 4,
       }
     },

@@ -7,7 +7,7 @@
         class="tab" 
         [class.tab--active]="t.nodeId === terminalStore.activeNodeId()"
         (click)="setActiveTab(t.nodeId)">
-        <span class="icon mono text-sm">&gt;_</span>
+        <span class="icon">&gt;_</span>
         <span class="label">{{ t.nodeName }}</span>
         <button class="close-btn" (click)="$event.stopPropagation(); closeTerminal(t.nodeId)">×</button>
       </div>

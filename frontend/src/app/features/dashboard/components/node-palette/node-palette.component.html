@@ -1,11 +1,39 @@
-<div class="h-full bg-slate-900 border-r border-slate-700 flex flex-col w-56 overflow-hidden">
+<div class="h-full bg-slate-900 border-r border-slate-700 flex flex-col overflow-hidden transition-all duration-200"
+     [class.w-56]="!collapsed()" [class.w-12]="collapsed()">
   <!-- Header -->
   <div class="p-3 border-b border-slate-800">
-    <div class="flex items-center justify-between">
-      <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Components</h2>
-      <span class="text-[10px] text-slate-500">{{ nodes().length }} total</span>
+    <div class="flex items-center justify-between" [class.justify-center]="collapsed()">
+      @if (!collapsed()) {
+        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Components</h2>
+        <span class="text-[10px] text-slate-500">{{ nodes().length }} total</span>
+      }
+      <button type="button" (click)="toggleCollapsed()"
+              class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+              [title]="collapsed() ? 'Expand palette' : 'Collapse palette'">
+        <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="collapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+      </button>
     </div>
   </div>
+
+  @if (collapsed()) {
+    <!-- Collapsed: flat icon rail, click still opens naming (and expands) -->
+    <div class="flex-1 overflow-y-auto min-h-0 flex flex-col items-center gap-1.5 py-2">
+      @for (nt of nodeTypeConfigs; track nt.id) {
+        <button (click)="startNaming(nt.id)"
+                [class]="'relative p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 ' + nt.hoverBorder"
+                [title]="nt.label + ' (' + nt.shortcut + ')'">
+          <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-7 h-7">
+          @if (nodeCounts()[nt.id] > 0) {
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-slate-600">
+              {{ nodeCounts()[nt.id] }}
+            </span>
+          }
+        </button>
+      }
+    </div>
+  } @else {
 
   <!-- Scrollable node list -->
   <div class="flex-1 overflow-y-auto min-h-0">
@@ -21,8 +49,11 @@
     <div class="flex flex-col gap-1.5">
       @for (nt of networkDevices(); track nt.id) {
         <div class="relative group">
-          <button (click)="startNaming(nt.id)"
-                  [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
+          <div role="button" tabindex="0"
+               (click)="startNaming(nt.id)"
+               (keydown.enter)="startNaming(nt.id)"
+               (keydown.space)="$event.preventDefault(); startNaming(nt.id)"
+               [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 cursor-pointer ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
             <div class="relative">
               <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
               @if (nodeCounts()[nt.id] > 0) {
@@ -39,7 +70,7 @@
               <span class="text-[10px] text-slate-500 truncate">{{ nt.subtitle }}</span>
             </div>
             <!-- Info button -->
-            <button type="button" 
+            <button type="button"
                     (click)="toggleDescription(nt.id); $event.stopPropagation()"
                     class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
                     title="Show details">
@@ -47,7 +78,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </button>
-          </button>
+          </div>
 
           <!-- Description panel -->
           @if (expandedDescription() === nt.id) {
@@ -69,7 +100,7 @@
                 <button type="button" (click)="confirmName()"
                         [disabled]="!canConfirm()"
                         [class]="'flex-1 text-[11px] px-2 py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ' + (canConfirm()
-                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                          ? 'bg-signal-500 hover:bg-signal-300 text-slate-950'
                           : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
                   @if (canConfirm()) {
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,8 +142,11 @@
     <div class="flex flex-col gap-1.5">
       @for (nt of endDevices(); track nt.id) {
         <div class="relative group">
-          <button (click)="startNaming(nt.id)"
-                  [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
+          <div role="button" tabindex="0"
+               (click)="startNaming(nt.id)"
+               (keydown.enter)="startNaming(nt.id)"
+               (keydown.space)="$event.preventDefault(); startNaming(nt.id)"
+               [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 cursor-pointer ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
             <div class="relative">
               <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
               @if (nodeCounts()[nt.id] > 0) {
@@ -129,7 +163,7 @@
               <span class="text-[10px] text-slate-500 truncate">{{ nt.subtitle }}</span>
             </div>
             <!-- Info button -->
-            <button type="button" 
+            <button type="button"
                     (click)="toggleDescription(nt.id); $event.stopPropagation()"
                     class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
                     title="Show details">
@@ -137,7 +171,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </button>
-          </button>
+          </div>
 
           <!-- Description panel -->
           @if (expandedDescription() === nt.id) {
@@ -159,7 +193,7 @@
                 <button type="button" (click)="confirmName()"
                         [disabled]="!canConfirm()"
                         [class]="'flex-1 text-[11px] px-2 py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ' + (canConfirm()
-                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                          ? 'bg-signal-500 hover:bg-signal-300 text-slate-950'
                           : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
                   @if (canConfirm()) {
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,14 +228,7 @@
 
   <!-- Footer with Keyboard Shortcuts -->
   <div class="mt-auto py-2 px-3 border-t border-slate-800">
-    <div class="flex items-center justify-between">
-      <span class="text-[10px] text-slate-500">Quick add:</span>
-      <div class="flex items-center gap-1">
-        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">R</kbd>
-        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">S</kbd>
-        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">U</kbd>
-        <kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-mono rounded border border-slate-700">H</kbd>
-      </div>
-    </div>
+    <p class="text-[10px] text-slate-500 text-center">Hover a device for its shortcut key</p>
   </div>
+  }
 </div>

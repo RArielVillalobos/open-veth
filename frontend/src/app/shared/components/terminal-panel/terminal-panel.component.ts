@@ -118,12 +118,29 @@ export class TerminalPanelComponent implements AfterViewInit, OnDestroy {
     const term = new Terminal({
       cursorBlink: true,
       theme: {
-        background: '#0f172a', // Slate-900 (más oscuro para diferenciar)
-        foreground: '#f8fafc',
-        cursor: '#3b82f6',
-        selectionBackground: 'rgba(59, 130, 246, 0.3)'
+        background: '#0d1416',
+        foreground: '#e8efef',
+        cursor: '#7ed6ce',
+        cursorAccent: '#0d1416',
+        selectionBackground: 'rgba(79, 179, 172, 0.35)',
+        black: '#131b1e',
+        red: '#d97b68',
+        green: '#8fbb6c',
+        yellow: '#d7a153',
+        blue: '#4fb3ac',
+        magenta: '#717ed0',
+        cyan: '#7ed6ce',
+        white: '#8fa3a6',
+        brightBlack: '#5c6d70',
+        brightRed: '#e2917f',
+        brightGreen: '#a8d187',
+        brightYellow: '#e3b471',
+        brightBlue: '#63c2ba',
+        brightMagenta: '#9aa3e0',
+        brightCyan: '#9fe0d9',
+        brightWhite: '#e8efef',
       },
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: '"IBM Plex Mono", Menlo, Monaco, "Courier New", monospace',
       fontSize: 12,
       convertEol: true, // Importante para saltos de línea correctos
     });

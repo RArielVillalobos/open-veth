@@ -26,22 +26,22 @@
                 #labNameInput
                 type="text" 
                 placeholder="Project Name (e.g. BGP-Fabric)" 
-                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-signal-500 focus:ring-1 focus:ring-signal-500 transition-all placeholder:text-slate-600"
                 (keyup.enter)="createLab(labNameInput.value); labNameInput.value=''"
               >
             </div>
-            <button 
+            <button
               (click)="createLab(labNameInput.value); labNameInput.value=''"
-              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-3 rounded-lg text-sm font-semibold shadow-lg shadow-indigo-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              class="w-full bg-signal-500 hover:bg-signal-300 text-slate-950 px-4 py-3 rounded-lg text-sm font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
             >
               <span>+</span> Create Laboratory
             </button>
           </div>
         </div>
 
-        <div class="mt-auto bg-indigo-900/20 border border-indigo-500/20 rounded-lg p-4">
-          <h4 class="text-indigo-300 font-medium text-sm mb-1">Did you know?</h4>
-          <p class="text-indigo-200/60 text-xs leading-relaxed">
+        <div class="mt-auto bg-signal-900/30 border border-signal-700/30 rounded-lg p-4">
+          <h4 class="text-signal-300 font-medium text-sm mb-1">Did you know?</h4>
+          <p class="text-signal-200/60 text-xs leading-relaxed">
             Switching laboratories automatically saves your work and shuts down the previous environment to save resources.
           </p>
         </div>
@@ -54,23 +54,22 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4" *ngIf="store.laboratories().length > 0; else emptyState">
           
           <div *ngFor="let lab of store.laboratories()" 
-               class="group relative bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl p-5 transition-all hover:shadow-xl hover:shadow-black/20 hover:-translate-y-1 flex flex-col"
+               class="group relative bg-slate-800 border border-slate-700 hover:border-signal-500/50 rounded-xl p-5 transition-all hover:-translate-y-1 flex flex-col"
                [class.ring-2]="lab.id === store.currentLabId()"
-               [class.ring-indigo-500]="lab.id === store.currentLabId()"
+               [class.ring-signal-500]="lab.id === store.currentLabId()"
                [class.bg-slate-800]="lab.id !== store.currentLabId()"
                [class.bg-slate-800\/80]="lab.id === store.currentLabId()">
-            
+
             <!-- Status Badge -->
             <div class="absolute top-4 right-4">
-              <span *ngIf="lab.id === store.currentLabId()" class="flex h-3 w-3">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
+              <span *ngIf="lab.id === store.currentLabId()" class="flex h-3 w-3 rounded-full bg-up-500"></span>
             </div>
 
             <!-- Icon -->
-            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center mb-4 text-2xl group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-colors">
-              📂
+            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center mb-4 text-slate-400 group-hover:bg-signal-500/20 group-hover:text-signal-400 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+              </svg>
             </div>
 
             <!-- Content -->
@@ -84,25 +83,31 @@
                      (input)="editingName.set($any($event.target).value)"
                      (keyup.enter)="saveEditing()"
                      (keyup.escape)="cancelEditing()"
-                     [class]="'flex-1 bg-slate-900 border rounded px-2 py-1 text-sm text-slate-100 focus:outline-none ' + (nameError() ? 'border-red-500' : 'border-indigo-500')">
+                     [class]="'flex-1 bg-slate-900 border rounded px-2 py-1 text-sm text-slate-100 focus:outline-none ' + (nameError() ? 'border-red-500' : 'border-signal-500')">
               <button *ngIf="editingLabId() !== lab.id && lab.id === store.currentLabId()"
                       (click)="startEditing(lab)"
-                      class="text-slate-500 hover:text-indigo-400 transition-colors p-1"
+                      class="text-slate-500 hover:text-signal-400 transition-colors p-1"
                       title="Rename">
-                ✏️
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/>
+                </svg>
               </button>
               <button *ngIf="editingLabId() === lab.id"
                       (click)="saveEditing()"
                       [disabled]="!canSave()"
                       [class]="'transition-colors p-1 ' + (canSave() ? 'text-green-400 hover:text-green-300' : 'text-slate-600 cursor-not-allowed')"
                       title="Save">
-                ✓
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
               </button>
               <button *ngIf="editingLabId() === lab.id"
                       (click)="cancelEditing()"
                       class="text-slate-500 hover:text-red-400 transition-colors p-1"
                       title="Cancel">
-                ✕
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
               </button>
             </div>
             <p *ngIf="editingLabId() !== lab.id" class="text-xs text-slate-500 font-mono mb-6 truncate">{{ lab.id }}</p>
@@ -114,7 +119,7 @@
               <button *ngIf="lab.id !== store.currentLabId()"
                       (click)="switchLab(lab.id)"
                       [disabled]="activatingLabId() !== null"
-                      class="flex-1 bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                      class="flex-1 bg-slate-700 hover:bg-signal-500 text-slate-200 hover:text-slate-950 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
                 <svg *ngIf="activatingLabId() === lab.id" class="w-3 h-3 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
@@ -131,7 +136,9 @@
                       (click)="deleteLab(lab.id)"
                       class="px-3 py-2 bg-slate-700 hover:bg-red-900/50 hover:text-red-400 text-slate-400 rounded-lg transition-colors"
                       title="Delete Project">
-                🗑️
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
               </button>
             </div>
           </div>
@@ -141,8 +148,11 @@
         <!-- Empty State -->
         <ng-template #emptyState>
           <div class="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-            <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 text-4xl grayscale">
-              🕸️
+            <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-600">
+              <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="5" r="2" stroke-width="2"/><circle cx="5" cy="19" r="2" stroke-width="2"/><circle cx="19" cy="19" r="2" stroke-width="2"/>
+                <path stroke-linecap="round" stroke-width="2" d="M12 7l-5.5 10M12 7l5.5 10"/>
+              </svg>
             </div>
             <h3 class="text-lg font-medium text-slate-300">No laboratories yet</h3>
             <p class="text-slate-500 text-sm max-w-xs mt-2">Create your first network simulation project using the sidebar.</p>
