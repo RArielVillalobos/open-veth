@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,115 +8,53 @@ import (
 	"time"
 
 	"open-veth/internal/models"
-
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // GetNodeInterfaces executes 'ip -j addr' inside the container and returns parsed info
 func (m *Manager) GetNodeInterfaces(ctx context.Context, containerID string) ([]models.InterfaceInfo, error) {
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"ip", "-j", "addr"},
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	out, err := m.ExecCommand(ctx, containerID, []string{"ip", "-j", "addr"})
 	if err != nil {
-		return nil, fmt.Errorf("error creating exec: %v", err)
-	}
-
-	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error attaching to exec: %v", err)
-	}
-	defer resp.Close()
-
-	var outBuf, errBuf bytes.Buffer
-	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		return nil, fmt.Errorf("error reading exec output: %v", err)
-	}
-
-	if errBuf.Len() > 0 {
-		m.logger.Warn("ip addr stderr output", "stderr", errBuf.String())
+		return nil, fmt.Errorf("ip addr: %w", err)
 	}
 
 	var interfaces []models.InterfaceInfo
-	if err := json.Unmarshal(outBuf.Bytes(), &interfaces); err != nil {
-		return nil, fmt.Errorf("error parsing ip addr json: %v. Output: %s", err, outBuf.String())
+	if err := json.Unmarshal([]byte(out), &interfaces); err != nil {
+		return nil, fmt.Errorf("error parsing ip addr json: %v. Output: %s", err, out)
 	}
-
 	return interfaces, nil
 }
 
 // GetNodeRoutes executes 'ip -j route' inside the container
 func (m *Manager) GetNodeRoutes(ctx context.Context, containerID string) ([]models.RouteInfo, error) {
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"ip", "-j", "route"},
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-
-	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	out, err := m.ExecCommand(ctx, containerID, []string{"ip", "-j", "route"})
 	if err != nil {
-		return nil, fmt.Errorf("error creating route exec: %v", err)
-	}
-
-	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error attaching to route exec: %v", err)
-	}
-	defer resp.Close()
-
-	var outBuf, errBuf bytes.Buffer
-	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ip route: %w", err)
 	}
 
 	var routes []models.RouteInfo
-	if err := json.Unmarshal(outBuf.Bytes(), &routes); err != nil {
+	if err := json.Unmarshal([]byte(out), &routes); err != nil {
 		return nil, fmt.Errorf("error parsing routes: %v", err)
 	}
 
-	// Filter out docker0 routes (internal docker network)
 	var cleanRoutes []models.RouteInfo
 	for _, r := range routes {
 		if r.Dev != "docker0" {
 			cleanRoutes = append(cleanRoutes, r)
 		}
 	}
-
 	return cleanRoutes, nil
 }
 
 // GetNodeMacTable runs 'bridge fdb show br br0' inside a switch container and returns parsed MAC entries.
 func (m *Manager) GetNodeMacTable(ctx context.Context, containerID string) ([]models.MacEntry, error) {
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"bridge", "fdb", "show", "br", "br0"},
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-
-	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	out, err := m.ExecCommand(ctx, containerID, []string{"bridge", "fdb", "show", "br", "br0"})
 	if err != nil {
-		return nil, fmt.Errorf("error creating fdb exec: %v", err)
+		return nil, fmt.Errorf("bridge fdb: %w", err)
 	}
-
-	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error attaching to fdb exec: %v", err)
-	}
-	defer resp.Close()
-
-	var outBuf, errBuf bytes.Buffer
-	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		return nil, err
-	}
-
-	return parseFdbOutput(outBuf.String()), nil
+	return parseFdbOutput(out), nil
 }
 
 // parseFdbOutput parses the text output of 'bridge fdb show br br0' into MacEntry slice.
@@ -135,20 +72,16 @@ func parseFdbOutput(output string) []models.MacEntry {
 			continue
 		}
 		mac := fields[0]
-		// Skip multicast/broadcast MACs
 		if strings.HasPrefix(mac, "01:") || strings.HasPrefix(mac, "33:33:") || mac == "ff:ff:ff:ff:ff:ff" {
 			continue
 		}
-		// fields[1] == "dev", fields[2] == port
 		if fields[1] != "dev" {
 			continue
 		}
 		port := fields[2]
-		// Skip entries on br0 itself
 		if port == "br0" {
 			continue
 		}
-		// Skip "self" entries — per-interface infrastructure entries, not learned MACs
 		isSelf := false
 		for _, f := range fields[3:] {
 			if f == "self" {
@@ -159,7 +92,6 @@ func parseFdbOutput(output string) []models.MacEntry {
 		if isSelf {
 			continue
 		}
-		// Skip "permanent" entries — the port's own MAC registered by the bridge kernel
 		entryType := "dynamic"
 		isPermanent := false
 		for _, f := range fields[3:] {
@@ -188,37 +120,9 @@ func (m *Manager) ConfigureInterface(ctx context.Context, containerID, ifaceName
 		return fmt.Errorf("configure interface rejected: %v", err)
 	}
 
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"ip", "addr", "add", address, "dev", ifaceName},
-		AttachStdout: true,
-		AttachStderr: true,
+	if _, err := m.ExecCommand(ctx, containerID, []string{"ip", "addr", "add", address, "dev", ifaceName}); err != nil {
+		return fmt.Errorf("ip addr add failed: %w", err)
 	}
-
-	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create ip addr exec: %v", err)
-	}
-
-	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to attach to ip addr exec: %v", err)
-	}
-	defer resp.Close()
-
-	var outBuf, errBuf bytes.Buffer
-	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		return fmt.Errorf("failed to read exec output: %v", err)
-	}
-
-	inspectResp, err := m.cli.ContainerExecInspect(ctx, execIDResp.ID)
-	if err != nil {
-		return fmt.Errorf("failed to inspect exec: %v", err)
-	}
-
-	if inspectResp.ExitCode != 0 {
-		return fmt.Errorf("ip addr add failed: %s", errBuf.String())
-	}
-
 	return nil
 }
 
@@ -231,36 +135,8 @@ func (m *Manager) ConfigureRoute(ctx context.Context, containerID, dst, gateway,
 		return fmt.Errorf("configure route rejected: %v", err)
 	}
 
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"ip", "route", "replace", dst, "via", gateway, "dev", dev},
-		AttachStdout: true,
-		AttachStderr: true,
+	if _, err := m.ExecCommand(ctx, containerID, []string{"ip", "route", "replace", dst, "via", gateway, "dev", dev}); err != nil {
+		return fmt.Errorf("ip route add failed: %w", err)
 	}
-
-	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create route exec: %v", err)
-	}
-
-	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to attach to route exec: %v", err)
-	}
-	defer resp.Close()
-
-	var outBuf, errBuf bytes.Buffer
-	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		return fmt.Errorf("failed to read route exec output: %v", err)
-	}
-
-	inspectResp, err := m.cli.ContainerExecInspect(ctx, execIDResp.ID)
-	if err != nil {
-		return fmt.Errorf("failed to inspect route exec: %v", err)
-	}
-
-	if inspectResp.ExitCode != 0 {
-		return fmt.Errorf("ip route add failed: %s", errBuf.String())
-	}
-
 	return nil
 }

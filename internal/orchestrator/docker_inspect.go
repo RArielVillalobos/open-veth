@@ -111,34 +111,47 @@ func (m *Manager) RemoveAllOpenVethVolumes(ctx context.Context) int {
 	return removed
 }
 
-// RunTraceroute executes 'traceroute -n -w 2 -m 15 <dest>' inside the container and returns raw output
-func (m *Manager) RunTraceroute(ctx context.Context, containerID string, destination string) (string, error) {
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"traceroute", "-n", "-w", "2", "-m", "15", destination},
+// ExecCommand runs a command inside a container and returns its stdout.
+// Returns an error (wrapping stderr) if the command exits with a non-zero code.
+func (m *Manager) ExecCommand(ctx context.Context, containerID string, cmd []string) (string, error) {
+	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
+		Cmd:          cmd,
 		AttachStdout: true,
 		AttachStderr: true,
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	execIDResp, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig)
+	})
 	if err != nil {
-		return "", fmt.Errorf("error creating traceroute exec: %v", err)
+		return "", fmt.Errorf("exec create: %w", err)
 	}
 
 	resp, err := m.cli.ContainerExecAttach(ctx, execIDResp.ID, container.ExecStartOptions{})
 	if err != nil {
-		return "", fmt.Errorf("error attaching to traceroute exec: %v", err)
+		return "", fmt.Errorf("exec attach: %w", err)
 	}
 	defer resp.Close()
 
 	var outBuf, errBuf bytes.Buffer
 	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		return "", fmt.Errorf("error reading traceroute output: %v", err)
+		return "", fmt.Errorf("exec read: %w", err)
+	}
+
+	if inspect, err := m.cli.ContainerExecInspect(ctx, execIDResp.ID); err == nil && inspect.ExitCode != 0 {
+		return outBuf.String(), fmt.Errorf("exit %d: %s", inspect.ExitCode, errBuf.String())
 	}
 
 	return outBuf.String(), nil
+}
+
+// RunTraceroute executes 'traceroute -n -w 2 -m 15 <dest>' inside the container and returns raw output.
+// Exit-code errors are ignored — traceroute exits 1 on unreachable but still outputs partial hops.
+func (m *Manager) RunTraceroute(ctx context.Context, containerID string, destination string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	out, err := m.ExecCommand(ctx, containerID, []string{"traceroute", "-n", "-w", "2", "-m", "15", destination})
+	if out == "" && err != nil {
+		return "", err
+	}
+	return out, nil
 }
 
 // KillProcessByName finds processes matching a name pattern inside a container and kills them
