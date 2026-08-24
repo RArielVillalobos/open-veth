@@ -217,29 +217,16 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 			continue
 		}
 
-		// Exists but stopped (e.g. Docker Desktop restart, node was powered off) → start it
-		if ctr, ok := containerByName[node.Name]; ok && ctr.State != "running" {
-			h.Logger.Info("restarting stopped container", "node", node.Name, "state", ctr.State)
-			if err := h.Manager.StartNode(ctx, ctr.ID); err != nil {
-				h.Logger.Warn("failed to restart stopped container, will recreate", "node", node.Name, "error", err)
-				// Remove the broken container so CreateNode below can succeed
-				_ = h.Manager.DeleteNode(ctx, ctr.ID)
-			} else {
-				pid, err := h.Manager.GetNodePID(ctx, ctr.ID)
-				if err != nil {
-					h.Logger.Warn("failed to get PID after restart", "node", node.Name, "error", err)
-				}
-				h.Runtime.Set(node.ID, ctr.ID, pid)
-				h.storeServicePorts(ctx, &node, ctr.ID)
-				node.ContainerID = ctr.ID
-				node.PID = pid
-				nodeMap[node.ID] = node
-				revived++
-				continue
+		// Stopped or missing → delegate to CreateNode, which handles both cases:
+		// - stopped container: detects name conflict, restarts it, runs WaitForReady +
+		//   renameMgmtInterface + deleteDefaultRoute + setupBridge + setupInternetGateway
+		// - missing container: creates fresh; use snapshot image if available
+		if _, exists := containerByName[node.Name]; !exists {
+			if node.SnapshotImage != "" && h.Manager.ImageExists(ctx, node.SnapshotImage) {
+				node.Image = node.SnapshotImage
 			}
 		}
 
-		// Missing → create container
 		cid, err := h.Manager.CreateNode(ctx, node)
 		if err != nil {
 			h.Logger.Warn("failed to revive node", "node", node.Name, "error", err)
@@ -251,12 +238,12 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 		if err != nil {
 			h.Logger.Warn("failed to get PID for revived node", "node", node.Name, "error", err)
 		}
-			h.Runtime.Set(node.ID, cid, pid)
-			h.storeServicePorts(ctx, &node, cid)
-			node.ContainerID = cid
-			node.PID = pid
-			nodeMap[node.ID] = node
-			revived++
+		h.Runtime.Set(node.ID, cid, pid)
+		h.storeServicePorts(ctx, &node, cid)
+		node.ContainerID = cid
+		node.PID = pid
+		nodeMap[node.ID] = node
+		revived++
 	}
 	return
 }
