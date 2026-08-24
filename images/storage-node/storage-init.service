@@ -1,0 +1,13 @@
+[Unit]
+Description=Allocate loop device nodes for storage labs
+DefaultDependencies=no
+Before=local-fs-pre.target sysinit.target
+After=systemd-udevd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/sbin/storage-init.py
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

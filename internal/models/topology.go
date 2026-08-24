@@ -15,6 +15,7 @@ const (
 	MONITOR NodeType = "monitor" // Grafana + Prometheus pre-configured — for observability labs
 	TESTER  NodeType = "tester"  // Debian with wrk, k6, siege, iperf3, locust — for load and stress testing
 	HAPROXY NodeType = "haproxy" // Alpine + HAProxy — for load balancing and reverse proxy labs
+	STORAGE NodeType = "storage" // Debian with systemd + privileged — loop devices, LVM, RAID, LUKS, NFS
 )
 
 // Node status constants
@@ -31,7 +32,7 @@ func NeedsBridge(t NodeType) bool {
 // IsValidNodeType returns true if the given type is a known node type
 func IsValidNodeType(t NodeType) bool {
 	switch t {
-	case ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY:
+	case ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY, STORAGE:
 		return true
 	}
 	return false
@@ -52,6 +53,7 @@ const (
 	ImgTester  = "openveth/tester:latest"
 	ImgSwitch  = "openveth/switch:latest"
 	ImgHAProxy = "openveth/haproxy:latest"
+	ImgStorage = "openveth/storage:latest"
 )
 
 // GetImageForType returns the official docker image for a given node type
@@ -75,6 +77,8 @@ func GetImageForType(t NodeType) string {
 		return ImgTester
 	case HAPROXY:
 		return ImgHAProxy
+	case STORAGE:
+		return ImgStorage
 	default:
 		return ImgHost
 	}

@@ -87,6 +87,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
     { selector: 'node[type="monitor"]', style: nodeImageStyle(icon('monitor')) },
     { selector: 'node[type="tester"]',  style: nodeImageStyle(icon('tester'))  },
     { selector: 'node[type="haproxy"]', style: nodeImageStyle(icon('haproxy')) },
+    { selector: 'node[type="storage"]', style: nodeImageStyle(icon('storage')) },
     {
       selector: '.terminal-active',
       style: {

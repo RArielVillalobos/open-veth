@@ -24,8 +24,8 @@ export interface MacEntry {
   type: 'static' | 'dynamic';
 }
 
-export type NodeType = 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'server' | 'monitor' | 'tester' | 'haproxy';
-export const NODE_TYPES: NodeType[] = ['router', 'switch', 'host', 'hub', 'cloud', 'server', 'monitor', 'tester', 'haproxy'];
+export type NodeType = 'router' | 'switch' | 'host' | 'hub' | 'cloud' | 'server' | 'monitor' | 'tester' | 'haproxy' | 'storage';
+export const NODE_TYPES: NodeType[] = ['router', 'switch', 'host', 'hub', 'cloud', 'server', 'monitor', 'tester', 'haproxy', 'storage'];
 
 export interface Node {
   id: string;

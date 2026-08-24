@@ -51,25 +51,41 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	caps := []string{"NET_ADMIN"}
-	if node.Type == models.SERVER || node.Type == models.MONITOR {
+	if node.Type == models.SERVER || node.Type == models.MONITOR || node.Type == models.STORAGE {
 		// systemd requires SYS_ADMIN to manage cgroups inside the container
 		caps = append(caps, "SYS_ADMIN")
+	}
+	if node.Type == models.STORAGE {
+		// CAP_MKNOD lets storage-init.service create /dev/loopN nodes at startup
+		caps = append(caps, "MKNOD")
 	}
 
 	hostConfig := &container.HostConfig{
 		CapAdd: caps,
 	}
 
-	// systemd nodes (SERVER, MONITOR) need:
+	// systemd nodes (SERVER, MONITOR, STORAGE) need:
 	// - seccomp/apparmor unconfined: service sandbox directives use syscalls blocked by Docker defaults
 	// - cgroupns=host + /sys/fs/cgroup bind + /run tmpfs: required for systemd as PID 1
-	if node.Type == models.SERVER || node.Type == models.MONITOR {
+	if node.Type == models.SERVER || node.Type == models.MONITOR || node.Type == models.STORAGE {
 		hostConfig.SecurityOpt = []string{"seccomp=unconfined", "apparmor=unconfined"}
 		hostConfig.CgroupnsMode = "host"
 		hostConfig.Mounts = append(hostConfig.Mounts,
 			mount.Mount{Type: mount.TypeBind, Source: "/sys/fs/cgroup", Target: "/sys/fs/cgroup"},
 			mount.Mount{Type: mount.TypeTmpfs, Target: "/run"},
 			mount.Mount{Type: mount.TypeTmpfs, Target: "/run/lock"},
+		)
+	}
+
+	// STORAGE: expose only loop-control and device-mapper control.
+	// The storage-init.service inside the container uses LOOP_CTL_GET_FREE to find
+	// the first kernel-free slot and mknod's 8 loop devices starting there —
+	// so they never collide with host loop devices already in use (e.g. snapd).
+	// /dev/mapper/control is required for LVM and LUKS (device-mapper).
+	if node.Type == models.STORAGE {
+		hostConfig.Devices = append(hostConfig.Devices,
+			container.DeviceMapping{PathOnHost: "/dev/loop-control", PathInContainer: "/dev/loop-control", CgroupPermissions: "rwm"},
+			container.DeviceMapping{PathOnHost: "/dev/mapper/control", PathInContainer: "/dev/mapper/control", CgroupPermissions: "rwm"},
 		)
 	}
 
@@ -130,7 +146,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			if node.Type == models.CLOUD {
 				m.setupCloud(ctx, inspect.ID, node.Name)
 			}
-			if node.Type == models.SERVER {
+			if node.Type == models.SERVER || node.Type == models.STORAGE {
 				m.setupInternetGateway(ctx, inspect.ID, node.Name)
 			}
 
@@ -166,8 +182,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.setupCloud(ctx, resp.ID, node.Name)
 	}
 
-	// 9. If node is SERVER, restore default gateway for direct internet access
-	if node.Type == models.SERVER {
+	// 9. If node is SERVER or STORAGE, restore default gateway for direct internet access
+	if node.Type == models.SERVER || node.Type == models.STORAGE {
 		m.setupInternetGateway(ctx, resp.ID, node.Name)
 	}
 

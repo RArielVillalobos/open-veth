@@ -73,8 +73,9 @@ pull-images: ## Pull node images from Docker Hub (openveth/*)
 	$(DOCKER_CMD) pull openveth/tester:latest
 	$(DOCKER_CMD) pull openveth/switch:latest
 	$(DOCKER_CMD) pull openveth/haproxy:latest
+	$(DOCKER_CMD) pull openveth/storage:latest
 
-images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch, HAProxy)
+images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch, HAProxy, Storage)
 	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
@@ -83,6 +84,7 @@ images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, 
 	$(DOCKER_CMD) build -t openveth/tester:latest ./images/tester-node
 	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
 	$(DOCKER_CMD) build -t openveth/haproxy:latest ./images/haproxy-node
+	$(DOCKER_CMD) build -t openveth/storage:latest ./images/storage-node
 
 switch-image: ## Build only the switch node image (Debian + SNMP + Bridge tools)
 	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
@@ -98,6 +100,10 @@ tester-image: ## Build only the tester node image (wrk, k6, siege, iperf3, locus
 
 haproxy-image: ## Build only the haproxy node image (Alpine + HAProxy)
 	$(DOCKER_CMD) build -t openveth/haproxy:latest ./images/haproxy-node
+
+storage-image: ## Build only the storage node image (Debian + loop/LVM/RAID/LUKS/NFS tools)
+	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
+	$(DOCKER_CMD) build -t openveth/storage:latest ./images/storage-node
 
 # --- Testing ---
 test-go: ## Run Go tests

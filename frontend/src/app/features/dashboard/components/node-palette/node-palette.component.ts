@@ -134,6 +134,18 @@ export class NodePaletteComponent {
       description: 'Debian with wrk, k6, siege, ab, iperf3, hping3, vegeta, stress-ng and locust. Ideal for HTTP load testing, network throughput measurement and system stress testing.'
     },
     {
+      id: 'storage',
+      label: 'Storage',
+      subtitle: 'Debian + block tools',
+      icon: 'storage.svg',
+      placeholder: 'e.g. STO1',
+      accentBorder: 'border-sky-500',
+      hoverBorder: 'hover:border-sky-500/50',
+      category: 'end',
+      shortcut: 'G',
+      description: 'Debian with systemd and block storage tools: fdisk, parted, gdisk, LVM, mdadm, cryptsetup. Loop devices pre-allocated at startup. Ideal for storage, sysadmin and LFCS labs.'
+    },
+    {
       id: 'haproxy',
       label: 'HAProxy',
       subtitle: 'Load Balancer',
@@ -149,7 +161,7 @@ export class NodePaletteComponent {
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0, haproxy: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0, haproxy: 0, storage: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;
