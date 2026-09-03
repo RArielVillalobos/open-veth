@@ -146,7 +146,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			if node.Type == models.CLOUD {
 				m.setupCloud(ctx, inspect.ID, node.Name)
 			}
-			if node.Type == models.SERVER || node.Type == models.STORAGE {
+			if node.Type == models.SERVER || node.Type == models.STORAGE || node.Type == models.CLOUD {
 				m.setupInternetGateway(ctx, inspect.ID, node.Name)
 			}
 
@@ -182,8 +182,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.setupCloud(ctx, resp.ID, node.Name)
 	}
 
-	// 9. If node is SERVER or STORAGE, restore default gateway for direct internet access
-	if node.Type == models.SERVER || node.Type == models.STORAGE {
+	// 9. Restore default gateway: SERVER/STORAGE need it for apt-get; CLOUD needs it to forward packets to internet
+	if node.Type == models.SERVER || node.Type == models.STORAGE || node.Type == models.CLOUD {
 		m.setupInternetGateway(ctx, resp.ID, node.Name)
 	}
 
