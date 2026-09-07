@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mdadm \
     cryptsetup \
     nfs-common \
+    nfs-kernel-server \
+    quota \
+    quotatool \
     smartmontools \
     testdisk \
     && rm -rf /var/lib/apt/lists/*
