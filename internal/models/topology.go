@@ -16,6 +16,7 @@ const (
 	TESTER  NodeType = "tester"  // Debian with wrk, k6, siege, iperf3, locust — for load and stress testing
 	HAPROXY NodeType = "haproxy" // Alpine + HAProxy — for load balancing and reverse proxy labs
 	STORAGE NodeType = "storage" // Debian with systemd + privileged — loop devices, LVM, RAID, LUKS, NFS
+	ZABBIX  NodeType = "zabbix"  // Debian + Zabbix 8 + MariaDB + Apache — monitoring, SNMP, alerts, network maps
 )
 
 // Node status constants
@@ -32,7 +33,7 @@ func NeedsBridge(t NodeType) bool {
 // IsValidNodeType returns true if the given type is a known node type
 func IsValidNodeType(t NodeType) bool {
 	switch t {
-	case ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY, STORAGE:
+	case ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY, STORAGE, ZABBIX:
 		return true
 	}
 	return false
@@ -54,6 +55,7 @@ const (
 	ImgSwitch  = "openveth/switch:latest"
 	ImgHAProxy = "openveth/haproxy:latest"
 	ImgStorage = "openveth/storage:latest"
+	ImgZabbix  = "openveth/zabbix:latest"
 )
 
 // GetImageForType returns the official docker image for a given node type
@@ -79,6 +81,8 @@ func GetImageForType(t NodeType) string {
 		return ImgHAProxy
 	case STORAGE:
 		return ImgStorage
+	case ZABBIX:
+		return ImgZabbix
 	default:
 		return ImgHost
 	}

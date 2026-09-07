@@ -74,8 +74,9 @@ pull-images: ## Pull node images from Docker Hub (openveth/*)
 	$(DOCKER_CMD) pull openveth/switch:latest
 	$(DOCKER_CMD) pull openveth/haproxy:latest
 	$(DOCKER_CMD) pull openveth/storage:latest
+	$(DOCKER_CMD) pull openveth/zabbix:latest
 
-images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch, HAProxy, Storage)
+images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch, HAProxy, Storage, Zabbix)
 	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
 	$(DOCKER_CMD) build -t openveth/host:latest ./images/host-node
 	$(DOCKER_CMD) build -t openveth/router:latest ./images/router-node
@@ -85,6 +86,7 @@ images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, 
 	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
 	$(DOCKER_CMD) build -t openveth/haproxy:latest ./images/haproxy-node
 	$(DOCKER_CMD) build -t openveth/storage:latest ./images/storage-node
+	$(DOCKER_CMD) build -t openveth/zabbix:latest ./images/zabbix-node
 
 switch-image: ## Build only the switch node image (Debian + SNMP + Bridge tools)
 	$(DOCKER_CMD) build -t openveth/switch:latest ./images/switch-node
@@ -104,6 +106,10 @@ haproxy-image: ## Build only the haproxy node image (Alpine + HAProxy)
 storage-image: ## Build only the storage node image (Debian + loop/LVM/RAID/LUKS/NFS tools)
 	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
 	$(DOCKER_CMD) build -t openveth/storage:latest ./images/storage-node
+
+zabbix-image: ## Build only the zabbix node image (Debian + Zabbix 8 + MariaDB + Apache)
+	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
+	$(DOCKER_CMD) build -t openveth/zabbix:latest ./images/zabbix-node
 
 # --- Testing ---
 test-go: ## Run Go tests

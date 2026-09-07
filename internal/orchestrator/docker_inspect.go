@@ -56,6 +56,10 @@ func (m *Manager) GetServicePorts(ctx context.Context, containerID string) (map[
 			ports["prometheus"] = hostPort
 		case "8404":
 			ports["stats"] = hostPort
+		case "80":
+			ports["zabbix"] = hostPort
+		case "10051":
+			ports["trapper"] = hostPort
 		}
 	}
 	return ports, nil

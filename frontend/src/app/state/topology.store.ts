@@ -15,6 +15,7 @@ export interface TopologyState {
   domains: DomainsResponse | null;
   activeDomainOverlay: 'broadcast' | 'collision' | null;
   togglingNodes: string[]; // Node IDs with a pending power toggle
+  serviceMessages: Record<string, string>; // nodeId → current startup stage message
 }
 
 const LAB_ID_KEY = 'openveth_current_lab_id';
@@ -40,7 +41,8 @@ const initialState: TopologyState = {
   error: null,
   domains: null,
   activeDomainOverlay: null,
-  togglingNodes: []
+  togglingNodes: [],
+  serviceMessages: {}
 };
 
 export const TopologyStore = signalStore(
@@ -96,6 +98,7 @@ export const TopologyStore = signalStore(
           patchState(store, (state) => ({
             isLoading: false,
             laboratories: labs,
+            serviceMessages: {},
             topology: {
               ...state.topology,
               id: state.currentLabId,
@@ -246,6 +249,16 @@ export const TopologyStore = signalStore(
         } finally {
           patchState(store, (state) => ({ togglingNodes: state.togglingNodes.filter(n => n !== id) }));
         }
+      },
+
+      setServiceMessage(nodeId: string, message: string) {
+        patchState(store, (state) => {
+          if (!message) {
+            const { [nodeId]: _, ...rest } = state.serviceMessages;
+            return { serviceMessages: rest };
+          }
+          return { serviceMessages: { ...state.serviceMessages, [nodeId]: message } };
+        });
       },
 
       updateNodeStatus(id: string, status: 'running' | 'stopped') {

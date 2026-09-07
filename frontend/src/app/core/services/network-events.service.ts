@@ -115,6 +115,13 @@ export class NetworkEventsService {
         this.store.loadTopology();
         break;
 
+      case 'node:service_status':
+        if (event.nodeId) {
+          const message = (event.data?.['message'] as string) ?? '';
+          this.store.setServiceMessage(event.nodeId, message);
+        }
+        break;
+
       case 'node:stopped':
         if (event.nodeId) this.store.updateNodeStatus(event.nodeId, 'stopped');
         break;

@@ -1,0 +1,14 @@
+[Unit]
+Description=Initialize Zabbix database and web config (first boot only)
+After=mariadb.service
+Requires=mariadb.service
+Before=zabbix-server.service apache2.service
+ConditionPathExists=!/var/lib/zabbix/.initialized
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zabbix-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

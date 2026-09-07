@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { Node, Link, RouteInfo, MacEntry } from '../../../../models/topology.model';
 import { TopologyService } from '../../../../core/services/topology.service';
 import { ToastService } from '../../../../core/services/toast.service';
+import { TopologyStore } from '../../../../state/topology.store';
 import { ROUTE_HIGHLIGHT_COLOR, ROUTE_HIGHLIGHT_STATIC_COLOR } from '../../../../shared/components/topology-canvas/domain-colors';
 
 @Component({
@@ -28,6 +29,7 @@ export class PropertiesPanelComponent {
 
   private service = inject(TopologyService);
   private toast = inject(ToastService);
+  private store = inject(TopologyStore);
   
   // Internal state
   routes = signal<RouteInfo[]>([]);
@@ -54,6 +56,8 @@ export class PropertiesPanelComponent {
 
   isHAProxyNode = computed(() => this.selectedNode()?.type === 'haproxy');
 
+  isZabbixNode = computed(() => this.selectedNode()?.type === 'zabbix');
+
   grafanaUrl = computed(() => {
     const port = this.selectedNode()?.service_ports?.['grafana'];
     return port ? `http://localhost:${port}` : null;
@@ -67,6 +71,16 @@ export class PropertiesPanelComponent {
   haproxyStatsUrl = computed(() => {
     const port = this.selectedNode()?.service_ports?.['stats'];
     return port ? `http://localhost:${port}/stats` : null;
+  });
+
+  zabbixUrl = computed(() => {
+    const port = this.selectedNode()?.service_ports?.['zabbix'];
+    return port ? `http://localhost:${port}/zabbix` : null;
+  });
+
+  nodeServiceMessage = computed(() => {
+    const id = this.selectedNode()?.id;
+    return id ? (this.store.serviceMessages()[id] ?? '') : '';
   });
 
   // Safe check for interfaces to use in template

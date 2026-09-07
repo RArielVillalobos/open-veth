@@ -35,6 +35,7 @@ func TestGetImageForType(t *testing.T) {
 		{TESTER, ImgTester},            // Tester uses its own load-testing image
 		{HAPROXY, ImgHAProxy},          // HAProxy uses its own Alpine+HAProxy image
 		{STORAGE, ImgStorage},          // Storage uses its own privileged debian+systemd image
+		{ZABBIX, ImgZabbix},            // Zabbix uses its own Debian+Zabbix8+MariaDB image
 		{NodeType("unknown"), ImgHost}, // default fallback
 	}
 
@@ -47,7 +48,7 @@ func TestGetImageForType(t *testing.T) {
 }
 
 func TestIsValidNodeType(t *testing.T) {
-	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY, STORAGE}
+	valid := []NodeType{ROUTER, SWITCH, HUB, HOST, CLOUD, SERVER, MONITOR, TESTER, HAPROXY, STORAGE, ZABBIX}
 	for _, tt := range valid {
 		if !IsValidNodeType(tt) {
 			t.Errorf("IsValidNodeType(%q) = false, want true", tt)

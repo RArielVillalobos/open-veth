@@ -146,6 +146,18 @@ export class NodePaletteComponent {
       description: 'Debian with systemd and block storage tools: fdisk, parted, gdisk, LVM, mdadm, cryptsetup. Loop devices pre-allocated at startup. Ideal for storage, sysadmin and LFCS labs.'
     },
     {
+      id: 'zabbix',
+      label: 'Zabbix',
+      subtitle: 'Zabbix 8 + MariaDB',
+      icon: 'zabbix.svg',
+      placeholder: 'e.g. ZBX1',
+      accentBorder: 'border-red-500',
+      hoverBorder: 'hover:border-red-500/50',
+      category: 'end',
+      shortcut: 'Z',
+      description: 'Debian with Zabbix 8, MariaDB and Apache pre-configured. Ready on first boot — no setup wizard. Monitor hosts via Zabbix Agent 2, routers and switches via SNMP. Includes alerts, triggers, templates and network maps.'
+    },
+    {
       id: 'haproxy',
       label: 'HAProxy',
       subtitle: 'Load Balancer',
@@ -161,7 +173,7 @@ export class NodePaletteComponent {
 
   // Computed count of nodes by type
   nodeCounts = computed(() => {
-    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0, haproxy: 0, storage: 0 };
+    const counts: Record<NodeType, number> = { router: 0, switch: 0, hub: 0, host: 0, cloud: 0, server: 0, monitor: 0, tester: 0, haproxy: 0, storage: 0, zabbix: 0 };
     this.nodes().forEach(node => {
       if (counts[node.type as NodeType] !== undefined) {
         counts[node.type as NodeType]++;

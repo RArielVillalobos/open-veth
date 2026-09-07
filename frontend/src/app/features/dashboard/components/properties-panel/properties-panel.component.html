@@ -80,10 +80,10 @@
             </a>
           } @else {
             <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-500 text-sm py-2.5 px-4 rounded-lg border border-slate-700/50">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20V10m6 10V4m6 16v-7"/>
+              <svg class="w-4 h-4 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
-              <span>Grafana — starting...</span>
+              <span>{{ nodeServiceMessage() || 'Grafana — starting...' }}</span>
             </div>
           }
           @if (prometheusUrl()) {
@@ -135,6 +135,44 @@
               <span>Stats — starting...</span>
             </div>
           }
+        </div>
+      }
+
+      <!-- Zabbix Node: web UI quick access -->
+      @if (isZabbixNode()) {
+        <div class="space-y-2">
+          @if (zabbixUrl()) {
+            <a [href]="zabbixUrl()!" target="_blank"
+               class="flex items-center justify-between gap-2 w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm py-2.5 px-4 rounded-lg border border-red-500/30 transition-all">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span class="font-medium">Open Zabbix</span>
+              </div>
+              <span class="text-[10px] font-mono text-red-300/70">:{{ selectedNode()?.service_ports?.['zabbix'] }}</span>
+            </a>
+          } @else {
+            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-500 text-sm py-2.5 px-4 rounded-lg border border-slate-700/50">
+              <svg class="w-4 h-4 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              <span>{{ nodeServiceMessage() || 'Zabbix — starting...' }}</span>
+            </div>
+          }
+          <div class="flex items-start gap-2 px-3 py-2 bg-red-500/5 rounded-lg border border-red-500/20">
+            <svg class="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-[10px] text-red-300/70 leading-relaxed">
+              Login: <span class="font-mono text-red-300">Admin / zabbix</span>
+              · First boot initializes the DB (~30s). Add hosts via
+              <span class="font-mono">Configuration → Hosts</span>
+              @if (selectedNode()?.service_ports?.['trapper']) {
+                · Trapper: <span class="font-mono text-red-300">:{{ selectedNode()?.service_ports?.['trapper'] }}</span>
+              }
+            </p>
+          </div>
         </div>
       }
 

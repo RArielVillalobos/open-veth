@@ -51,7 +51,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 	}
 
 	caps := []string{"NET_ADMIN"}
-	if node.Type == models.SERVER || node.Type == models.MONITOR || node.Type == models.STORAGE {
+	if node.Type == models.SERVER || node.Type == models.MONITOR || node.Type == models.STORAGE || node.Type == models.ZABBIX {
 		// systemd requires SYS_ADMIN to manage cgroups inside the container
 		caps = append(caps, "SYS_ADMIN")
 	}
@@ -64,10 +64,10 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		CapAdd: caps,
 	}
 
-	// systemd nodes (SERVER, MONITOR, STORAGE) need:
+	// systemd nodes (SERVER, MONITOR, STORAGE, ZABBIX) need:
 	// - seccomp/apparmor unconfined: service sandbox directives use syscalls blocked by Docker defaults
 	// - cgroupns=host + /sys/fs/cgroup bind + /run tmpfs: required for systemd as PID 1
-	if node.Type == models.SERVER || node.Type == models.MONITOR || node.Type == models.STORAGE {
+	if node.Type == models.SERVER || node.Type == models.MONITOR || node.Type == models.STORAGE || node.Type == models.ZABBIX {
 		hostConfig.SecurityOpt = []string{"seccomp=unconfined", "apparmor=unconfined"}
 		hostConfig.CgroupnsMode = "host"
 		hostConfig.Mounts = append(hostConfig.Mounts,
@@ -98,6 +98,18 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		hostConfig.PortBindings = nat.PortMap{
 			"3000/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
 			"9090/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
+		}
+	}
+
+	// ZABBIX: expose web UI (80) and server trapper port (10051) on dynamic host ports
+	if node.Type == models.ZABBIX {
+		config.ExposedPorts = nat.PortSet{
+			"80/tcp":    struct{}{},
+			"10051/tcp": struct{}{},
+		}
+		hostConfig.PortBindings = nat.PortMap{
+			"80/tcp":    []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
+			"10051/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "0"}},
 		}
 	}
 
@@ -146,7 +158,7 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 			if node.Type == models.CLOUD {
 				m.setupCloud(ctx, inspect.ID, node.Name)
 			}
-			if node.Type == models.SERVER || node.Type == models.STORAGE || node.Type == models.CLOUD {
+			if node.Type == models.SERVER || node.Type == models.STORAGE || node.Type == models.ZABBIX || node.Type == models.CLOUD {
 				m.setupInternetGateway(ctx, inspect.ID, node.Name)
 			}
 
@@ -182,8 +194,8 @@ func (m *Manager) CreateNode(ctx context.Context, node models.Node) (string, err
 		m.setupCloud(ctx, resp.ID, node.Name)
 	}
 
-	// 9. Restore default gateway: SERVER/STORAGE need it for apt-get; CLOUD needs it to forward packets to internet
-	if node.Type == models.SERVER || node.Type == models.STORAGE || node.Type == models.CLOUD {
+	// 9. Restore default gateway: SERVER/STORAGE/ZABBIX need it for apt-get; CLOUD needs it to forward packets to internet
+	if node.Type == models.SERVER || node.Type == models.STORAGE || node.Type == models.ZABBIX || node.Type == models.CLOUD {
 		m.setupInternetGateway(ctx, resp.ID, node.Name)
 	}
 

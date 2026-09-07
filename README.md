@@ -51,6 +51,8 @@ If you want to understand why a network fails, you need to break a real one firs
 - **Observability**: Deploy a Monitor node with Grafana + Prometheus pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` and build your own dashboards from scratch
 - **Load & Stress Testing**: Generate HTTP load with `wrk` or `k6`, measure throughput with `iperf3`, simulate degraded links with `tc netem` — all from a dedicated Tester node
 - **Load Balancing**: Deploy an HAProxy node to distribute traffic across multiple backends. Stats page auto-starts on a dynamic port, accessible directly from the node panel
+- **Block Storage & LFCS Prep**: Practice `fdisk`, LVM, RAID, LUKS and NFS with a Storage node — loop devices pre-allocated at startup, no VM needed. Covers ~70% of the LFCS storage domain
+- **Enterprise Monitoring**: Deploy a Zabbix node with Zabbix 8, MariaDB and Apache pre-configured. Monitor hosts via Agent 2 and routers/switches via SNMP. Web UI auto-starts on a dynamic port
 - **Security**: Practice iptables rules, NAT, port forwarding and firewall policies in an isolated environment
 
 ---
@@ -138,6 +140,8 @@ Run traceroute from any node and watch the path light up on the graph in real-ti
 | **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + snmp_exporter pre-installed and auto-started. Loki is installed but disabled by default — enable with `systemctl enable loki --now`. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
 | **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
 | **HAPROXY** | Alpine Linux + HAProxy | Load balancer — HAProxy pre-configured with stats page on port 8404 (auto-mapped). Edit `/etc/haproxy/haproxy.cfg` and reload with `haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)` |
+| **STORAGE** | Debian bookworm + systemd | Block storage labs — `fdisk`, `parted`, `gdisk`, `LVM`, `mdadm`, `cryptsetup`, `nfs-common`, `smartmontools` pre-installed. Loop devices pre-allocated at startup so you can practice `mkfs`, `mount`, LVM, RAID and LUKS without attaching real disks. Ideal for LFCS preparation |
+| **ZABBIX** | Debian bookworm + systemd | Enterprise monitoring — Zabbix 8, MariaDB and Apache pre-configured. Ready on first boot (no setup wizard). Monitor hosts via Zabbix Agent 2, routers and switches via SNMP. Web UI (port 80) auto-mapped. Login: `Admin / zabbix` |
 
 All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
 
@@ -174,7 +178,7 @@ make up
 > `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
 
 That's it! The command will:
-- Pull node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester, HAProxy — Hub and Cloud reuse the Host image)
+- Pull node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester, HAProxy, Storage, Zabbix — Hub and Cloud reuse the Host image)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL to open in your browser
 
@@ -193,8 +197,9 @@ That's it! The command will:
 | OpenVeth UI | `http://localhost` | — | — |
 | Node terminal (SSH) | `ssh root@<node-ip>` | `root` | `openveth` |
 | Grafana (MONITOR node) | `http://localhost:<mapped-port>` | `admin` | `admin` |
+| Zabbix (ZABBIX node) | `http://localhost:<mapped-port>` | `Admin` | `zabbix` |
 
-> The Grafana port is auto-assigned — find it in the node card after activating a lab with a MONITOR node.
+> Service ports (Grafana, Zabbix, HAProxy stats) are auto-assigned — find them in the node panel after the node finishes starting up.
 
 ### Useful Commands
 
@@ -368,6 +373,8 @@ The UI updates in real-time even when the node shuts itself down from within —
 | Grafana + Prometheus built-in (Monitor node) | ✅ |
 | Load testing built-in (wrk, k6, iperf3) | ✅ |
 | HAProxy load balancer node | ✅ |
+| Block storage labs (LVM, RAID, LUKS, loop devices) | ✅ |
+| Zabbix 8 monitoring node (Agent 2 + SNMP) | ✅ |
 | SNMP monitoring (router + switch) | ✅ |
 | MAC address table (live) | ✅ |
 | Filesystem snapshots (docker commit) | ✅ |
