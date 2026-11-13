@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"open-veth/internal/models"
 
@@ -238,8 +240,12 @@ func (h *Handler) ActivateLaboratory(c *gin.Context) {
 		return
 	}
 
+	h.activationMu.Lock()
+	h.activation = activationStatus{LabID: labID, OperationID: fmt.Sprint(time.Now().UnixNano()), Status: "activating"}
+	operationID := h.activation.OperationID
+	h.activationMu.Unlock()
 	h.Logger.Info("activating laboratory (async)", "id", labID)
-	c.JSON(http.StatusAccepted, gin.H{"message": "activation started", "lab_id": labID})
+	c.JSON(http.StatusAccepted, gin.H{"message": "activation started", "lab_id": labID, "operation_id": operationID})
 
 	// Run activation in background; use a fresh context since the request context
 	// will be cancelled as soon as the HTTP handler returns.

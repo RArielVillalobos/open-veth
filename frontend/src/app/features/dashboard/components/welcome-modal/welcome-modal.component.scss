@@ -1,1 +1,13 @@
-/* Welcome modal styles - currently empty, using Tailwind only */
+
+.welcome-backdrop { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: #0009; padding: 16px; }
+.welcome-dialog { width: min(380px, 100%); border: 1px solid #425256; border-radius: 3px; background: #131b1e; color: #b4c4c6; box-shadow: 0 16px 48px #0006; }
+.welcome-dialog header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 0; }
+.welcome-dialog h2 { color: #dbe4e5; font-size: 16px; font-weight: 500; }
+.welcome-dialog header button { font-size: 24px; line-height: 1; padding: 0 4px; }
+.welcome-description { color: #8fa3a6; font-size: 12px; padding: 2px 20px 16px; }
+.welcome-dialog nav { border-top: 1px solid #28353a; }
+.welcome-dialog nav button { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 12px 20px; width: 100%; border-bottom: 1px solid #28353a; font-size: 13px; color: #dbe4e5; }
+.welcome-dialog nav button:hover { background: #1a2427; }
+.welcome-dialog nav button span + span { color: #8fa3a6; font-size: 12px; }
+.welcome-hint { padding: 12px 20px; color: #8fa3a6; font-size: 11px; line-height: 1.6; }
+.welcome-hint kbd { color: #b4c4c6; }

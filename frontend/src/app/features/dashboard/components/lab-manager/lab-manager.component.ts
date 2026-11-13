@@ -1,11 +1,13 @@
-import { Component, inject, Output, EventEmitter, signal, computed, ElementRef, viewChildren } from '@angular/core';
+import { Component, inject, Output, EventEmitter, signal, computed, ElementRef, viewChildren, HostListener } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
+import { DecisionDialogService } from '../../../../core/services/decision-dialog.service';
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../../../state/topology.store';
 
 @Component({
   selector: 'app-lab-manager',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, A11yModule],
   templateUrl: './lab-manager.component.html',
   styleUrl: './lab-manager.component.scss'
 })
@@ -13,6 +15,11 @@ export class LabManagerComponent {
   readonly store = inject(TopologyStore);
 
   @Output() close = new EventEmitter<void>();
+
+  private decisions = inject(DecisionDialogService);
+  newName = signal('');
+  readonly busy = computed(() => this.store.isLoading() || ['requesting', 'activating', 'uncertain'].includes(this.store.activationPhase()));
+  @HostListener('document:keydown.escape') onEscape() { if (document.querySelector('cdk-dialog-container')) return; if (this.editingLabId()) this.cancelEditing(); else if (!this.busy()) this.close.emit(); }
 
   editingLabId = signal<string | null>(null);
   editingName = signal('');
@@ -35,22 +42,23 @@ export class LabManagerComponent {
     return name.length > 0 && !this.nameError();
   });
 
-  createLab(name: string) {
-    if (!name.trim()) return;
-    this.store.createLaboratory(name.trim());
+  async createLab() {
+    if (this.busy() || !this.newName().trim()) return;
+    if (await this.store.createLaboratory(this.newName().trim())) this.close.emit();
   }
 
   async switchLab(id: string) {
+    if (this.busy()) return;
     this.activatingLabId.set(id);
-    await this.store.switchLab(id);
+    const accepted = await this.store.switchLab(id);
     this.activatingLabId.set(null);
-    this.close.emit();
+    if (accepted) this.close.emit();
   }
 
-  deleteLab(id: string) {
-    if (confirm('Are you sure you want to delete this laboratory? This cannot be undone.')) {
-      this.store.deleteLaboratory(id);
-    }
+  async deleteLab(id: string) {
+    if (this.busy()) return;
+    const lab = this.store.laboratories().find(item => item.id === id);
+    if (await this.decisions.confirm('Delete laboratory?', 'Delete "' + lab?.name + '" and all its nodes, links, saved settings, and snapshots? This cannot be undone.', 'Delete laboratory')) await this.store.deleteLaboratory(id);
   }
 
   startEditing(lab: { id: string; name: string }) {

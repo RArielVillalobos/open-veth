@@ -7,6 +7,7 @@ function createMockTopologyStore() {
   return {
     fetchNodeInterfaces: vi.fn(),
     loadTopology: vi.fn(),
+    reconcileAfterReconnect: vi.fn(),
     updateNodeStatus: vi.fn(),
   };
 }
@@ -146,4 +147,28 @@ describe('NetworkEventsService', () => {
     expect((service as any).reconnectAttempts).toBe(5);
     expect((service as any).reconnectTimeout).toBeNull();
   });
+  it('reconciles state after both automatic and manual reconnection', () => {
+    class FakeSocket {
+      static OPEN = 1;
+      static CONNECTING = 0;
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      close() {}
+    }
+    vi.stubGlobal('WebSocket', FakeSocket);
+    try {
+      service.connect();
+      (service as any).ws.onopen();
+      expect(mockStore.reconcileAfterReconnect).not.toHaveBeenCalled();
+      service.reconnect();
+      (service as any).ws.onopen();
+      expect(mockStore.reconcileAfterReconnect).toHaveBeenCalledTimes(1);
+      service.disconnect();
+      (service as any).reconnectAttempts = 1;
+      service.connect();
+      (service as any).ws.onopen();
+      expect(mockStore.reconcileAfterReconnect).toHaveBeenCalledTimes(2);
+    } finally { service.disconnect(); vi.unstubAllGlobals(); }
+  });
+
 });

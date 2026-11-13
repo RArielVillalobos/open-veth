@@ -1,10 +1,11 @@
 import { Component, output, HostListener } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
 import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-welcome-modal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, A11yModule],
   templateUrl: './welcome-modal.component.html',
   styleUrl: './welcome-modal.component.scss'
 })

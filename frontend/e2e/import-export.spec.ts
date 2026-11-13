@@ -17,9 +17,12 @@ test.describe('Import / Export', () => {
     );
 
     // Click Export button
+    const downloadPromise = page.waitForEvent('download');
     await page.locator('button:has-text("Export")').click();
 
     await exportPromise;
+    const download = await downloadPromise;
+    expect(await download.failure()).toBeNull();
   });
 
   test('Import button opens file chooser', async ({ page }) => {
@@ -41,6 +44,7 @@ test.describe('Import / Export', () => {
       buffer: Buffer.from(MOCK_TOPOLOGY_YAML),
     });
 
+    await page.getByRole('dialog', { name: 'Import topology' }).getByRole('button', { name: 'Replace current laboratory' }).click();
     // Verify import API was called
     const req = await importPromise;
     expect(req.postData()).toContain('Imported Lab');
@@ -54,13 +58,14 @@ test.describe('Import / Export', () => {
       buffer: Buffer.from(MOCK_TOPOLOGY_YAML),
     });
 
+    await page.getByRole('dialog', { name: 'Import topology' }).getByRole('button', { name: 'Replace current laboratory' }).click();
     // Wait for success toast
-    await expect(page.locator('text=Topology imported successfully')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Topology imported: 2 nodes, 1 links')).toBeVisible({ timeout: 5000 });
   });
 
   test('Import error shows error toast', async ({ page }) => {
     // Override the import route to return an error
-    await page.route('**/api/v1/topology/import', async (route) => {
+    await page.route('**/api/v1/topology/import?**', async (route) => {
       await route.fulfill({
         status: 400,
         json: { error: 'Invalid YAML format' },
@@ -74,6 +79,7 @@ test.describe('Import / Export', () => {
       buffer: Buffer.from('invalid: [yaml'),
     });
 
+    await page.getByRole('dialog', { name: 'Import topology' }).getByRole('button', { name: 'Replace current laboratory' }).click();
     // Wait for error toast
     await expect(page.locator('text=Import failed')).toBeVisible({ timeout: 5000 });
   });

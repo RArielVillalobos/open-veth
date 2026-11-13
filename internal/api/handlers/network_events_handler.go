@@ -113,6 +113,7 @@ func (h *Handler) BroadcastNodeStarted(nodeID, labID string) {
 
 // BroadcastLabActivated emits an event when async lab activation completes successfully
 func (h *Handler) BroadcastLabActivated(labID string, nodesRevived, ipsRestored, routesRestored int) {
+	h.finishActivation(labID, "succeeded", "")
 	if h.EventHub == nil {
 		return
 	}
@@ -130,6 +131,7 @@ func (h *Handler) BroadcastLabActivated(labID string, nodesRevived, ipsRestored,
 
 // BroadcastLabActivationFailed emits an event when async lab activation fails
 func (h *Handler) BroadcastLabActivationFailed(labID, reason string) {
+	h.finishActivation(labID, "failed", reason)
 	if h.EventHub == nil {
 		return
 	}

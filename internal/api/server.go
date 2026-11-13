@@ -101,6 +101,7 @@ func (s *Server) setupRoutes() {
 		api.GET("/laboratories", s.handler.ListLaboratories)
 		api.POST("/laboratories", s.handler.CreateLaboratory)
 		api.POST("/laboratories/:id/activate", s.handler.ActivateLaboratory)
+		api.GET("/laboratories/:id/activation", s.handler.GetLabActivation)
 		api.POST("/laboratories/:id/save-state", s.handler.SaveLabState)
 		api.DELETE("/laboratories/:id/cleanup", s.handler.CleanupLaboratory)
 		api.PATCH("/laboratories/:id", s.handler.UpdateLaboratory)

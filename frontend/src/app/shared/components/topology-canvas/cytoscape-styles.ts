@@ -46,8 +46,17 @@ function generateDomainStyles(): cytoscape.StylesheetStyle[] {
 
 function nodeImageStyle(url: string): cytoscape.StylesheetStyle['style'] {
   return {
-    'background-image': url,
-    'background-fit': 'contain',
+    'background-image': (node: cytoscape.NodeSingular) => {
+      const colors: Record<string, string> = { running: '#8eaf9f', stopped: '#8fa3a6', pending: '#c3ac81', error: '#e2917f' };
+      const color = colors[node.data('status')] ?? '#8fa3a6';
+      const badge = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="' + color + '" stroke="#0d1416" stroke-width="2"/></svg>';
+      return [url, 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(badge)];
+    },
+    'background-fit': ['contain', 'none'],
+    'background-width': ['100%', 12],
+    'background-height': ['100%', 12],
+    'background-position-x': ['50%', '100%'],
+    'background-position-y': ['50%', '100%'],
     'background-clip': 'none',
     'width': 52,
     'height': 52,
@@ -119,6 +128,8 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'target-label': 'data(target_int)',
         'source-text-offset': 55,
         'target-text-offset': 55,
+        'source-text-margin-y': -24,
+        'target-text-margin-y': 24,
         'text-margin-y': 4,
         'font-size': '13px',
         'font-family': '"IBM Plex Mono", monospace',
@@ -141,7 +152,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
     {
       selector: 'node.node-stopped',
       style: {
-        'opacity': 0.4,
+        'opacity': 1,
       }
     },
     {

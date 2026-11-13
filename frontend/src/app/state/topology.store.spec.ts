@@ -4,12 +4,13 @@ import { UIStore } from './ui.store';
 import { TopologyService } from '../core/services/topology.service';
 import { ToastService } from '../core/services/toast.service';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { createMockNode, createMockLink, createMockLaboratory, createMockInterface, createMockDomainsResponse } from '../../testing/mock-factories';
 
 function createMockTopologyService() {
   return {
     getNodes: vi.fn().mockReturnValue(of([])),
+    getLabActivation: vi.fn(),
     getLinks: vi.fn().mockReturnValue(of([])),
     getLaboratories: vi.fn().mockReturnValue(of([])),
     createNode: vi.fn(),
@@ -82,6 +83,9 @@ describe('TopologyStore', () => {
 
     await store.switchLab('lab-custom');
 
+    expect(store.currentLabId()).not.toBe('lab-custom');
+    expect(localStorage.getItem('openveth_current_lab_id')).not.toBe('lab-custom');
+    await store.onLabActivated('lab-custom');
     expect(store.currentLabId()).toBe('lab-custom');
     expect(localStorage.getItem('openveth_current_lab_id')).toBe('lab-custom');
   });
@@ -291,6 +295,8 @@ describe('TopologyStore', () => {
     await store.switchLab('lab-2');
 
     expect(mockService.activateLaboratory).toHaveBeenCalledWith('lab-2');
+    expect(store.currentLabId()).not.toBe('lab-2');
+    await store.onLabActivated('lab-2');
     expect(store.currentLabId()).toBe('lab-2');
     expect(localStorage.getItem('openveth_current_lab_id')).toBe('lab-2');
   });
@@ -466,7 +472,8 @@ describe('TopologyStore', () => {
     mockService.activateLaboratory.mockReturnValue(of(undefined));
     mockService.getLaboratories.mockReturnValue(of([createMockLaboratory({ id: 'lab-2' })]));
     await store.switchLab('lab-2');
-
+    expect(store.activeDomainOverlay()).toBe('broadcast');
+    await store.onLabActivated('lab-2');
     expect(store.activeDomainOverlay()).toBeNull();
   });
 
@@ -558,4 +565,103 @@ describe('TopologyStore', () => {
     expect(store.topology().nodes.find(n => n.id === 'node-1')?.status).toBe('stopped');
     expect(store.topology().nodes.find(n => n.id === 'node-2')?.status).toBe('running');
   });
+  it('keeps the previous laboratory and persisted selection if activation is rejected', async () => {
+    mockService.activateLaboratory.mockReturnValue(throwError(() => ({ status: 409 })));
+    const previous = store.currentLabId();
+    expect(await store.switchLab('another')).toBe(false);
+    expect(store.currentLabId()).toBe(previous);
+    expect(localStorage.getItem('openveth_current_lab_id')).not.toBe('another');
+    expect(store.activationPhase()).toBe('failed');
+    expect(store.activationError()).toContain('operation is in progress');
+  });
+
+  it('ignores unrelated activation events while a requested laboratory is pending', async () => {
+    await store.switchLab('target');
+    await store.onLabActivated('unrelated');
+    expect(store.pendingLabId()).toBe('target');
+    expect(mockService.getNodes).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh the previous view from unrelated node events during activation', async () => {
+    await store.switchLab('target');
+    await store.loadTopology();
+    expect(mockService.getNodes).not.toHaveBeenCalled();
+    expect(store.activationPhase()).toBe('activating');
+  });
+
+  it('ignores a late refresh response after the active laboratory has changed', async () => {
+    const oldResponse = new Subject<ReturnType<typeof createMockNode>[]>();
+    mockService.getNodes.mockReturnValueOnce(oldResponse);
+    const refreshing = store.syncState();
+    const currentNode = createMockNode({ id: 'current' });
+    mockService.getNodes.mockReturnValue(of([currentNode]));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory({ id: 'new-lab' })]));
+    await store.onLabActivated('new-lab');
+    oldResponse.next([createMockNode({ id: 'stale' })]);
+    oldResponse.complete();
+    await refreshing;
+    expect(store.currentLabId()).toBe('new-lab');
+    expect(store.topology().nodes.map(node => node.id)).toEqual(['current']);
+  });
+
+  it('clears a failed refresh after retry succeeds', async () => {
+    mockService.getNodes.mockReturnValueOnce(throwError(() => new Error('offline')));
+    await store.syncState();
+    expect(store.error()).toBe('offline');
+    mockService.getNodes.mockReturnValue(of([]));
+    await store.syncState();
+    expect(store.error()).toBeNull();
+    expect(store.isLoading()).toBe(false);
+  });
+
+  it('recovers a missed activation success after reconnect', async () => {
+    mockService.activateLaboratory.mockReturnValue(of({ operation_id: 'op-1' }));
+    await store.switchLab('target');
+    mockService.getLabActivation.mockReturnValue(of({ operation_id: 'op-1', status: 'succeeded' }));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory({ id: 'target' })]));
+    await store.reconcileAfterReconnect();
+    expect(store.currentLabId()).toBe('target');
+    expect(store.activationPhase()).toBe('idle');
+    expect(await store.waitForActivation()).toBe(true);
+  });
+
+  it('keeps waiting while activation is still running or its result belongs to another operation', async () => {
+    mockService.activateLaboratory.mockReturnValue(of({ operation_id: 'op-2' }));
+    await store.switchLab('target');
+    for (const result of [{ operation_id: 'op-2', status: 'activating' }, { operation_id: 'op-1', status: 'succeeded' }]) {
+      mockService.getLabActivation.mockReturnValue(of(result));
+      await store.reconcileAfterReconnect();
+      expect(store.pendingLabId()).toBe('target');
+      expect(store.activationPhase()).toBe('activating');
+      expect(mockService.getNodes).not.toHaveBeenCalled();
+    }
+  });
+
+  it('recovers a missed activation failure after reconnect', async () => {
+    mockService.activateLaboratory.mockReturnValue(of({ operation_id: 'op-3' }));
+    await store.switchLab('target');
+    mockService.getLabActivation.mockReturnValue(of({ operation_id: 'op-3', status: 'failed', reason: 'restore failed' }));
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory({ id: store.currentLabId() })]));
+    await store.reconcileAfterReconnect();
+    expect(store.activationPhase()).toBe('failed');
+    expect(store.activationError()).toBe('restore failed');
+    expect(await store.waitForActivation()).toBe(false);
+  });
+
+  it('does not race duplicate completion from a socket event and reconnect query', async () => {
+    mockService.activateLaboratory.mockReturnValue(of({ operation_id: 'op-4' }));
+    await store.switchLab('target');
+    const nodes = new Subject<ReturnType<typeof createMockNode>[]>();
+    mockService.getNodes.mockReturnValue(nodes);
+    mockService.getLaboratories.mockReturnValue(of([createMockLaboratory({ id: 'target' })]));
+    mockService.getLabActivation.mockReturnValue(of({ operation_id: 'op-4', status: 'succeeded' }));
+    const completion = store.onLabActivated('target');
+    await store.reconcileAfterReconnect();
+    expect(mockService.getNodes).toHaveBeenCalledTimes(1);
+    nodes.next([]); nodes.complete();
+    await completion;
+    expect(store.activationPhase()).toBe('idle');
+    expect(await store.waitForActivation()).toBe(true);
+  });
+
 });

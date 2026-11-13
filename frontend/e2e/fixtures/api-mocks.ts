@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, WebSocketRoute } from '@playwright/test';
 import { MOCK_LAB, MOCK_NODES, MOCK_LINKS, MOCK_INTERFACES, MOCK_ROUTES } from './test-data';
 
 interface MockState {
@@ -11,17 +11,25 @@ interface MockState {
  * Sets up API route mocks for all /api/v1/* endpoints.
  * Returns a mutable state object so tests can inspect what was "created".
  */
-export async function setupApiMocks(page: Page, options?: { empty?: boolean }): Promise<MockState> {
+export async function setupApiMocks(page: Page, options?: { empty?: boolean; autoActivate?: boolean }): Promise<MockState> {
   const state: MockState = {
     nodes: options?.empty ? [] : [...MOCK_NODES],
     links: options?.empty ? [] : [...MOCK_LINKS],
     labs: [{ ...MOCK_LAB }],
   };
 
+  let events: WebSocketRoute | undefined;
+  if (options?.autoActivate !== false) {
+    await page.routeWebSocket('**/api/v1/events', socket => { events = socket; });
+  }
+  await page.routeWebSocket('**/api/v1/terminal?**', () => {});
+  await page.route('**/api/v1/laboratories/*/domains', route => route.fulfill({ json: { broadcast_domains: [], collision_domains: [] } }));
+
   // --- Nodes ---
   await page.route('**/api/v1/nodes?**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ json: state.nodes });
+      const labId = new URL(route.request().url()).searchParams.get('lab_id');
+      await route.fulfill({ json: labId ? state.nodes.filter(node => node.lab_id === labId) : state.nodes });
     } else {
       await route.continue();
     }
@@ -66,7 +74,8 @@ export async function setupApiMocks(page: Page, options?: { empty?: boolean }): 
 
   // --- Links ---
   await page.route('**/api/v1/links?**', async (route) => {
-    await route.fulfill({ json: state.links });
+    const labId = new URL(route.request().url()).searchParams.get('lab_id');
+    await route.fulfill({ json: labId ? state.links.filter(link => !link.lab_id || link.lab_id === labId) : state.links });
   });
 
   await page.route('**/api/v1/links', async (route) => {
@@ -111,11 +120,12 @@ export async function setupApiMocks(page: Page, options?: { empty?: boolean }): 
     const url = route.request().url();
     const id = url.split('/laboratories/')[1].split('/activate')[0];
     state.labs = state.labs.map((l) => ({ ...l, status: l.id === id ? 'active' : 'inactive' }));
-    await route.fulfill({ json: null });
+    await route.fulfill({ status: 202, json: { lab_id: id, message: 'activation started' } });
+    if (events) setTimeout(() => events?.send(JSON.stringify({ type: 'lab:activated', labId: id })), 50);
   });
 
   await page.route('**/api/v1/laboratories/*/save-state', async (route) => {
-    await route.fulfill({ json: { message: 'ok', ips_saved: 2, routes_saved: 1 } });
+    await route.fulfill({ json: { message: 'ok', ips_saved: 2, routes_saved: 1, snapshots_saved: state.nodes.length } });
   });
 
   await page.route('**/api/v1/laboratories/*/cleanup', async (route) => {
@@ -143,15 +153,15 @@ export async function setupApiMocks(page: Page, options?: { empty?: boolean }): 
   });
 
   // --- Topology ---
-  await page.route('**/api/v1/topology/export', async (route) => {
+  await page.route('**/api/v1/topology/export?**', async (route) => {
     await route.fulfill({
       body: 'name: E2E Test Lab\nnodes:\n  - id: node-r1\n    name: R1\nlinks: []',
       headers: { 'Content-Type': 'application/x-yaml' },
     });
   });
 
-  await page.route('**/api/v1/topology/import', async (route) => {
-    await route.fulfill({ json: { message: 'Topology imported successfully' } });
+  await page.route('**/api/v1/topology/import?**', async (route) => {
+    await route.fulfill({ json: { message: 'Topology imported successfully', nodes: 2, links: 1, errors: [] } });
   });
 
   await page.route('**/api/v1/topology/deploy', async (route) => {

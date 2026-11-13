@@ -1,4 +1,4 @@
-import { Component, input, output, inject, computed, effect, signal } from '@angular/core';
+import { Component, input, output, inject, computed, effect, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { Node, Link, RouteInfo, MacEntry } from '../../../../models/topology.model';
@@ -11,7 +11,8 @@ import { ROUTE_HIGHLIGHT_COLOR, ROUTE_HIGHLIGHT_STATIC_COLOR } from '../../../..
   selector: 'app-properties-panel',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './properties-panel.component.html'
+  templateUrl: './properties-panel.component.html',
+  styleUrl: './properties-panel.component.scss'
 })
 export class PropertiesPanelComponent {
   selectedNode = input<Node | null>(null);
@@ -22,6 +23,9 @@ export class PropertiesPanelComponent {
   deleteNode = output<string>();
   deleteLink = output<string>();
   close = output<void>();
+  traceroute = output<void>();
+  toggleLink = output<string>();
+  expanded = signal(false);
   routeHover = output<{ subnet: string | null; gateway: string | null } | null>();
 
   readonly routeHighlightColor = ROUTE_HIGHLIGHT_COLOR;
@@ -31,6 +35,15 @@ export class PropertiesPanelComponent {
   private toast = inject(ToastService);
   private store = inject(TopologyStore);
   
+  readonly powering = computed(() => this.store.togglingNodes().includes(this.selectedNode()?.id ?? ''));
+  private readonly selectedIdentity = computed(() => { const n = this.selectedNode(); return n ? n.id + ':' + n.status + ':' + n.type : null; });
+  private routeRequest = 0;
+  private macRequest = 0;
+  routeError = signal<string | null>(null);
+  macError = signal<string | null>(null);
+  nodeName(id: string | undefined) { return this.store.topology().nodes.find(node => node.id === id)?.name ?? id; }
+  togglePower() { const node = this.selectedNode(); if (node) void this.store.toggleNodePower(node.id); }
+
   // Internal state
   routes = signal<RouteInfo[]>([]);
   loadingRoutes = signal(false);
@@ -40,7 +53,12 @@ export class PropertiesPanelComponent {
   uploading = signal(false);
   uploadResult = signal<{ success: boolean; path: string } | null>(null);
   showConnect = signal(false);
-  showInterfaces = signal(false);
+  showInterfaces = signal(true);
+  readonly nodeStatus = computed(() => {
+    const status = this.selectedNode()?.status;
+    if (this.powering()) return status === 'running' ? 'Stopping…' : 'Starting…';
+    return ({ running: 'Running', stopped: 'Stopped', pending: 'Starting…', error: 'Error' } as Record<string, string>)[status ?? ''] ?? 'Unknown';
+  });
 
 
   // Whether the selected node is a bridge-based node (switch/hub) — used for interface display
@@ -94,14 +112,18 @@ export class PropertiesPanelComponent {
     const n = this.selectedNode();
     if (!n || !n.interfaces) return 0;
     return n.interfaces.filter(i =>
-      i.ifname !== 'docker0' && !(this.isBridgeNode() && i.ifname === 'br0')
+      i.ifname !== 'lo' && i.ifname !== 'docker0' && !(this.isBridgeNode() && i.ifname === 'br0')
     ).length;
   });
 
   constructor() {
     // Automatically load routes when a node is selected
     effect(() => {
-      const node = this.selectedNode();
+      this.selectedIdentity();
+      const node = untracked(() => this.selectedNode());
+      ++this.routeRequest; ++this.macRequest;
+      this.loadingRoutes.set(false); this.loadingMacTable.set(false);
+      this.routeError.set(null); this.macError.set(null);
       // Reset state immediately
       this.routes.set([]);
       this.macTable.set([]);
@@ -118,8 +140,10 @@ export class PropertiesPanelComponent {
 
   async loadRoutes(nodeId?: string) {
     const id = nodeId || this.selectedNode()?.id;
-    if (!id) return;
+    if (!id || this.selectedNode()?.id !== id) return;
 
+    const request = ++this.routeRequest;
+    this.routeError.set(null);
     this.loadingRoutes.set(true);
     try {
       const data = await firstValueFrom(this.service.getNodeRoutes(id));
@@ -130,34 +154,40 @@ export class PropertiesPanelComponent {
         if (aIsKernel !== bIsKernel) return aIsKernel - bIsKernel;
         return a.dst.localeCompare(b.dst);
       });
-      this.routes.set(sorted);
+      if (request === this.routeRequest && this.selectedNode()?.id === id) this.routes.set(sorted);
     } catch (err: any) {
-      this.routes.set([]);
+      if (request !== this.routeRequest || this.selectedNode()?.id !== id) return;
+      this.routes.set([]); this.routeError.set('Routes could not be loaded. Try Refresh.');
       this.toast.error('Failed to load routes: ' + (err.error?.error || err.message || 'unknown error'));
     } finally {
-      this.loadingRoutes.set(false);
+      if (request === this.routeRequest) this.loadingRoutes.set(false);
     }
   }
 
   async loadMacTable(nodeId?: string) {
     const id = nodeId || this.selectedNode()?.id;
-    if (!id) return;
+    if (!id || this.selectedNode()?.id !== id) return;
 
+    const request = ++this.macRequest;
+    this.macError.set(null);
     this.loadingMacTable.set(true);
     try {
       const data = await firstValueFrom(this.service.getNodeMacTable(id));
-      this.macTable.set(data || []);
+      if (request === this.macRequest && this.selectedNode()?.id === id) this.macTable.set(data || []);
     } catch {
-      this.macTable.set([]);
+      if (request !== this.macRequest || this.selectedNode()?.id !== id) return;
+      this.macTable.set([]); this.macError.set('MAC table could not be loaded. Try Refresh.');
     } finally {
-      this.loadingMacTable.set(false);
+      if (request === this.macRequest) this.loadingMacTable.set(false);
     }
   }
 
   copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      this.toast.success('Copied to clipboard');
-    });
+    if (!navigator.clipboard?.writeText) {
+      this.toast.error('Clipboard is unavailable. Select the command and copy it manually.');
+      return;
+    }
+    navigator.clipboard.writeText(text.trim()).then(() => this.toast.success('Copied to clipboard')).catch(() => this.toast.error('Could not copy. Select the command and copy it manually.'));
   }
 
   async onFileSelected(event: Event) {

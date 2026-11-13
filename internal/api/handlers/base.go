@@ -29,7 +29,9 @@ type Handler struct {
 	// labOpMu serializes operations that save state, destroy containers,
 	// or rebuild labs. Prevents the auto-save goroutine from reading
 	// stale containers while ActivateLaboratory is mid-nuke.
-	labOpMu sync.Mutex
+	labOpMu      sync.Mutex
+	activationMu sync.RWMutex
+	activation   activationStatus
 
 	// reconciling is set while ReconcileState is rebuilding containers.
 	// The Docker watcher ignores events during this window.

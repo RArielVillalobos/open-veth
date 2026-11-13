@@ -1,147 +1,25 @@
-:host {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.terminal-panel {
-  width: 100%;
-  height: 100%;
-  background-color: #131b1e;
-  border-top: 1px solid #28353a;
-  display: flex;
-  flex-direction: column;
-  font-family: 'IBM Plex Sans', system-ui, sans-serif; /* Reset fuente UI */
-
-  &__header {
-    height: 40px;
-    background-color: #0d1416;
-    display: flex;
-    align-items: flex-end; /* Alinear tabs abajo */
-    padding: 0 10px;
-    border-bottom: 1px solid #131b1e;
-    gap: 4px;
-
-    .tabs-container {
-      display: flex;
-      flex-direction: row; /* Forzar fila */
-      align-items: flex-end;
-      gap: 4px;
-      height: 100%;
-      overflow-x: auto; /* Scroll horizontal si hay muchas */
-
-      &::-webkit-scrollbar { display: none; } /* Ocultar scrollbar para estética */
-    }
-
-    .controls {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      padding-bottom: 4px;
-
-      .clear-btn {
-        background: none;
-        border: 1px solid #28353a;
-        color: #8fa3a6;
-        font-size: 11px;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        transition: all 0.2s;
-
-        svg { width: 14px; height: 14px; }
-
-        &:hover {
-          background-color: #28353a;
-          color: #e8efef;
-          border-color: #425256;
-        }
-      }
-    }
-
-    .tab {
-      background-color: #131b1e;
-      color: #8fa3a6;
-      padding: 0 16px;
-      height: 32px; /* Altura tab */
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      border-radius: 6px 6px 0 0;
-      border: 1px solid transparent;
-      user-select: none;
-      min-width: 140px;
-      justify-content: space-between;
-      transition: all 0.2s;
-
-      &:hover {
-        background-color: #28353a;
-        color: #e8efef;
-      }
-
-      &--active {
-        background-color: #131b1e;
-        color: #7ed6ce;
-        border-top: 3px solid #4fb3ac;
-        font-weight: 600;
-        height: 34px; /* Un poco más alto */
-        margin-bottom: -1px; /* Solapar borde */
-        z-index: 10;
-
-        .icon { color: #7ed6ce; }
-      }
-
-      .icon { font-size: 14px; color: #5c6d70; font-family: 'IBM Plex Mono', monospace; }
-
-      .close-btn {
-        background: none;
-        border: none;
-        color: #5c6d70;
-        cursor: pointer;
-        font-size: 16px;
-        line-height: 1;
-        padding: 2px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px;
-        height: 18px;
-        &:hover { background-color: #d97b68; color: #0d1416; }
-      }
-    }
-  }
-
-  &__body {
-    flex: 1;
-    position: relative;
-    background-color: #0d1416;
-    padding: 8px;
-    overflow: hidden;
-
-    .xterm-wrapper {
-      position: absolute;
-      inset: 0;
-      display: block;
-      visibility: visible;
-      opacity: 1;
-      transition: opacity 0.1s ease-in-out;
-
-      &.tab--inactive {
-        visibility: hidden;
-        opacity: 0;
-        pointer-events: none;
-      }
-    }
-  }
-}
-
-/* Estilos globales para xterm (opcional si xterm.css está cargado, pero asegura visibilidad) */
-::ng-deep .xterm-viewport {
-    overflow-y: auto !important;
-}
+:host { display: block; width: 100%; height: 100%; min-width: 0; }
+.terminal-panel { height: 100%; display: flex; flex-direction: column; background: #0d1416; border-top: 1px solid #28353a; color: #b4c4c6; font: 12px 'IBM Plex Sans', sans-serif; }
+.terminal-panel__header { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #28353a; min-height: 34px; }
+.tabs-container { display: flex; flex: 1 1 180px; min-width: 0; overflow-x: auto; }
+.tab { display: flex; align-items: center; flex-shrink: 0; border-right: 1px solid #28353a; border-bottom: 2px solid transparent; }
+.tab--active { color: #83b9df; border-bottom-color: #83b9df; background: #152125; }
+.tab-selector { display: flex; align-items: center; gap: 7px; padding: 8px 10px; white-space: nowrap; }
+button { color: inherit; background: transparent; border: 0; border-radius: 2px; cursor: pointer; padding: 5px 7px; font: inherit; }
+button:hover { background: #1a2427; color: #e8efef; }
+button:disabled { opacity: .4; cursor: default; }
+.close-btn { margin-right: 4px; font-size: 16px; }
+.controls { display: flex; align-items: center; gap: 2px; padding: 2px 6px; }
+.font-size { color: #8fa3a6; min-width: 15px; text-align: center; font-size: 11px; }
+.connection-dot { width: 6px; height: 6px; border-radius: 50%; background: #c3ac81; }
+.connection-dot--connected { background: #8eaf9f; }
+.connection-dot--disconnected { background: #e2917f; }
+.terminal-status { display: flex; align-items: center; gap: 10px; min-height: 26px; padding: 0 10px; color: #8fa3a6; font-size: 11px; }
+.terminal-status__hint { margin-left: auto; }
+.terminal-search { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-bottom: 1px solid #28353a; }
+.terminal-search input { width: 220px; min-width: 60px; background: #152125; border: 1px solid #425256; padding: 4px 6px; color: #e8efef; }
+.terminal-search span { font-size: 11px; color: #8fa3a6; }
+.terminal-panel__body { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.xterm-wrapper { position: absolute; inset: 4px 8px; }
+.tab--inactive { visibility: hidden; pointer-events: none; }
+@media (max-width: 700px) { .terminal-status__hint { display: none; } }

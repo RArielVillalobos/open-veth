@@ -6,11 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // "Signal Console" identity — teal accent + graphite neutrals,
-        // replaces the old indigo/slate "AI dashboard" look.
-        // `slate` itself is overridden below so every existing bg-slate-*/
-        // border-slate-*/text-slate-* class picks up the new graphite tone
-        // without touching each component.
+        // Graphite neutrals with restrained blue accents.
         slate: {
           50: '#eef3f3',
           100: '#dbe4e5',
@@ -25,21 +21,21 @@ module.exports = {
           950: '#0d1416',
         },
         signal: {
-          50: '#eafaf8',
-          100: '#cdf0ec',
-          200: '#9fe0d9',
-          300: '#7ed6ce',  // signal-hi: links, active mono data
-          400: '#63c2ba',
-          500: '#4fb3ac',  // primary accent — replaces indigo-600
-          600: '#2e8f89',
-          700: '#256f6b',
-          800: '#1d5451',
-          900: '#123230',
+          50: '#eef4f8',
+          100: '#d7e5ef',
+          200: '#b0cddd',
+          300: '#83b9df',  // signal-hi: links, active mono data
+          400: '#76a4c5',
+          500: '#648eac',  // primary accent — replaces indigo-600
+          600: '#476d89',
+          700: '#37566e',
+          800: '#293f52',
+          900: '#1c2d3a',
         },
         up: {
-          400: '#a8d187',
-          500: '#8fbb6c',
-          600: '#6f9c4f',
+          400: '#a0b9a5',
+          500: '#8eaf9f',
+          600: '#648775',
         },
         pending: {
           400: '#e3b471',
@@ -51,9 +47,9 @@ module.exports = {
           500: '#d97b68',
           600: '#b85c4c',
         },
-        'brand-primary': '#4fb3ac',
+        'brand-primary': '#648eac',
         'brand-dark': '#131b1e',
-        'brand-accent': '#8fbb6c',
+        'brand-accent': '#8eaf9f',
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],

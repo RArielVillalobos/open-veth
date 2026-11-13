@@ -16,3 +16,32 @@
     @apply bg-red-100 border-red-200 text-red-700; 
   }
 }
+
+.dashboard-header { flex-wrap: wrap; gap: 8px 20px; min-height: 44px; padding: 5px 12px; }
+.workspace-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.toolbar-group { display: flex; align-items: center; gap: 2px; padding: 0 8px; border-right: 1px solid #28353a; }
+.toolbar-group:first-child { padding-left: 0; }
+.tool-button, .lab-selector { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 9px; border: 0; border-radius: 2px; background: transparent; color: #b4c4c6; font-size: 12px; font-weight: 400; }
+.tool-button:hover, .lab-selector:hover { background: #1a2427; color: #dbe4e5; }
+.tool-button--icon { justify-content: center; width: 30px; padding: 4px; }
+.tool-button.is-active { color: #83b9df; box-shadow: inset 0 -2px #648eac; }
+.tool-button--danger:hover { color: #e2917f; }
+.lab-selector { font-size: 13px; max-width: 240px; }
+.lab-selector > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-status { display: flex; align-items: center; gap: 12px; min-height: 26px; padding: 1px 12px; background: #131b1e; color: #8fa3a6; font-size: 11px; border-bottom: 1px solid #28353a; }
+.status-action { padding: 4px 8px; color: #83b9df; border-radius: 4px; white-space: nowrap; &:hover { background: #28353a; } }
+.workspace-message { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #b85c4c; background: #392824; color: #f1c6bb; font-size: 13px; span { flex: 1; min-width: 200px; } }
+.canvas-progress { position: absolute; inset: 0; z-index: 15; background: #0d1416b8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; strong { font-size: 20px; } span { color: #b4c4c6; font-size: 14px; } }
+@media (max-width: 1100px) {
+  app-properties-panel { position: absolute; right: 0; top: 0; bottom: 0; z-index: 20; box-shadow: -12px 0 32px #0005; }
+}
+@media (max-width: 720px) {
+  .dashboard-header > div { flex-wrap: wrap; gap: 8px; }
+  .workspace-status { flex-wrap: wrap; gap: 6px; }
+}
+
+.events-status { display: inline-flex; align-items: center; gap: 6px; color: #8fa3a6; }
+.events-status__dot { width: 5px; height: 5px; border-radius: 50%; background: #c3ac81; }
+.events-status__dot--connected { background: #8eaf9f; }
+
+.brand-wordmark { border-left: 2px solid #648eac; padding-left: 7px; }

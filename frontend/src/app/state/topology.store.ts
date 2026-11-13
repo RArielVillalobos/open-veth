@@ -1,16 +1,20 @@
 import { signalStore, withState, withMethods, patchState, withHooks } from '@ngrx/signals';
 import { Topology, Node, Link, Laboratory, DomainsResponse } from '../models/topology.model';
-import { inject, effect, untracked } from '@angular/core';
+import { DestroyRef, inject, effect, untracked } from '@angular/core';
 import { firstValueFrom, forkJoin } from 'rxjs';
 import { TopologyService } from '../core/services/topology.service';
 import { ToastService } from '../core/services/toast.service';
 import { UIStore } from './ui.store';
+import { PositionSaveService } from '../core/services/position-save.service';
 
 export interface TopologyState {
   topology: Topology;
   laboratories: Laboratory[]; // List of available labs
   currentLabId: string;
   isLoading: boolean;
+  pendingLabId: string | null;
+  activationPhase: 'idle' | 'requesting' | 'activating' | 'failed' | 'uncertain';
+  activationError: string | null;
   error: string | null;
   domains: DomainsResponse | null;
   activeDomainOverlay: 'broadcast' | 'collision' | null;
@@ -38,6 +42,7 @@ const initialState: TopologyState = {
   laboratories: [],
   currentLabId: getInitialLabId(),
   isLoading: false,
+  pendingLabId: null, activationPhase: 'idle', activationError: null,
   error: null,
   domains: null,
   activeDomainOverlay: null,
@@ -49,124 +54,149 @@ export const TopologyStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
   withMethods((store, service = inject(TopologyService), toast = inject(ToastService)) => {
-    let positionDebounceTimer: any = null;
+    const positions = inject(PositionSaveService);
+    let loadVersion = 0;
+    let activationVersion = 0;
+    let activationOperationId: string | null = null;
+    let activationTimer: ReturnType<typeof setTimeout> | undefined;
+    let resolveActivation: ((success: boolean) => void) | null = null;
+    let activationResult: Promise<boolean> = Promise.resolve(false);
+    const activationBusy = () => ['requesting', 'activating', 'uncertain'].includes(store.activationPhase());
+    inject(DestroyRef).onDestroy(() => { clearTimeout(activationTimer); resolveActivation?.(false); });
+    const rememberLab = (id: string) => { try { localStorage.setItem(LAB_ID_KEY, id); } catch {} };
+    const mergePositions = (nodes: Node[], labId: string) => nodes.map(node => {
+      const pending = positions.get(node.id);
+      return pending?.labId === labId ? { ...node, x: pending.x, y: pending.y } : node;
+    });
 
     return {
       // --- Initial Load ---
-      async loadTopology() {
+      async loadTopology(requestedLabId = store.currentLabId(), confirmedActivation = false) {
+        if (activationBusy() && !confirmedActivation) return false;
+        const version = ++loadVersion;
         patchState(store, { isLoading: true, error: null });
         try {
-          const labId = store.currentLabId();
-          
-          // Load labs list and current topology in parallel
-          const [initialNodes, initialLinks, labs] = await firstValueFrom(
-            forkJoin([
-              service.getNodes(true, labId),
-              service.getLinks(labId),
-              service.getLaboratories()
-            ])
-          );
-
-          let activeNodes = initialNodes;
-          let activeLinks = initialLinks;
-          let currentLab = labs.find(l => l.id === labId);
-
-          // No labs at all (fresh install / nuked DB) — create a default lab automatically
-          if (labs.length === 0) {
-            const newId = 'lab-' + crypto.randomUUID().substring(0, 8);
-            const newLab = await firstValueFrom(service.createLaboratory({ id: newId, name: 'Default Laboratory' }));
-            localStorage.setItem(LAB_ID_KEY, newLab.id);
-            patchState(store, { currentLabId: newLab.id, laboratories: [newLab], isLoading: false,
-              topology: { id: newLab.id, name: newLab.name, nodes: [], links: [] } });
-            await this.loadDomains();
-            return;
+          const [initialNodes, initialLinks, labs] = await firstValueFrom(forkJoin([
+            service.getNodes(true, requestedLabId), service.getLinks(requestedLabId), service.getLaboratories()
+          ]));
+          if (version !== loadVersion) return false;
+          let lab = labs.find(item => item.id === requestedLabId);
+          let nodes = initialNodes ?? [], links = initialLinks ?? [];
+          if (!labs.length) {
+            lab = await firstValueFrom(service.createLaboratory({ id: 'lab-' + crypto.randomUUID().substring(0, 8), name: 'Default Laboratory' }));
+            labs.push(lab); nodes = []; links = [];
+          } else if (!lab) {
+            lab = labs[0];
+            [nodes, links] = await firstValueFrom(forkJoin([service.getNodes(true, lab.id), service.getLinks(lab.id)]));
           }
-
-          // Fallback: If lab from localStorage doesn't exist anymore, use the first available lab
-          if (!currentLab) {
-            const firstLab = labs[0];
-            patchState(store, { currentLabId: firstLab.id });
-            localStorage.setItem(LAB_ID_KEY, firstLab.id);
-            const [fNodes, fLinks] = await firstValueFrom(
-              forkJoin([service.getNodes(false, firstLab.id), service.getLinks(firstLab.id)])
-            );
-            currentLab = firstLab;
-            activeNodes = fNodes;
-            activeLinks = fLinks;
-          }
-
-          patchState(store, (state) => ({
-            isLoading: false,
-            laboratories: labs,
-            serviceMessages: {},
-            topology: {
-              ...state.topology,
-              id: state.currentLabId,
-              name: currentLab?.name || 'Unknown Lab',
-              nodes: activeNodes || [],
-              links: activeLinks || []
-            }
-          }));
+          if (version !== loadVersion) return false;
+          rememberLab(lab.id);
+          patchState(store, { isLoading: false, laboratories: labs, currentLabId: lab.id,
+            topology: { id: lab.id, name: lab.name, nodes: mergePositions(nodes ?? [], lab.id), links: links ?? [] } });
           await this.loadDomains();
+          return true;
         } catch (err: any) {
-          const msg = err.message || 'Error loading topology';
-          patchState(store, { isLoading: false, error: msg });
-          toast.error(msg);
+          if (version !== loadVersion) return false;
+          const message = err.error?.error || err.message || 'Could not load laboratory';
+          patchState(store, { isLoading: false, error: message }); toast.error(message);
+          return false;
         }
       },
 
-      // --- Lab Management ---
       async switchLab(labId: string) {
-        const labName = store.laboratories().find(l => l.id === labId)?.name ?? labId;
-        localStorage.setItem(LAB_ID_KEY, labId);
-        patchState(store, { isLoading: true, currentLabId: labId, domains: null, activeDomainOverlay: null });
-        toast.info(`Activating "${labName}"...`);
-
+        if (activationBusy() || !(await positions.flush())) return false;
+        ++activationVersion;
+        activationOperationId = null;
+        ++loadVersion;
+        clearTimeout(activationTimer);
+        resolveActivation?.(false);
+        activationResult = new Promise<boolean>(resolve => { resolveActivation = resolve; });
+        patchState(store, { pendingLabId: labId, activationPhase: 'requesting', activationError: null, error: null, isLoading: false });
+        activationTimer = setTimeout(() => {
+          patchState(store, { activationPhase: 'uncertain', activationError: 'Completion has not been confirmed. The laboratory may still be starting. Reconnect events or reload the application.' });
+          resolveActivation?.(false); resolveActivation = null;
+        }, 180_000);
         try {
-          // Returns 202 immediately — actual completion arrives via lab:activated WebSocket event
-          await firstValueFrom(service.activateLaboratory(labId));
+          const accepted = await firstValueFrom(service.activateLaboratory(labId));
+          activationOperationId = accepted?.operation_id ?? null;
+          if (store.pendingLabId() === labId && store.activationPhase() === 'requesting') patchState(store, { activationPhase: 'activating' });
+          return true;
         } catch (err: any) {
-          patchState(store, { isLoading: false });
-          if (err.status === 409) {
-            toast.error('Another lab operation is in progress, please wait');
-          } else {
-            toast.error('Failed to start activation: ' + (err.error?.error || err.message));
-          }
+          clearTimeout(activationTimer);
+          const message = err.status === 409 ? 'Another laboratory operation is in progress. Wait and try again.' : (err.error?.error || err.message || 'Could not start activation');
+          patchState(store, { activationPhase: 'failed', activationError: message });
+          resolveActivation?.(false); resolveActivation = null;
+          toast.error(message); return false;
         }
+      },
+
+      waitForActivation() { return activationResult; },
+
+      async reconcileAfterReconnect() {
+        const labId = store.pendingLabId();
+        if (!labId || !activationBusy()) return this.loadTopology();
+        // Only a matching server operation can confirm completion; running nodes alone cannot.
+        const operationId = activationOperationId;
+        const version = activationVersion;
+        if (!operationId) return false;
+        try {
+          const result = await firstValueFrom(service.getLabActivation(labId));
+          if (version !== activationVersion || store.pendingLabId() !== labId || !activationBusy() || result.operation_id !== operationId) return false;
+          if (result.status === 'succeeded') { await this.onLabActivated(labId); return true; }
+          if (result.status === 'failed') await this.onLabActivationFailed(labId, result.reason || 'Laboratory activation failed');
+        } catch {
+          // Keep the pending operation and its timeout; never infer success from a failed query.
+        }
+        return false;
       },
 
       async onLabActivated(labId: string) {
-        await this.loadTopology(); // clears isLoading when done
-        const labName = store.laboratories().find(l => l.id === labId)?.name ?? labId;
-        toast.success(`"${labName}" is now active`);
+        if (store.pendingLabId() && store.pendingLabId() !== labId) return;
+        // A WebSocket event and reconnect query may confirm the same operation together.
+        if (activationBusy() && store.isLoading()) return;
+        const version = activationVersion;
+        const completion = resolveActivation;
+        clearTimeout(activationTimer);
+        const loaded = await this.loadTopology(labId, true);
+        if (version !== activationVersion) return;
+        patchState(store, loaded ? { pendingLabId: null, activationPhase: 'idle', activationError: null, activeDomainOverlay: null, serviceMessages: {} }
+          : { activationPhase: 'uncertain', activationError: 'Activation finished, but the laboratory view could not be loaded. Reload the application.' });
+        if (loaded) toast.success('Laboratory is now active');
+        completion?.(loaded);
+        if (resolveActivation === completion) resolveActivation = null;
       },
 
-      onLabActivationFailed(labId: string, reason: string) {
-        patchState(store, { isLoading: false });
-        toast.error(`Lab activation failed: ${reason}`);
+      async onLabActivationFailed(labId: string, reason: string) {
+        if (store.pendingLabId() && store.pendingLabId() !== labId) return;
+        clearTimeout(activationTimer);
+        patchState(store, { isLoading: false, activationPhase: 'failed', activationError: reason });
+        resolveActivation?.(false); resolveActivation = null;
+        toast.error('Laboratory activation failed: ' + reason);
+        await this.loadTopology();
       },
+
+      dismissActivationError() { patchState(store, { pendingLabId: null, activationPhase: 'idle', activationError: null }); },
+      clearError() { patchState(store, { error: null }); },
 
       async createLaboratory(name: string) {
-        // Validation: Prevent duplicate names
-        const nameExists = store.laboratories().some(l => l.name.toLowerCase() === name.toLowerCase());
-        if (nameExists) {
-          toast.error(`A laboratory with the name "${name}" already exists.`);
-          return;
+        if (activationBusy() || !(await positions.flush())) return null;
+        name = name.trim();
+        if (!name || store.laboratories().some(lab => lab.name.toLowerCase() === name.toLowerCase())) {
+          toast.error('A laboratory with this name already exists, or the name is empty.'); return null;
         }
-
-        const id = 'lab-' + crypto.randomUUID().substring(0, 8);
-        patchState(store, { isLoading: true });
+        patchState(store, { isLoading: true, error: null });
         try {
-          await firstValueFrom(service.createLaboratory({ id, name }));
-          await this.switchLab(id); // Auto-switch to new lab
-          toast.success('Laboratory created');
+          const lab = await firstValueFrom(service.createLaboratory({ id: 'lab-' + crypto.randomUUID().substring(0, 8), name }));
+          patchState(store, state => ({ laboratories: [...state.laboratories, lab], isLoading: false }));
+          return await this.switchLab(lab.id) ? lab.id : null;
         } catch (err: any) {
-          patchState(store, { isLoading: false, error: err.message });
-          toast.error('Failed to create lab');
+          patchState(store, { isLoading: false, error: err.error?.error || err.message });
+          toast.error('Could not create laboratory'); return null;
         }
       },
 
       async deleteLaboratory(id: string) {
+        if (activationBusy()) return;
          if (id === store.currentLabId()) {
              toast.error("Cannot delete active laboratory");
              return;
@@ -184,6 +214,7 @@ export const TopologyStore = signalStore(
 
       // --- Nodes ---
       async addNode(node: Node) {
+        if (activationBusy() || !(await positions.flush())) return;
         patchState(store, { isLoading: true, error: null });
         try {
           // Inject current Lab ID
@@ -193,7 +224,7 @@ export const TopologyStore = signalStore(
             isLoading: false,
             topology: {
               ...state.topology,
-              nodes: [...state.topology.nodes, createdNode]
+              nodes: [...state.topology.nodes.filter(n => n.id !== createdNode.id), createdNode]
             }
           }));
           toast.success(`Node ${node.name} created`);
@@ -206,9 +237,11 @@ export const TopologyStore = signalStore(
       },
 
       async removeNode(id: string) {
+        if (activationBusy() || !(await positions.flush())) return;
         patchState(store, { isLoading: true, error: null });
         try {
           await firstValueFrom(service.deleteNode(id));
+          positions.discard(id);
           patchState(store, (state) => ({
             isLoading: false,
             topology: {
@@ -219,14 +252,17 @@ export const TopologyStore = signalStore(
           }));
           toast.success('Node deleted');
           this.loadDomains();
+          return true;
         } catch (err: any) {
           const msg = err.message || 'Error deleting node';
           patchState(store, { isLoading: false, error: msg });
           toast.error(msg);
+          return false;
         }
       },
 
       async toggleNodePower(id: string) {
+        if (activationBusy() || !(await positions.flush())) return;
         const node = store.topology().nodes.find(n => n.id === id);
         if (!node) return;
         if (store.togglingNodes().includes(id)) return;
@@ -289,28 +325,15 @@ export const TopologyStore = signalStore(
       },
 
       async updateNodePosition(id: string, x: number, y: number) {
-        patchState(store, (state) => ({
-          topology: {
-            ...state.topology,
-            nodes: state.topology.nodes.map(n => 
-              n.id === id ? { ...n, x, y } : n
-            )
-          }
-        }));
-
-        if (positionDebounceTimer) clearTimeout(positionDebounceTimer);
-        
-        positionDebounceTimer = setTimeout(async () => {
-          try {
-            await firstValueFrom(service.updateNodePosition(id, x, y));
-          } catch (err) {
-            console.error('Failed to persist node position', err);
-          }
-        }, 500);
+        if (activationBusy()) return;
+        patchState(store, state => ({ topology: { ...state.topology,
+          nodes: state.topology.nodes.map(node => node.id === id ? { ...node, x, y } : node) } }));
+        positions.enqueue(id, { labId: store.currentLabId(), x, y });
       },
 
       // --- Links ---
       async addLink(link: Link) {
+        if (activationBusy() || !(await positions.flush())) return;
         patchState(store, { isLoading: true, error: null });
         try {
           // Inject current Lab ID
@@ -320,7 +343,7 @@ export const TopologyStore = signalStore(
             isLoading: false,
             topology: {
               ...state.topology,
-              links: [...state.topology.links, createdLink]
+              links: [...state.topology.links.filter(l => l.id !== createdLink.id), createdLink]
             }
           }));
           toast.success('Link created');
@@ -333,6 +356,7 @@ export const TopologyStore = signalStore(
       },
 
       async toggleLink(id: string) {
+        if (activationBusy() || !(await positions.flush())) return;
         const link = store.topology().links.find(l => l.id === id);
         if (!link) return;
         const newEnabled = !(link.enabled ?? true);
@@ -353,6 +377,7 @@ export const TopologyStore = signalStore(
       },
 
       async removeLink(id: string) {
+        if (activationBusy() || !(await positions.flush())) return;
         patchState(store, { isLoading: true, error: null });
         try {
           await firstValueFrom(service.deleteLink(id));
@@ -365,39 +390,46 @@ export const TopologyStore = signalStore(
           }));
           toast.success('Link deleted');
           this.loadDomains();
+          return true;
         } catch (err: any) {
           const msg = err.message || 'Error deleting link';
           patchState(store, { isLoading: false, error: msg });
           toast.error(msg);
+          return false;
         }
       },
 
       // --- System ---
       async syncState() {
-        patchState(store, { isLoading: true });
+        if (activationBusy()) return;
+        const labId = store.currentLabId();
+        patchState(store, { isLoading: true, error: null });
         try {
           // Sync only current lab nodes
-          const nodes = await firstValueFrom(service.getNodes(true, store.currentLabId()));
+          const nodes = await firstValueFrom(service.getNodes(true, labId));
+          if (store.currentLabId() !== labId) return;
           patchState(store, (state) => ({
             isLoading: false,
             topology: {
               ...state.topology,
-              nodes: nodes
+              nodes: mergePositions(nodes, labId)
             }
           }));
           toast.success('Network state synced');
         } catch (err: any) {
+          if (store.currentLabId() !== labId) return;
           patchState(store, { isLoading: false, error: err.message });
           toast.error('Sync failed');
         }
       },
 
       async renameLaboratory(name: string) {
+        if (activationBusy()) return;
         const labId = store.currentLabId();
         try {
           await firstValueFrom(service.updateLaboratory(labId, name));
           patchState(store, (state) => ({
-            topology: { ...state.topology, name },
+            topology: state.currentLabId === labId ? { ...state.topology, name } : state.topology,
             // Also update the list
             laboratories: state.laboratories.map(l => l.id === labId ? { ...l, name } : l)
           }));
@@ -408,21 +440,25 @@ export const TopologyStore = signalStore(
       },
 
       async cleanupCurrentLab() {
+        if (activationBusy() || !(await positions.flush())) return;
         const labId = store.currentLabId();
         const labName = store.topology().name;
         patchState(store, { isLoading: true });
         try {
           await firstValueFrom(service.cleanupLaboratory(labId));
+          if (store.currentLabId() !== labId) return false;
           patchState(store, (state) => ({
             isLoading: false,
             topology: { ...state.topology, nodes: [], links: [] },
             domains: null
           }));
           toast.success(`Lab "${labName}" cleaned successfully`);
+          return true;
         } catch (err: any) {
           const msg = err.message || 'Cleanup error';
           patchState(store, { isLoading: false, error: msg });
           toast.error(msg);
+          return false;
         }
       },
 
@@ -431,9 +467,9 @@ export const TopologyStore = signalStore(
         const labId = store.currentLabId();
         try {
           const domains = await firstValueFrom(service.getDomains(labId));
-          patchState(store, { domains });
+          if (store.currentLabId() === labId) patchState(store, { domains });
         } catch {
-          patchState(store, { domains: null });
+          if (store.currentLabId() === labId) patchState(store, { domains: null });
         }
       },
 

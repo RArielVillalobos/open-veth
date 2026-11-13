@@ -92,7 +92,7 @@ test.describe('Topology Canvas', () => {
     expect(cyState!.nodeCount).toBe(2);
 
     // Add a new router via palette
-    await page.locator('button:has-text("Router")').click();
+    await page.getByRole('button', { name: 'Add Router', exact: true }).click();
     const nameInput = page.locator('input[placeholder*="R1"]');
     await expect(nameInput).toBeVisible();
     await nameInput.fill('R2');

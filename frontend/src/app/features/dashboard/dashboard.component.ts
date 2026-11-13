@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, OnDestroy, computed, effect, ViewChild } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, effect, ViewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TopologyStore } from '../../state/topology.store';
 import { UIStore } from '../../state/ui.store';
@@ -18,6 +18,8 @@ import { LabManagerComponent } from './components/lab-manager/lab-manager.compon
 import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
 import { firstValueFrom } from 'rxjs';
 import { FileService } from '../../core/services/file.service';
+import { PositionSaveService } from '../../core/services/position-save.service';
+import { DecisionDialogService } from '../../core/services/decision-dialog.service';
 import { TracerouteResponse, NodeType } from '../../models/topology.model';
 
 @Component({
@@ -46,11 +48,34 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private layoutService = inject(LayoutService);
   private toast = inject(ToastService);
   private fileService = inject(FileService);
-  private networkEvents = inject(NetworkEventsService);
+  readonly networkEvents = inject(NetworkEventsService);
+
+  readonly positions = inject(PositionSaveService);
+  private decisions = inject(DecisionDialogService);
+  readonly isImporting = signal(false);
+  readonly operationError = signal<string | null>(null);
+  readonly saveStatus = signal<'idle' | 'saving' | 'saved' | 'partial' | 'error'>('idle');
+  readonly activationBusy = computed(() => ['requesting', 'activating', 'uncertain'].includes(this.store.activationPhase()));
+  readonly busy = computed(() => this.store.isLoading() || this.activationBusy() || this.isSavingState() || this.isImporting());
+  readonly pendingLabName = computed(() => this.store.laboratories().find(lab => lab.id === this.store.pendingLabId())?.name || 'laboratory');
+  readonly statusText = computed(() => {
+    if (this.store.activationPhase() === 'uncertain') return 'Activation unconfirmed';
+    if (this.activationBusy()) return 'Activating laboratory';
+    if (this.store.activationError()) return 'Activation failed';
+    if (this.isImporting()) return 'Importing topology';
+    if (this.isSavingState()) return 'Saving laboratory state';
+    if (this.positions.error()) return 'Positions not saved';
+    if (this.operationError() || this.store.error()) return 'Action failed';
+    if (this.store.isLoading()) return 'Updating laboratory';
+    if (this.positions.saving()) return 'Saving positions';
+    if (this.positions.count()) return 'Positions pending';
+    if (this.saveStatus() === 'saved') return 'State saved';
+    return 'Ready';
+  });
 
   // Mostrar modal solo cuando la carga terminó, la topología está vacía y el usuario no ha interactuado
   showWelcomeModal = computed(() =>
-    !this.store.isLoading() && this.store.topology().nodes.length === 0 && !this.ui.hasUserInteracted()
+    !this.busy() && !this.store.error() && this.store.topology().nodes.length === 0 && !this.ui.hasUserInteracted()
   );
 
   selectedNode = computed(() =>
@@ -88,6 +113,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const currentId = this.store.topology().id;
       if (this.lastLabId !== null && this.lastLabId !== currentId) {
         this.ui.resetSession();
+        this.saveStatus.set('idle');
+        this.operationError.set(null);
+        this.clearTraceroute();
         this.terminalStore.closeAll();
         this.captureStore.closeAll();
       }
@@ -103,8 +131,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.networkEvents.disconnect();
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
     document.removeEventListener('mousemove', this.boundMouseMove);
     document.removeEventListener('mouseup', this.boundMouseUp);
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  protectPendingChanges(event: BeforeUnloadEvent) {
+    if (this.positions.count() || this.isSavingState() || this.isImporting()) { event.preventDefault(); event.returnValue = ''; }
+  }
+
+  reloadApplication() { window.location.reload(); }
+
+  resizeTerminalByKey(event: KeyboardEvent) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    this.terminalHeight.update(height => Math.max(this.MIN_TERMINAL_HEIGHT, Math.min(window.innerHeight * this.MAX_TERMINAL_HEIGHT_RATIO, height + (event.key === 'ArrowUp' ? 32 : -32))));
+    requestAnimationFrame(() => this.terminalPanel?.fitAll());
   }
 
   onResizeStart(event: MouseEvent) {
@@ -145,6 +189,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   onLinkRequest(event: { source: string; target: string }) {
+    if (this.busy()) return;
     const { links } = this.store.topology();
     const source_int = this.layoutService.getNextInterface(event.source, links);
     const target_int = this.layoutService.getNextInterface(event.target, links);
@@ -159,6 +204,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   onAddNode(event: { type: NodeType; name: string }) {
+    if (this.busy()) return;
     this.ui.markInteraction();
     const { nodes, links } = this.store.topology();
     const { x, y } = this.layoutService.getNextNodePosition(nodes, links);
@@ -171,15 +217,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  onDeleteNode(id: string) {
-    this.store.removeNode(id);
-    this.ui.clearSelection();
-    this.terminalStore.closeTerminal(id);
+  async onDeleteNode(id: string) {
+    if (this.busy()) return;
+    if (await this.store.removeNode(id)) { this.ui.clearSelection(); this.terminalStore.closeTerminal(id); }
   }
 
-  onDeleteLink(id: string) {
-    this.store.removeLink(id);
-    this.ui.clearSelection();
+  async onDeleteLink(id: string) {
+    if (!this.busy() && await this.store.removeLink(id)) this.ui.clearSelection();
   }
 
   onToggleLink(id: string) {
@@ -192,6 +236,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   async onExport() {
     try {
+      if (!(await this.positions.flush())) return;
       const lab = this.store.topology();
       const blob = await firstValueFrom(this.service.exportTopology(lab.id));
       this.fileService.downloadBlob(blob, `${lab.name}.yaml`);
@@ -201,33 +246,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async onImport(event: any) {
+  async onImport(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.busy()) return;
     this.ui.markInteraction();
-    const file = event.target.files[0];
-    if (!file) return;
-
-    try {
-      const content = await this.fileService.readAsText(file);
-      const labId = this.store.topology().id;
-      const result = await firstValueFrom(this.service.importTopology(content, labId));
-      if (result.errors?.length) {
-        this.toast.error(`Import partial: ${result.errors.length} error(s) — ${result.errors[0]}`);
-      } else {
-        this.toast.success(`Topology imported: ${result.nodes} nodes, ${result.links} links`);
-      }
-      await this.store.loadTopology();
-      setTimeout(() => this.canvasComponent?.fitToView());
-    } catch (err: any) {
-      console.error('Failed to import topology', err);
-      this.toast.error('Import failed: ' + (err.error?.error || err.message));
-    } finally {
-      event.target.value = '';
+    const current = this.store.topology();
+    const baseName = file.name.replace(/\.ya?ml$/i, '').trim() || 'Imported laboratory';
+    let newName = baseName, suffix = 2;
+    while (this.store.laboratories().some(lab => lab.name.toLowerCase() === newName.toLowerCase())) newName = baseName + ' (' + suffix++ + ')';
+    const choice = await this.decisions.choose({
+      title: 'Import topology',
+      message: 'File: ' + file.name + '\nCreate a new laboratory named "' + newName + '", or replace "' + current.name + '". Replacing deletes its existing nodes, links, saved network settings, and snapshots.',
+      actions: [{ value: 'new', label: 'Import into new laboratory' }, { value: 'replace', label: 'Replace current laboratory', destructive: true }],
+    });
+    if (!choice || this.busy()) return;
+    if (current.id !== this.store.currentLabId()) {
+      this.toast.error('The selected laboratory changed. Choose the import destination again.');
+      return;
     }
+    this.isImporting.set(true); this.operationError.set(null);
+    try {
+      if (!(await this.positions.flush())) return;
+      const content = await this.fileService.readAsText(file);
+      let labId = current.id;
+      if (choice === 'new') {
+        const createdId = await this.store.createLaboratory(newName);
+        if (!createdId || !(await this.store.waitForActivation())) return;
+        labId = createdId;
+      }
+      const result = await firstValueFrom(this.service.importTopology(content, labId));
+      if (result.errors?.length) this.operationError.set('Import incomplete: ' + result.errors.join('; '));
+      else this.toast.success('Topology imported: ' + result.nodes + ' nodes, ' + result.links + ' links');
+      await this.store.loadTopology();
+      this.terminalStore.closeAll(); this.captureStore.closeAll(); this.ui.clearSelection();
+      setTimeout(() => this.canvasComponent?.fitToView());
+      this.saveStatus.set('idle');
+    } catch (err: any) {
+      this.operationError.set('Import failed: ' + (err.error?.error || err.message));
+    } finally { this.isImporting.set(false); }
   }
 
   openTerminal(nodeId: string) {
     const node = this.store.topology().nodes.find(n => n.id === nodeId);
-    if (node) {
+    if (node && node.status !== 'stopped' && !this.busy()) {
       this.terminalStore.openTerminal(nodeId, node.name);
     }
   }
@@ -239,26 +302,35 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  onCleanupLab() {
-    const labName = this.store.topology().name;
-    if (confirm(`Are you sure you want to delete all nodes and links in "${labName}"? This cannot be undone.`)) {
-      this.store.cleanupCurrentLab();
-      this.ui.resetSession();
-      this.terminalStore.closeAll();
-      this.captureStore.closeAll();
+  async onCleanupLab() {
+    if (this.busy()) return;
+    const lab = this.store.topology();
+    const confirmed = await this.decisions.confirm('Reset laboratory?', 'Delete all ' + lab.nodes.length + ' nodes, their links, saved settings, and snapshots in "' + lab.name + '"? The laboratory itself will remain. This cannot be undone.', 'Reset laboratory');
+    if (confirmed && lab.id !== this.store.currentLabId()) {
+      this.toast.error('The selected laboratory changed. Review the reset action again.');
+      return;
+    }
+    if (confirmed && !this.busy() && await this.store.cleanupCurrentLab()) {
+      this.ui.resetSession(); this.terminalStore.closeAll(); this.captureStore.closeAll(); this.saveStatus.set('idle');
     }
   }
 
   async onSaveState() {
-    if (this.isSavingState()) return;
-    this.isSavingState.set(true);
+    if (this.busy() || !(await this.positions.flush())) return;
+    this.isSavingState.set(true); this.saveStatus.set('saving'); this.operationError.set(null);
     const labId = this.store.topology().id;
     try {
       const result = await firstValueFrom(this.service.saveLabState(labId));
-      this.toast.success(`State saved: ${result.ips_saved} IPs, ${result.routes_saved} routes, ${result.snapshots_saved} snapshots`);
+      if (labId !== this.store.currentLabId()) return;
+      if (result.snapshots_saved < this.store.topology().nodes.filter(node => node.status === 'running').length) {
+        this.saveStatus.set('partial'); this.operationError.set('Network settings were saved, but some node snapshots failed. Save again to retry.');
+      } else {
+        this.saveStatus.set('saved');
+        this.toast.success(`State saved: ${result.ips_saved} IPs, ${result.routes_saved} routes, ${result.snapshots_saved} snapshots`);
+      }
     } catch (err: any) {
       console.error('Failed to save lab state', err);
-      this.toast.error('Save failed: ' + (err.error?.error || err.message));
+      this.saveStatus.set('error'); this.operationError.set('Save failed: ' + (err.error?.error || err.message));
     } finally {
       this.isSavingState.set(false);
     }

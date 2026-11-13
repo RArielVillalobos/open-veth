@@ -1,5 +1,6 @@
 /* Global Styles */
 @import 'xterm/css/xterm.css'; /* <--- IMPORTANTE */
+@import '@angular/cdk/overlay-prebuilt.css';
 
 @tailwind base;
 @tailwind components;
@@ -8,7 +9,7 @@
 @layer components {
   /* BEM Component: Button */
   .btn {
-    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2;
+    @apply px-4 py-2 rounded-sm font-medium transition-colors duration-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2;
 
     &--primary { @apply bg-signal-500 text-slate-950 hover:bg-signal-300 font-semibold; }
     &--secondary { @apply bg-slate-800 text-slate-200 hover:border-signal-500 border border-slate-700; }
@@ -29,4 +30,24 @@
 html, body {
   @apply h-full bg-slate-50;
   margin: 0;
+}
+
+button, a, input, select, [tabindex] {
+  &:focus-visible { outline: 2px solid #83b9df; outline-offset: 3px; }
+}
+button:disabled { cursor: not-allowed; opacity: 0.5; }
+.decision-dialog {
+  width: min(540px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid #425256;
+  border-radius: 3px;
+  background: #131b1e;
+  color: #dbe4e5;
+  box-shadow: 0 24px 64px #0008;
+  h2 { font-size: 16px; font-weight: 500; margin: 0 0 12px; }
+  p { color: #b4c4c6; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+}
+.decision-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

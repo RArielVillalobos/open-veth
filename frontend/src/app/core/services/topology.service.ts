@@ -82,8 +82,12 @@ export class TopologyService {
     return this.http.post<Laboratory>(`${this.apiUrl}/laboratories`, lab);
   }
 
-  activateLaboratory(id: string): Observable<{ message: string; lab_id: string }> {
-    return this.http.post<{ message: string; lab_id: string }>(`${this.apiUrl}/laboratories/${id}/activate`, {});
+  activateLaboratory(id: string): Observable<{ message: string; lab_id: string; operation_id?: string }> {
+    return this.http.post<{ message: string; lab_id: string; operation_id?: string }>(`${this.apiUrl}/laboratories/${id}/activate`, {});
+  }
+
+  getLabActivation(id: string): Observable<{ lab_id: string; operation_id: string; status: string; reason?: string }> {
+    return this.http.get<{ lab_id: string; operation_id: string; status: string; reason?: string }>(`${this.apiUrl}/laboratories/${id}/activation`);
   }
 
   updateLaboratory(id: string, name: string): Observable<Laboratory> {

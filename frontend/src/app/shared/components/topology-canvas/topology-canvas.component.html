@@ -1,11 +1,13 @@
 <div class="canvas-overlay">
+  <button class="canvas-mode-button" [attr.aria-pressed]="linkMode()" (click)="toggleLinkMode()">{{ linkMode() ? 'Exit connection mode' : 'Connect nodes' }}</button>
+  <span class="canvas-hint">{{ linkMode() ? 'Choose two nodes to connect. Escape cancels.' : 'Select a node to inspect it.' }}</span>
   <div *ngIf="sourceNodeId" class="linking-indicator">
     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <circle cx="8" cy="12" r="3" stroke-width="2"/><circle cx="16" cy="12" r="3" stroke-width="2"/>
       <path stroke-linecap="round" stroke-width="2" d="M11 12h2"/>
     </svg>
     Linking from: <strong>{{ getNodeName(sourceNodeId) }}</strong> (Click another node to connect)
-    <button (click)="cancelLinking()">Cancel</button>
+    <button (click)="stopLinking()">Cancel</button>
   </div>
 </div>
 
@@ -124,15 +126,15 @@
 </div>
 
 <!-- Traceroute Dialog -->
-<div *ngIf="showTracerouteDialog" class="traceroute-dialog" cdkDrag>
+<div *ngIf="showTracerouteDialog" class="traceroute-dialog" role="dialog" aria-modal="false" aria-labelledby="traceroute-title" cdkDrag>
   <div class="traceroute-dialog__header" cdkDragHandle>
-    <span>Traceroute from <strong>{{ tracerouteNodeName }}</strong></span>
-    <button class="traceroute-dialog__close" (click)="clearTraceroute()">&times;</button>
+    <span id="traceroute-title">Traceroute from <strong>{{ tracerouteNodeName }}</strong></span>
+    <button class="traceroute-dialog__close" aria-label="Close traceroute" (click)="clearTraceroute()">&times;</button>
   </div>
   <div class="traceroute-dialog__body">
     <div class="traceroute-dialog__input-row">
       <input type="text"
-             [(ngModel)]="tracerouteDestIP"
+             [(ngModel)]="tracerouteDestIP" aria-label="Traceroute destination IP"
              placeholder="Destination IP (e.g. 10.0.1.2)"
              class="traceroute-dialog__input"
              (keydown.enter)="runTraceroute()"

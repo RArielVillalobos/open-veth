@@ -9,12 +9,14 @@ const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
   selector: 'app-node-palette',
   standalone: true,
   imports: [ReactiveFormsModule],
-  templateUrl: './node-palette.component.html'
+  templateUrl: './node-palette.component.html',
+  styleUrl: './node-palette.component.scss'
 })
 export class NodePaletteComponent {
   private injector = inject(Injector);
 
   nodes = input<Node[]>([]);
+  disabled = input(false);
   addNode = output<{ type: NodeType; name: string }>();
 
   pendingType = signal<NodeType | null>(null);
@@ -185,6 +187,10 @@ export class NodePaletteComponent {
   // Filtered node types by category
   networkDevices = computed(() => this.nodeTypeConfigs.filter(nt => nt.category === 'network'));
   endDevices = computed(() => this.nodeTypeConfigs.filter(nt => nt.category === 'end'));
+  deviceGroups = computed(() => [
+    { label: 'Network devices', devices: this.networkDevices() },
+    { label: 'End devices', devices: this.endDevices() },
+  ]);
   
   nameError = computed(() => {
     const name = this.nameValue().trim();
@@ -199,12 +205,7 @@ export class NodePaletteComponent {
     return name.length > 0 && !this.nameError();
   });
 
-  inputClasses = computed(() => {
-    const base = 'w-full px-3 py-1.5 text-sm bg-slate-800 border rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1';
-    return this.nameError()
-      ? `${base} border-red-500 focus:ring-red-500`
-      : `${base} border-slate-600 focus:ring-signal-500`;
-  });
+  inputClasses = computed(() => this.nameError() ? 'palette-name palette-name--invalid' : 'palette-name');
 
   collapsed = signal(false);
 
@@ -247,7 +248,9 @@ export class NodePaletteComponent {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
+    if (this.disabled() || document.querySelector('[role="dialog"]')) return;
     const target = event.target as HTMLElement;
+    if (target.isContentEditable) return;
     if (['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 

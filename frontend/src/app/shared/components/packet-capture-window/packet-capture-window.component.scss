@@ -1,20 +1,17 @@
-.capture-container {
-  height: 400px;
-  width: 850px;
-  pointer-events: auto;
-}
-
-table {
-  table-layout: fixed;
-  width: 100%;
-}
-
-tbody tr:nth-child(even) {
-  background-color: rgba(30, 41, 59, 0.3);
-}
-
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+:host { display: block; max-width: calc(100vw - 24px); }
+.capture-container { height: 440px; max-height: calc(100vh - 100px); width: min(960px, calc(100vw - 24px)); pointer-events: auto; border-radius: 3px; }
+.capture-header { flex-wrap: wrap; gap: 8px; }
+.capture-tools { flex-wrap: wrap; }
+.protocol-filters { display: flex; border-right: 1px solid #28353a; padding-right: 6px; }
+.protocol-filter { color: #8fa3a6; border-bottom: 2px solid transparent; border-radius: 0; font-size: 11px; font-weight: 400; }
+.protocol-filter:hover { color: #dbe4e5; background: #1a2427; }
+.protocol-filter--active { color: #83b9df; border-bottom-color: #648eac; }
+table { width: 100%; table-layout: fixed; }
+th { font-weight: 500; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.protocol-tcp { color: #91b5d2; }
+.protocol-udp { color: #9abbab; }
+.protocol-icmp { color: #c3ac81; }
+.protocol-arp { color: #b0a0c2; }
+.protocol-other { color: #b4c4c6; }
+.packet-detail-section { padding: 0 0 12px; border-bottom: 1px solid #28353a; }

@@ -1,165 +1,49 @@
-<div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in">
-  <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-up">
-    
-    <!-- Header -->
-    <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
-      <div>
-        <h2 class="text-2xl font-bold text-slate-100 tracking-tight">My Laboratories</h2>
-        <p class="text-slate-400 text-sm mt-1">Manage your network simulation projects</p>
-      </div>
-      <button (click)="close.emit()" class="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-800">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
-      
-      <!-- Sidebar / Create New -->
-      <div class="w-full md:w-80 bg-slate-800/30 border-r border-slate-700 p-6 flex flex-col gap-6">
-        <div>
-          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4">Create New Project</h3>
-          <div class="flex flex-col gap-3">
-            <div class="relative">
-              <input 
-                #labNameInput
-                type="text" 
-                placeholder="Project Name (e.g. BGP-Fabric)" 
-                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-signal-500 focus:ring-1 focus:ring-signal-500 transition-all placeholder:text-slate-600"
-                (keyup.enter)="createLab(labNameInput.value); labNameInput.value=''"
-              >
+<div class="lab-backdrop">
+  <div class="lab-dialog" role="dialog" aria-modal="true" aria-labelledby="lab-manager-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+    <header class="lab-dialog-heading">
+      <h2 id="lab-manager-title">Laboratories</h2>
+      <button type="button" (click)="close.emit()" aria-label="Close laboratory manager" [disabled]="busy()">&times;</button>
+    </header>
+    <div class="lab-dialog-content">
+      <section class="lab-create" aria-label="Create laboratory">
+        <h3>New laboratory</h3>
+        <label for="new-laboratory-name">Name</label>
+        <input id="new-laboratory-name" aria-label="New laboratory name" [value]="newName()"
+               (input)="newName.set($any($event.target).value)" [disabled]="busy()"
+               placeholder="Laboratory name (e.g. BGP-Fabric)" (keyup.enter)="createLab()">
+        <button type="button" class="lab-create-button" (click)="createLab()" [disabled]="busy() || !newName().trim()">Create Laboratory</button>
+        <p>Switching saves network settings and stops the previous environment. Use Save to preserve installed packages and other filesystem changes.</p>
+      </section>
+      <section class="lab-list" aria-label="Saved laboratories">
+        @for (lab of store.laboratories(); track lab.id) {
+          <div class="lab-row" [class.lab-row--active]="lab.id === store.currentLabId()">
+            <div class="lab-name">
+              @if (editingLabId() !== lab.id) {
+                <h3 [title]="lab.name">{{ lab.name }}</h3>
+              } @else {
+                <input #renameInput [value]="editingName()" aria-label="Laboratory name"
+                       (input)="editingName.set($any($event.target).value)" (keyup.enter)="saveEditing()"
+                       (keyup.escape)="cancelEditing()" [attr.aria-invalid]="!!nameError()">
+                @if (nameError()) { <p class="lab-error" role="alert">{{ nameError() }}</p> }
+              }
             </div>
-            <button
-              (click)="createLab(labNameInput.value); labNameInput.value=''"
-              class="w-full bg-signal-500 hover:bg-signal-300 text-slate-950 px-4 py-3 rounded-lg text-sm font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-            >
-              <span>+</span> Create Laboratory
-            </button>
-          </div>
-        </div>
-
-        <div class="mt-auto bg-signal-900/30 border border-signal-700/30 rounded-lg p-4">
-          <h4 class="text-signal-300 font-medium text-sm mb-1">Did you know?</h4>
-          <p class="text-signal-200/60 text-xs leading-relaxed">
-            Switching laboratories automatically saves your work and shuts down the previous environment to save resources.
-          </p>
-        </div>
-      </div>
-
-      <!-- Main Grid -->
-      <div class="flex-1 overflow-y-auto p-6 bg-slate-950/30">
-        
-        <!-- Grid Layout -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4" *ngIf="store.laboratories().length > 0; else emptyState">
-          
-          <div *ngFor="let lab of store.laboratories()" 
-               class="group relative bg-slate-800 border border-slate-700 hover:border-signal-500/50 rounded-xl p-5 transition-all hover:-translate-y-1 flex flex-col"
-               [class.ring-2]="lab.id === store.currentLabId()"
-               [class.ring-signal-500]="lab.id === store.currentLabId()"
-               [class.bg-slate-800]="lab.id !== store.currentLabId()"
-               [class.bg-slate-800\/80]="lab.id === store.currentLabId()">
-
-            <!-- Status Badge -->
-            <div class="absolute top-4 right-4">
-              <span *ngIf="lab.id === store.currentLabId()" class="flex h-3 w-3 rounded-full bg-up-500"></span>
-            </div>
-
-            <!-- Icon -->
-            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center mb-4 text-slate-400 group-hover:bg-signal-500/20 group-hover:text-signal-400 transition-colors">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
-              </svg>
-            </div>
-
-            <!-- Content -->
-            <div class="mb-1 flex items-center gap-2">
-              <h3 *ngIf="editingLabId() !== lab.id"
-                  class="font-semibold text-slate-100 text-lg truncate flex-1"
-                  title="{{lab.name}}">{{ lab.name }}</h3>
-              <input *ngIf="editingLabId() === lab.id"
-                     #renameInput
-                     [value]="editingName()"
-                     (input)="editingName.set($any($event.target).value)"
-                     (keyup.enter)="saveEditing()"
-                     (keyup.escape)="cancelEditing()"
-                     [class]="'flex-1 bg-slate-900 border rounded px-2 py-1 text-sm text-slate-100 focus:outline-none ' + (nameError() ? 'border-red-500' : 'border-signal-500')">
-              <button *ngIf="editingLabId() !== lab.id && lab.id === store.currentLabId()"
-                      (click)="startEditing(lab)"
-                      class="text-slate-500 hover:text-signal-400 transition-colors p-1"
-                      title="Rename">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/>
-                </svg>
-              </button>
-              <button *ngIf="editingLabId() === lab.id"
-                      (click)="saveEditing()"
-                      [disabled]="!canSave()"
-                      [class]="'transition-colors p-1 ' + (canSave() ? 'text-green-400 hover:text-green-300' : 'text-slate-600 cursor-not-allowed')"
-                      title="Save">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-              </button>
-              <button *ngIf="editingLabId() === lab.id"
-                      (click)="cancelEditing()"
-                      class="text-slate-500 hover:text-red-400 transition-colors p-1"
-                      title="Cancel">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-            <p *ngIf="editingLabId() !== lab.id" class="text-xs text-slate-500 font-mono mb-6 truncate">{{ lab.id }}</p>
-            <p *ngIf="editingLabId() === lab.id && nameError()" class="text-xs text-red-400 mb-6">{{ nameError() }}</p>
-            <p *ngIf="editingLabId() === lab.id && !nameError()" class="text-xs text-slate-500 font-mono mb-6 truncate">{{ lab.id }}</p>
-
-            <!-- Actions -->
-            <div class="mt-auto flex gap-2">
-              <button *ngIf="lab.id !== store.currentLabId()"
-                      (click)="switchLab(lab.id)"
-                      [disabled]="activatingLabId() !== null"
-                      class="flex-1 bg-slate-700 hover:bg-signal-500 text-slate-200 hover:text-slate-950 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
-                <svg *ngIf="activatingLabId() === lab.id" class="w-3 h-3 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                {{ activatingLabId() === lab.id ? 'Activating...' : 'Open Project' }}
-              </button>
-              
-              <button *ngIf="lab.id === store.currentLabId()"
-                      disabled
-                      class="flex-1 bg-green-900/20 text-green-400 border border-green-900/30 py-2 rounded-lg text-xs font-medium cursor-default">
-                Active
-              </button>
-
-              <button *ngIf="lab.id !== store.currentLabId()"
-                      (click)="deleteLab(lab.id)"
-                      class="px-3 py-2 bg-slate-700 hover:bg-red-900/50 hover:text-red-400 text-slate-400 rounded-lg transition-colors"
-                      title="Delete Project">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-              </button>
+            <div class="lab-row-actions">
+              @if (editingLabId() === lab.id) {
+                <button type="button" (click)="saveEditing()" [disabled]="!canSave()" title="Save">Save</button>
+                <button type="button" (click)="cancelEditing()" title="Cancel">Cancel</button>
+              } @else if (lab.id === store.currentLabId()) {
+                <button type="button" (click)="startEditing(lab)" [disabled]="busy()" title="Rename">Rename</button>
+                <button type="button" class="lab-active-label" disabled>Active</button>
+              } @else {
+                <button type="button" (click)="switchLab(lab.id)" [disabled]="busy() || activatingLabId() !== null">{{ activatingLabId() === lab.id ? 'Activating...' : 'Open Laboratory' }}</button>
+                <button type="button" class="lab-delete" (click)="deleteLab(lab.id)" [disabled]="busy()" [attr.aria-label]="'Delete laboratory ' + lab.name" title="Delete Laboratory">Delete</button>
+              }
             </div>
           </div>
-
-        </div>
-
-        <!-- Empty State -->
-        <ng-template #emptyState>
-          <div class="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-            <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-600">
-              <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <circle cx="12" cy="5" r="2" stroke-width="2"/><circle cx="5" cy="19" r="2" stroke-width="2"/><circle cx="19" cy="19" r="2" stroke-width="2"/>
-                <path stroke-linecap="round" stroke-width="2" d="M12 7l-5.5 10M12 7l5.5 10"/>
-              </svg>
-            </div>
-            <h3 class="text-lg font-medium text-slate-300">No laboratories yet</h3>
-            <p class="text-slate-500 text-sm max-w-xs mt-2">Create your first network simulation project using the sidebar.</p>
-          </div>
-        </ng-template>
-
-      </div>
+        } @empty {
+          <p class="lab-empty">No laboratories. Enter a name to create one.</p>
+        }
+      </section>
     </div>
   </div>
 </div>

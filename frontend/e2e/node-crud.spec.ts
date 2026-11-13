@@ -14,18 +14,18 @@ test.describe('Node CRUD', () => {
     // Lab name should be visible in the header
     await expect(page.locator('text=E2E Test Lab')).toBeVisible();
     // Node palette should be visible (now called "Components")
-    await expect(page.locator('text=Components')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Devices', exact: true })).toBeVisible();
   });
 
   test('node palette shows Router, Switch, Hub, Host, Cloud options', async ({ page }) => {
     // Dismiss welcome modal if present
     await page.locator('text=New Topology').click({ timeout: 2000 }).catch(() => {});
 
-    await expect(page.locator('button:has-text("Router")')).toBeVisible();
-    await expect(page.locator('button:has-text("Switch")')).toBeVisible();
-    await expect(page.locator('button:has-text("Hub")')).toBeVisible();
-    await expect(page.locator('button:has-text("Host")')).toBeVisible();
-    await expect(page.locator('button:has-text("Cloud")')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Router', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Switch', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Hub', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Host', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Cloud', exact: true })).toBeVisible();
   });
 
   test('create a router node via palette', async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe('Node CRUD', () => {
     );
 
     // Click Router button to start naming
-    await page.locator('button:has-text("Router")').click();
+    await page.getByRole('button', { name: 'Add Router', exact: true }).click();
 
     // Input should appear with placeholder
     const nameInput = page.locator('input[placeholder*="R1"]');
@@ -65,7 +65,7 @@ test.describe('Node CRUD', () => {
       req.url().includes('/api/v1/nodes') && req.method() === 'POST'
     );
 
-    await page.locator('button:has-text("Host")').click();
+    await page.getByRole('button', { name: 'Add Host', exact: true }).click();
     const nameInput = page.locator('input[placeholder*="PC1"]');
     await expect(nameInput).toBeVisible();
     await nameInput.fill('PC2');
@@ -85,7 +85,7 @@ test.describe('Node CRUD', () => {
       req.url().includes('/api/v1/nodes') && req.method() === 'POST'
     );
 
-    await page.locator('button:has-text("Cloud")').click();
+    await page.getByRole('button', { name: 'Add Cloud', exact: true }).click();
     const nameInput = page.locator('input[placeholder*="INET"]');
     await expect(nameInput).toBeVisible();
     await nameInput.fill('INTERNET');
@@ -105,7 +105,7 @@ test.describe('Node CRUD', () => {
       req.url().includes('/api/v1/nodes') && req.method() === 'POST'
     );
 
-    await page.locator('button:has-text("Hub")').click();
+    await page.getByRole('button', { name: 'Add Hub', exact: true }).click();
     const nameInput = page.locator('input[placeholder*="HUB1"]');
     await expect(nameInput).toBeVisible();
     await nameInput.fill('HUB1');
@@ -129,7 +129,8 @@ test.describe('Node CRUD', () => {
     );
 
     // Click Reset button (title contains "Reset Lab")
-    await page.locator('button[title*="Reset Lab"]').click();
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Reset laboratory?' }).getByRole('button', { name: 'Reset laboratory', exact: true }).click();
 
     // Verify cleanup API was called
     await cleanupPromise;

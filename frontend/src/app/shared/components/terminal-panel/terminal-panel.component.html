@@ -1,28 +1,47 @@
 <div class="terminal-panel">
   <!-- Tabs Header -->
   <div class="terminal-panel__header">
-    <div class="tabs-container">
+    <div class="tabs-container" role="tablist" aria-label="Node terminals">
       <div 
         *ngFor="let t of terminalStore.sessions()" 
         class="tab" 
         [class.tab--active]="t.nodeId === terminalStore.activeNodeId()"
-        (click)="setActiveTab(t.nodeId)">
-        <span class="icon">&gt;_</span>
+        >
+        <button class="tab-selector" role="tab" [attr.aria-controls]="'terminal-content-' + t.nodeId" [id]="'terminal-tab-' + t.nodeId" [attr.aria-selected]="t.nodeId === terminalStore.activeNodeId()" [attr.tabindex]="t.nodeId === terminalStore.activeNodeId() ? 0 : -1" (click)="setActiveTab(t.nodeId)" (keydown.arrowright)="$event.preventDefault(); selectAdjacentTab(1)" (keydown.arrowleft)="$event.preventDefault(); selectAdjacentTab(-1)">
+        <span class="connection-dot" [class.connection-dot--connected]="connectionStates()[t.nodeId] === 'Connected'" [class.connection-dot--disconnected]="connectionStates()[t.nodeId] === 'Disconnected'" [attr.title]="connectionStates()[t.nodeId] || 'Connecting'"></span>
         <span class="label">{{ t.nodeName }}</span>
-        <button class="close-btn" (click)="$event.stopPropagation(); closeTerminal(t.nodeId)">×</button>
+        </button>
+        <button [attr.aria-label]="'Close terminal for ' + t.nodeName" class="close-btn" (click)="$event.stopPropagation(); closeTerminal(t.nodeId)">×</button>
       </div>
     </div>
     
     <!-- Controls -->
     <div class="controls">
-      <button class="clear-btn" (click)="clearActiveTerminal()" title="Clear Scrollback">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-        </svg>
-        Clear
-      </button>
+      <button (click)="openSearch()" title="Find (Ctrl+Shift+F)">Find</button>
+      <button (click)="copySelection()" title="Copy selection (Ctrl+Shift+C)">Copy</button>
+      <button (click)="pasteClipboard()" title="Paste (Ctrl+Shift+V)" [disabled]="connectionStates()[terminalStore.activeNodeId()!] !== 'Connected'">Paste</button>
+      <button (click)="changeFontSize(-1)" aria-label="Decrease terminal font size" [disabled]="fontSize() <= 10">A−</button>
+      <span class="font-size">{{ fontSize() }}</span>
+      <button (click)="changeFontSize(1)" aria-label="Increase terminal font size" [disabled]="fontSize() >= 22">A+</button>
+      <button (click)="clearActiveTerminal()" title="Clear scrollback">Clear</button>
     </div>
   </div>
+  <div class="terminal-status">
+    <span role="status">{{ connectionStates()[terminalStore.activeNodeId()!] || 'Connecting' }}</span>
+    @if (connectionStates()[terminalStore.activeNodeId()!] === 'Disconnected') {
+      <button (click)="reconnect()">Reconnect</button>
+    }
+    <span class="terminal-status__hint">Ctrl+C interrupt · Ctrl+Shift+C copy · Ctrl+Shift+V paste</span>
+  </div>
+  @if (searchOpen()) {
+    <div class="terminal-search" role="search" aria-label="Terminal output">
+      <input id="terminal-search" aria-label="Find in terminal" placeholder="Find in output" [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value); find()" (keydown.enter)="find($any($event).shiftKey)" (keydown.escape)="closeSearch()">
+      <button (click)="find(true)" aria-label="Previous match">↑</button>
+      <button (click)="find()" aria-label="Next match">↓</button>
+      <span role="status">{{ searchResult() }}</span>
+      <button (click)="closeSearch()" aria-label="Close terminal search">×</button>
+    </div>
+  }
 
   <!-- Terminal Content (Mantener todos en DOM pero ocultar los inactivos para no perder sesión) -->
   <div class="terminal-panel__body">
@@ -30,7 +49,7 @@
       *ngFor="let t of terminalStore.sessions()" 
       #termContainer
       [attr.data-node-id]="t.nodeId"
-      class="xterm-wrapper"
+      class="xterm-wrapper" role="tabpanel" [id]="'terminal-content-' + t.nodeId" [attr.aria-labelledby]="'terminal-tab-' + t.nodeId"
       [class.tab--inactive]="t.nodeId !== terminalStore.activeNodeId()">
     </div>
   </div>

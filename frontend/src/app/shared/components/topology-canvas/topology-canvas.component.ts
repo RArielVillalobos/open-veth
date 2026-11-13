@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, input, output, effect, OnDestroy } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, input, output, effect, OnDestroy, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -45,11 +45,22 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private cy!: cytoscape.Core;
   private hasActiveHighlight = false;
   private canvasReady = false;
+  private destroyed = false;
+  private viewportSize = { width: 0, height: 0 };
+  private resizingViewport = false;
   private resizeObserver!: ResizeObserver;
   private overlayCtx: CanvasRenderingContext2D | null = null;
   private pulseInterval: ReturnType<typeof setInterval> | null = null;
   private previousTogglingNodes: string[] = [];
+  linkMode = signal(false);
   sourceNodeId: string | null = null;
+  toggleLinkMode() { this.linkMode.update(value => !value); this.cancelLinking(); }
+  stopLinking() { this.linkMode.set(false); this.cancelLinking(); }
+  @HostListener('document:keydown.escape') onEscape() {
+    this.stopLinking(); this.closeContextMenu();
+    if (this.showTracerouteDialog) this.clearTraceroute();
+  }
+
   
   // Context menu state
   contextMenu = {
@@ -78,6 +89,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   constructor() {
     effect(() => {
       this.nodes();
+      this.links();
       if (this.cy) {
         this.updateCanvas();
       }
@@ -166,7 +178,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    this.prerasterizeIcons().then(bg => this.initCytoscape(bg));
+    this.prerasterizeIcons().then(bg => { if (!this.destroyed) this.initCytoscape(bg); });
   }
 
   private prerasterizeIcons(): Promise<Record<string, string>> {
@@ -186,6 +198,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.resizeObserver?.disconnect();
     if (this.pulseInterval) clearInterval(this.pulseInterval);
     if (this.cy) this.cy.destroy();
@@ -339,8 +352,15 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     (this.container.nativeElement as any).__cy = this.cy;
 
     // Recalculate canvas when container resizes
+    this.viewportSize = { width: this.cy.width(), height: this.cy.height() };
     this.resizeObserver = new ResizeObserver(() => {
+      const pan = this.cy.pan(), zoom = this.cy.zoom();
+      const center = { x: (this.viewportSize.width / 2 - pan.x) / zoom, y: (this.viewportSize.height / 2 - pan.y) / zoom };
+      this.resizingViewport = true;
       this.cy.resize();
+      this.viewportSize = { width: this.cy.width(), height: this.cy.height() };
+      this.cy.pan({ x: this.viewportSize.width / 2 - center.x * zoom, y: this.viewportSize.height / 2 - center.y * zoom });
+      this.resizingViewport = false;
       this.redrawOverlayCanvas();
     });
     this.resizeObserver.observe(this.container.nativeElement);
@@ -351,6 +371,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     this.cy.on('tap', 'node', (evt) => {
       const clickedNode = evt.target;
       const clickedId = clickedNode.id();
+      if (!this.linkMode()) { this.nodeSelected.emit(clickedId); return; }
 
       if (!this.sourceNodeId) {
         // Mode: Start Link
@@ -442,7 +463,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     });
 
     this.cy.on('zoom pan', () => {
-      this.closeContextMenu();
+      if (!this.resizingViewport) this.closeContextMenu();
       this.redrawOverlayCanvas();
     });
 
@@ -458,6 +479,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         y: pos.y
       });
     });
+    this.updateCanvas();
   }
 
   private clearDomainOverlay(): void {
@@ -754,8 +776,8 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         if (existing.empty()) {
           const added = this.cy.add({
             group: 'nodes',
-            data: { id: node.id, label: node.name, name: node.name, type: node.type },
-            position: { x: node.x || 100, y: node.y || 100 }
+            data: { id: node.id, label: node.name, name: node.name, type: node.type, status: node.status },
+            position: { x: node.x ?? 100, y: node.y ?? 100 }
           });
           if (node.status === 'stopped') added.addClass('node-stopped');
           if (node.snapshot_image) added.addClass('has-snapshot');
@@ -764,6 +786,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
           if (existing.data('label') !== node.name) {
             existing.data('label', node.name);
           }
+          existing.data('status', node.status);
           if (node.status === 'stopped') {
             existing.addClass('node-stopped');
           } else {
@@ -845,7 +868,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     });
 
     if (!this.canvasReady) {
-      this.canvasReady = true;
+      this.canvasReady = this.cy.nodes().length > 0;
       if (this.cy.nodes().length > 0) {
         this.cy.fit(undefined, 50);
       }

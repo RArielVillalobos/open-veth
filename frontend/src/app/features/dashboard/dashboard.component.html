@@ -1,38 +1,38 @@
-<div class="h-screen flex flex-col bg-slate-900 text-white overflow-hidden">
+<div class="dashboard-shell h-screen flex flex-col bg-slate-900 text-white overflow-hidden" [attr.aria-busy]="busy()">
   
   <!-- Top Bar -->
-  <header class="h-14 border-b border-slate-700 bg-slate-950 flex items-center justify-between px-4 shrink-0 z-10">
+  <header class="dashboard-header border-b border-slate-700 bg-slate-950 flex items-center justify-between shrink-0 z-10">
     <!-- Left: Brand & Lab Selector -->
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-slate-100 tracking-tight">Open<span class="text-signal-300">Veth</span></span>
+        <span class="brand-wordmark font-bold text-slate-100 tracking-tight">OpenVeth</span>
       </div>
       
       <div class="h-6 w-px bg-slate-700 mx-1"></div>
       
       <button (click)="onRename()"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-signal-500/50 hover:bg-slate-800 transition-all group"
-              title="Manage Laboratories (Ctrl+L)">
+              class="lab-selector group"
+              title="Manage laboratories" aria-label="Manage laboratories" [disabled]="busy()">
         <span class="text-sm font-medium text-slate-200">{{ store.topology().name }}</span>
         <svg class="w-3 h-3 text-slate-500 group-hover:text-signal-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
       </button>
 
-      <!-- Save Status Indicator -->
-      <div class="flex items-center gap-1.5 text-xs font-mono" [class.text-up-400]="!store.isLoading()" [class.text-pending-400]="store.isLoading()">
-        <span class="h-2 w-2 rounded-full transition-colors" [class.bg-up-500]="!store.isLoading()" [class.bg-pending-500]="store.isLoading()"></span>
-        <span class="font-medium">{{ store.isLoading() ? 'saving...' : 'saved' }}</span>
+      <div class="flex items-center gap-2 text-xs text-slate-300" role="status" aria-live="polite">
+        <span class="h-2 w-2 rounded-full" [class.bg-pending-500]="busy() || positions.count() > 0" [class.bg-red-400]="!!positions.error() || !!store.error() || !!operationError()" [class.bg-up-500]="!busy() && !positions.count() && !positions.error() && !store.error() && !operationError()"></span>
+        <span>{{ statusText() }}</span>
       </div>
+
     </div>
 
     <!-- Right: Action Buttons -->
-    <div class="flex items-center gap-2">
+    <div class="workspace-tools" role="toolbar" aria-label="Laboratory tools">
       <!-- State Actions Group -->
-      <div class="flex items-center gap-1.5 p-1 bg-slate-900/50 rounded-lg border border-slate-800">
+      <div class="toolbar-group">
         <button (click)="store.syncState()"
-                class="h-8 w-8 flex items-center justify-center rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-all"
-                title="Refresh Interfaces (Ctrl+R)">
+                class="tool-button tool-button--icon"
+                title="Refresh interfaces" aria-label="Refresh interfaces" [disabled]="busy()">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
           </svg>
@@ -40,8 +40,8 @@
 
         <div class="relative group">
           <button (click)="onSaveState()"
-                  [disabled]="isSavingState()"
-                  class="h-8 px-3 flex items-center gap-1.5 rounded-md hover:bg-emerald-900/30 text-slate-300 hover:text-emerald-400 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                  [disabled]="busy()"
+                  class="tool-button">
             <svg *ngIf="!isSavingState()" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
             </svg>
@@ -51,50 +51,43 @@
             {{ isSavingState() ? 'Saving...' : 'Save' }}
           </button>
           <!-- Tooltip -->
-          <div class="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 hidden group-hover:block z-50 pointer-events-none">
-            <div class="bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 text-xs text-slate-300 leading-relaxed">
+          <div class="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 hidden group-hover:block group-focus-within:block z-50 pointer-events-none">
+            <div class="bg-slate-800 border border-slate-600 rounded-sm shadow-lg p-3 text-xs text-slate-300 leading-relaxed">
               <p class="font-semibold text-slate-100 mb-1">Save Lab State</p>
-              <p class="text-slate-400">Saves the current state of all nodes — IP addresses, routes, and installed packages — so everything is restored exactly as-is next time you open this lab.</p>
+              <p class="text-slate-400">Save IP addresses, routes, and node filesystem snapshots for the next activation.</p>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Domain Overlay Group -->
-      <div class="flex items-center gap-1.5 p-1 bg-slate-900/50 rounded-lg border border-slate-800">
+      <div class="toolbar-group">
         <button (click)="store.setDomainOverlay('broadcast')"
-                class="h-8 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all"
-                [class]="store.activeDomainOverlay() === 'broadcast'
-                  ? 'bg-signal-500 text-slate-950 font-semibold'
-                  : 'hover:bg-slate-700 text-slate-300 hover:text-slate-100'"
-                title="Broadcast Domains">
+                class="tool-button" [class.is-active]="store.activeDomainOverlay() === 'broadcast'"
+                title="Show broadcast domains" [attr.aria-pressed]="store.activeDomainOverlay() === 'broadcast'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0"></path>
           </svg>
-          BD
+          Broadcast
           <span *ngIf="store.domains()" class="ml-0.5 opacity-70">{{ store.domains()!.broadcast_domains.length }}</span>
         </button>
         <button (click)="store.setDomainOverlay('collision')"
-                class="h-8 px-3 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all"
-                [class]="store.activeDomainOverlay() === 'collision'
-                  ? 'bg-pending-500 text-slate-950 font-semibold'
-                  : 'hover:bg-slate-700 text-slate-300 hover:text-slate-100'"
-                title="Collision Domains">
+                class="tool-button" [class.is-active]="store.activeDomainOverlay() === 'collision'"
+                title="Show collision domains" [attr.aria-pressed]="store.activeDomainOverlay() === 'collision'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
           </svg>
-          CD
+          Collision
           <span *ngIf="store.domains()" class="ml-0.5 opacity-70">{{ store.domains()!.collision_domains.length }}</span>
         </button>
       </div>
 
-      <div class="h-6 w-px bg-slate-800"></div>
 
       <!-- Import/Export Group -->
-      <div class="flex items-center gap-1.5 p-1 bg-slate-900/50 rounded-lg border border-slate-800">
+      <div class="toolbar-group">
         <button (click)="onExport()" 
-                class="h-8 px-3 flex items-center gap-1.5 rounded-md hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition-all text-xs font-medium"
-                title="Export Lab (Ctrl+E)">
+                class="tool-button"
+                title="Export laboratory" [disabled]="busy()">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
           </svg>
@@ -102,8 +95,8 @@
         </button>
 
         <button (click)="fileInput.click()"
-                class="h-8 px-3 flex items-center gap-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-signal-500/50 text-slate-200 transition-all text-xs font-medium"
-                title="Import Lab (Ctrl+I)">
+                class="tool-button"
+                title="Import topology" [disabled]="busy()">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
           </svg>
@@ -113,23 +106,21 @@
 
       <input type="file" #fileInput class="hidden" (change)="onImport($event)" accept=".yaml,.yml">
 
-      <div class="h-6 w-px bg-slate-800"></div>
 
       <!-- GitHub -->
       <a href="https://github.com/RArielVillalobos/open-veth" target="_blank" rel="noopener"
-         class="h-8 w-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
-         title="View on GitHub">
+         class="tool-button tool-button--icon"
+         title="View on GitHub" aria-label="Open OpenVeth on GitHub">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
         </svg>
       </a>
 
-      <div class="h-6 w-px bg-slate-800"></div>
 
       <!-- Danger Zone -->
       <button (click)="onCleanupLab()"
-              class="h-8 px-3 flex items-center gap-1.5 rounded-md hover:bg-red-900/30 text-slate-400 hover:text-red-400 transition-all text-xs font-medium border border-transparent hover:border-red-800/50"
-              title="Reset Lab - Delete all nodes (Ctrl+Shift+R)">
+              class="tool-button tool-button--danger"
+              title="Reset laboratory: delete its nodes and saved state" [disabled]="busy()">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
         </svg>
@@ -138,16 +129,46 @@
     </div>
   </header>
 
+  <div class="workspace-status" aria-live="polite">
+    <span class="events-status"><span class="events-status__dot" [class.events-status__dot--connected]="networkEvents.status() === 'connected'" aria-hidden="true"></span>Events: {{ networkEvents.status() }}</span>
+    @if (networkEvents.status() === 'disconnected' || networkEvents.status() === 'reconnecting') {
+      <button class="status-action" (click)="networkEvents.reconnect()">Reconnect events</button>
+    }
+    <button class="status-action ml-auto" (click)="canvasComponent.fitToView()" [disabled]="busy()">Fit topology</button>
+  </div>
+  @if (positions.error()) {
+    <div class="workspace-message" role="alert"><span>{{ positions.error() }}</span><button class="status-action" (click)="positions.flush()">Retry saving positions</button></div>
+  }
+  @if (operationError() || store.error()) {
+    <div class="workspace-message" role="alert"><span>{{ operationError() || store.error() }}</span>
+      <button class="status-action" (click)="store.loadTopology()" [disabled]="busy()">Reload view</button>
+      <button class="status-action" (click)="operationError.set(null); store.clearError()">Dismiss</button>
+    </div>
+  }
+  @if (store.activationError()) {
+    <div class="workspace-message" role="alert"><span>{{ store.activationError() }}</span>
+      <button class="status-action" (click)="networkEvents.reconnect()">Reconnect events</button>
+      @if (store.activationPhase() === 'failed') {
+        <button class="status-action" (click)="store.switchLab(store.pendingLabId()!)">Retry activation</button>
+        <button class="status-action" (click)="store.dismissActivationError()">Dismiss</button>
+      }
+      <button class="status-action" (click)="reloadApplication()">Reload application</button>
+    </div>
+  }
+
   <!-- Main Workspace -->
-  <div class="flex-1 flex overflow-hidden">
+  <div class="workspace flex-1 flex overflow-hidden relative" [attr.inert]="busy() ? '' : null">
       
       <!-- Left: Component Library (Fixed) -->
-      <app-node-palette class="shrink-0" [nodes]="store.topology().nodes" (addNode)="onAddNode($event)"></app-node-palette>
+      <app-node-palette [disabled]="busy()" class="shrink-0" [nodes]="store.topology().nodes" (addNode)="onAddNode($event)"></app-node-palette>
 
       <!-- Center: Canvas -->
       <div class="flex-1 flex flex-col min-w-0 bg-slate-950 h-full relative">
           <!-- Canvas Area -->
           <div class="flex-1 relative overflow-hidden">
+            @if (activationBusy() || isImporting()) {
+              <div class="canvas-progress" role="status"><strong>{{ isImporting() ? 'Importing topology' : 'Activating ' + pendingLabName() }}</strong><span>The current view stays visible until the result is confirmed.</span></div>
+            }
             <app-topology-canvas
                 [nodes]="store.topology().nodes"
                 [links]="store.topology().links"
@@ -177,7 +198,7 @@
                [style.height.px]="terminalHeight()">
             <!-- Drag handle -->
             <div class="h-2 bg-slate-700 hover:bg-signal-500 cursor-ns-resize shrink-0 transition-colors"
-                 (mousedown)="onResizeStart($event)"
+                 (mousedown)="onResizeStart($event)" role="separator" tabindex="0" aria-label="Resize terminal" aria-orientation="horizontal" [attr.aria-valuenow]="terminalHeight()" [attr.aria-valuemin]="120" [attr.aria-valuemax]="800" (keydown)="resizeTerminalByKey($event)"
                  (dblclick)="terminalHeight.set(DEFAULT_TERMINAL_HEIGHT)"></div>
             <app-terminal-panel class="flex-1 min-h-0"></app-terminal-panel>
           </div>
@@ -188,6 +209,8 @@
           [selectedNode]="selectedNode()"
           [selectedLink]="selectedLink()"
           (openTerminal)="selectedNode() && openTerminal(selectedNode()!.id)"
+          (traceroute)="canvasComponent.openTracerouteDialog(selectedNode()!.id, selectedNode()!.name)"
+          (toggleLink)="onToggleLink($event)"
           (openCapture)="onOpenCapture($any($event))"
           (deleteNode)="onDeleteNode($event)"
           (deleteLink)="onDeleteLink($event)"

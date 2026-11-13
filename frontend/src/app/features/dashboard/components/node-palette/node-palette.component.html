@@ -1,234 +1,70 @@
-<div class="h-full bg-slate-900 border-r border-slate-700 flex flex-col overflow-hidden transition-all duration-200"
-     [class.w-56]="!collapsed()" [class.w-12]="collapsed()">
-  <!-- Header -->
-  <div class="p-3 border-b border-slate-800">
-    <div class="flex items-center justify-between" [class.justify-center]="collapsed()">
-      @if (!collapsed()) {
-        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Components</h2>
-        <span class="text-[10px] text-slate-500">{{ nodes().length }} total</span>
-      }
-      <button type="button" (click)="toggleCollapsed()"
-              class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
-              [title]="collapsed() ? 'Expand palette' : 'Collapse palette'">
-        <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="collapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
-      </button>
-    </div>
+<aside class="device-palette" [class.device-palette--collapsed]="collapsed()" aria-label="Device library">
+  <div class="palette-heading">
+    @if (!collapsed()) {
+      <h2>Devices</h2>
+      <span class="palette-total">{{ nodes().length }}</span>
+    }
+    <button type="button" class="palette-collapse" (click)="toggleCollapsed()"
+            [attr.aria-expanded]="!collapsed()" [attr.aria-label]="collapsed() ? 'Expand palette' : 'Collapse palette'"
+            [title]="collapsed() ? 'Expand palette' : 'Collapse palette'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" [class.palette-chevron--reversed]="collapsed()" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </button>
   </div>
 
-  @if (collapsed()) {
-    <!-- Collapsed: flat icon rail, click still opens naming (and expands) -->
-    <div class="flex-1 overflow-y-auto min-h-0 flex flex-col items-center gap-1.5 py-2">
+  <div class="palette-scroll">
+    @if (collapsed()) {
       @for (nt of nodeTypeConfigs; track nt.id) {
-        <button (click)="startNaming(nt.id)"
-                [class]="'relative p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 ' + nt.hoverBorder"
-                [title]="nt.label + ' (' + nt.shortcut + ')'">
-          <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-7 h-7">
-          @if (nodeCounts()[nt.id] > 0) {
-            <span class="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-slate-600">
-              {{ nodeCounts()[nt.id] }}
-            </span>
-          }
+        <button type="button" class="palette-icon" (click)="startNaming(nt.id)" [disabled]="disabled()"
+                [attr.aria-label]="'Add ' + nt.label" [title]="nt.label + ' (' + nt.shortcut + ')'">
+          <img [src]="'assets/icons/' + nt.icon" alt="" width="24" height="24">
         </button>
       }
-    </div>
-  } @else {
-
-  <!-- Scrollable node list -->
-  <div class="flex-1 overflow-y-auto min-h-0">
-
-  <!-- Network Devices Group -->
-  <div class="p-3 pb-1">
-    <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-      </svg>
-      Network Devices
-    </h3>
-    <div class="flex flex-col gap-1.5">
-      @for (nt of networkDevices(); track nt.id) {
-        <div class="relative group">
-          <div role="button" tabindex="0"
-               (click)="startNaming(nt.id)"
-               (keydown.enter)="startNaming(nt.id)"
-               (keydown.space)="$event.preventDefault(); startNaming(nt.id)"
-               [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 cursor-pointer ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
-            <div class="relative">
-              <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
-              @if (nodeCounts()[nt.id] > 0) {
-                <span class="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-slate-600">
-                  {{ nodeCounts()[nt.id] }}
-                </span>
-              }
-            </div>
-            <div class="flex flex-col items-start flex-1 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs font-medium text-slate-200 group-hover:text-white">{{ nt.label }}</span>
-                <kbd class="hidden group-hover:inline-flex px-1 py-0 text-[9px] bg-slate-700 text-slate-400 rounded">{{ nt.shortcut }}</kbd>
-              </div>
-              <span class="text-[10px] text-slate-500 truncate">{{ nt.subtitle }}</span>
-            </div>
-            <!-- Info button -->
-            <button type="button"
-                    (click)="toggleDescription(nt.id); $event.stopPropagation()"
-                    class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
-                    title="Show details">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </button>
-          </div>
-
-          <!-- Description panel -->
-          @if (expandedDescription() === nt.id) {
-            <div class="px-2 py-2 mt-1 bg-slate-800/80 border border-slate-700 rounded-lg animate-slide-down">
-              <p class="text-[11px] text-slate-300 leading-relaxed">{{ nt.description }}</p>
-            </div>
-          }
-
-          @if (pendingType() === nt.id) {
-            <div class="px-2 pb-1 mt-1 animate-slide-down">
-              <input #nameInputEl type="text"
-                     [formControl]="nameCtrl"
-                     (keydown.enter)="confirmName()"
-                     (keydown.escape)="cancelNaming()"
-                     [maxLength]="20"
-                     [placeholder]="nt.placeholder"
-                     [class]="inputClasses()">
-              <div class="flex items-center gap-1 mt-1.5">
-                <button type="button" (click)="confirmName()"
-                        [disabled]="!canConfirm()"
-                        [class]="'flex-1 text-[11px] px-2 py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ' + (canConfirm()
-                          ? 'bg-signal-500 hover:bg-signal-300 text-slate-950'
-                          : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
-                  @if (canConfirm()) {
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                  }
-                  Add {{ nt.label }}
+    } @else {
+      @for (group of deviceGroups(); track group.label) {
+        <section class="device-group" [attr.aria-label]="group.label">
+          <h3>{{ group.label }}</h3>
+          @for (nt of group.devices; track nt.id) {
+            <div class="device-entry" [class.device-entry--active]="pendingType() === nt.id">
+              <div class="device-row">
+                <button type="button" class="device-add" (click)="startNaming(nt.id)" [disabled]="disabled()"
+                        [attr.aria-label]="'Add ' + nt.label" [title]="nt.subtitle"
+                        [attr.aria-expanded]="pendingType() === nt.id">
+                  <img [src]="'assets/icons/' + nt.icon" alt="" width="22" height="22">
+                  <span>{{ nt.label }}</span>
+                  @if (nodeCounts()[nt.id] > 0) { <span class="device-count">{{ nodeCounts()[nt.id] }}</span> }
+                  <kbd>{{ nt.shortcut }}</kbd>
                 </button>
-                <button type="button" (click)="cancelNaming()"
-                        class="px-2 py-1.5 text-[11px] rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                <button type="button" class="device-info" (click)="toggleDescription(nt.id)"
+                        [attr.aria-label]="'Details about ' + nt.label" [attr.aria-expanded]="expandedDescription() === nt.id" title="Device details">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                 </button>
               </div>
-              @if (nameError()) {
-                <p class="text-[10px] text-red-400 mt-1 flex items-center gap-1">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  {{ nameError() }}
-                </p>
+              @if (expandedDescription() === nt.id) {
+                <p class="device-description">{{ nt.description }}</p>
+              }
+              @if (pendingType() === nt.id) {
+                <div class="device-naming">
+                  <label [for]="'device-name-' + nt.id">Name</label>
+                  <input #nameInputEl [id]="'device-name-' + nt.id" type="text" [formControl]="nameCtrl"
+                         (keydown.enter)="confirmName()" (keydown.escape)="cancelNaming()"
+                         [maxLength]="20" [placeholder]="nt.placeholder" [class]="inputClasses()"
+                         [attr.aria-invalid]="!!nameError()" [attr.aria-describedby]="nameError() ? 'device-name-error-' + nt.id : null">
+                  @if (nameError()) { <p class="name-error" [id]="'device-name-error-' + nt.id">{{ nameError() }}</p> }
+                  <div class="device-naming-actions">
+                    <button type="button" class="device-confirm" (click)="confirmName()" [disabled]="!canConfirm()">Add {{ nt.label }}</button>
+                    <button type="button" (click)="cancelNaming()">Cancel</button>
+                  </div>
+                </div>
               }
             </div>
           }
-        </div>
+        </section>
       }
-    </div>
+    }
   </div>
-
-  <!-- End Devices Group -->
-  <div class="p-3 pt-1">
-    <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-      </svg>
-      End Devices
-    </h3>
-    <div class="flex flex-col gap-1.5">
-      @for (nt of endDevices(); track nt.id) {
-        <div class="relative group">
-          <div role="button" tabindex="0"
-               (click)="startNaming(nt.id)"
-               (keydown.enter)="startNaming(nt.id)"
-               (keydown.space)="$event.preventDefault(); startNaming(nt.id)"
-               [class]="'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-all border border-slate-700/50 cursor-pointer ' + nt.hoverBorder + (pendingType() === nt.id ? ' ' + nt.accentBorder : '')">
-            <div class="relative">
-              <img [src]="'assets/icons/' + nt.icon" [alt]="nt.label" class="w-8 h-8 flex-shrink-0">
-              @if (nodeCounts()[nt.id] > 0) {
-                <span class="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-slate-600">
-                  {{ nodeCounts()[nt.id] }}
-                </span>
-              }
-            </div>
-            <div class="flex flex-col items-start flex-1 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs font-medium text-slate-200 group-hover:text-white">{{ nt.label }}</span>
-                <kbd class="hidden group-hover:inline-flex px-1 py-0 text-[9px] bg-slate-700 text-slate-400 rounded">{{ nt.shortcut }}</kbd>
-              </div>
-              <span class="text-[10px] text-slate-500 truncate">{{ nt.subtitle }}</span>
-            </div>
-            <!-- Info button -->
-            <button type="button"
-                    (click)="toggleDescription(nt.id); $event.stopPropagation()"
-                    class="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
-                    title="Show details">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </button>
-          </div>
-
-          <!-- Description panel -->
-          @if (expandedDescription() === nt.id) {
-            <div class="px-2 py-2 mt-1 bg-slate-800/80 border border-slate-700 rounded-lg animate-slide-down">
-              <p class="text-[11px] text-slate-300 leading-relaxed">{{ nt.description }}</p>
-            </div>
-          }
-
-          @if (pendingType() === nt.id) {
-            <div class="px-2 pb-1 mt-1 animate-slide-down">
-              <input #nameInputEl type="text"
-                     [formControl]="nameCtrl"
-                     (keydown.enter)="confirmName()"
-                     (keydown.escape)="cancelNaming()"
-                     [maxLength]="20"
-                     [placeholder]="nt.placeholder"
-                     [class]="inputClasses()">
-              <div class="flex items-center gap-1 mt-1.5">
-                <button type="button" (click)="confirmName()"
-                        [disabled]="!canConfirm()"
-                        [class]="'flex-1 text-[11px] px-2 py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ' + (canConfirm()
-                          ? 'bg-signal-500 hover:bg-signal-300 text-slate-950'
-                          : 'bg-slate-700 text-slate-500 cursor-not-allowed')">
-                  @if (canConfirm()) {
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                  }
-                  Add {{ nt.label }}
-                </button>
-                <button type="button" (click)="cancelNaming()"
-                        class="px-2 py-1.5 text-[11px] rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
-              @if (nameError()) {
-                <p class="text-[10px] text-red-400 mt-1 flex items-center gap-1">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  {{ nameError() }}
-                </p>
-              }
-            </div>
-          }
-        </div>
-      }
-    </div>
-  </div>
-
-  </div><!-- end scrollable -->
-
-  <!-- Footer with Keyboard Shortcuts -->
-  <div class="mt-auto py-2 px-3 border-t border-slate-800">
-    <p class="text-[10px] text-slate-500 text-center">Hover a device for its shortcut key</p>
-  </div>
-  }
-</div>
+  @if (!collapsed()) { <div class="palette-footer">Select a device to add it</div> }
+</aside>

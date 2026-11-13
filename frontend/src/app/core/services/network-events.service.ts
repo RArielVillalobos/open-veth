@@ -1,4 +1,4 @@
-import { Injectable, inject, NgZone, DestroyRef } from '@angular/core';
+import { Injectable, inject, NgZone, DestroyRef, signal } from '@angular/core';
 import { TopologyStore } from '../../state/topology.store';
 import { environment } from '../../../environments/environment';
 
@@ -14,8 +14,10 @@ interface NetworkEvent {
   providedIn: 'root'
 })
 export class NetworkEventsService {
+  readonly status = signal<'connecting' | 'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
+  private hasConnected = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private destroyRef = inject(DestroyRef);
   private store = inject(TopologyStore);
@@ -32,11 +34,12 @@ export class NetworkEventsService {
   }
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       this.log('Already connected');
       return;
     }
 
+    this.status.set(this.reconnectAttempts ? 'reconnecting' : 'connecting');
     const wsUrl = environment.apiUrl
       .replace('https://', 'wss://')
       .replace('http://', 'ws://')
@@ -54,6 +57,9 @@ export class NetworkEventsService {
 
     this.ws.onopen = () => {
       this.ngZone.run(() => {
+        this.status.set('connected');
+        if (this.hasConnected || this.reconnectAttempts) void this.store.reconcileAfterReconnect();
+        this.hasConnected = true;
         this.log('Connected');
         this.reconnectAttempts = 0;
       });
@@ -72,6 +78,7 @@ export class NetworkEventsService {
 
     this.ws.onclose = (event) => {
       this.ngZone.run(() => {
+        this.status.set('disconnected');
         this.log('Disconnected', event.code, event.reason);
         if (event.code !== 1000) {
           this.attemptReconnect();
@@ -86,7 +93,10 @@ export class NetworkEventsService {
     };
   }
 
+  reconnect(): void { this.disconnect(); this.connect(); }
+
   disconnect(): void {
+    this.status.set('disconnected');
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -95,12 +105,14 @@ export class NetworkEventsService {
     this.reconnectAttempts = 0;
 
     if (this.ws) {
+      this.ws.onopen = this.ws.onclose = this.ws.onerror = this.ws.onmessage = null;
       this.ws.close(1000, 'Client disconnected');
       this.ws = null;
     }
   }
 
   private handleEvent(event: NetworkEvent): void {
+    if (!event.type.startsWith('lab:') && event.labId && this.store.currentLabId?.() && event.labId !== this.store.currentLabId()) return;
     switch (event.type) {
       case 'interface:changed':
         if (event.nodeId) {
@@ -148,10 +160,12 @@ export class NetworkEventsService {
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.status.set('disconnected');
       this.error('Max reconnect attempts reached');
       return;
     }
 
+    this.status.set('reconnecting');
     this.reconnectAttempts++;
     this.log(`Reconnecting in ${this.reconnectDelay}ms (attempt ${this.reconnectAttempts})`);
 

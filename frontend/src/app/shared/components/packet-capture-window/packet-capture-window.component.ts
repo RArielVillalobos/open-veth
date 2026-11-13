@@ -81,39 +81,12 @@ export class PacketCaptureWindowComponent implements OnInit, OnDestroy {
   }
 
   getProtocolFilterClass(proto: string): string {
-    const isActive = this.activeProtocolFilter === proto;
-    const baseClasses = 'transition-all duration-200 ';
-    
-    switch(proto) {
-      case 'ALL':
-        return baseClasses + (isActive ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200');
-      case 'TCP':
-        return baseClasses + (isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-400/70 hover:text-blue-400');
-      case 'UDP':
-        return baseClasses + (isActive ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-400/70 hover:text-emerald-400');
-      case 'ICMP':
-        return baseClasses + (isActive ? 'bg-amber-600 text-white shadow-sm' : 'text-amber-400/70 hover:text-amber-400');
-      case 'ARP':
-        return baseClasses + (isActive ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-400/70 hover:text-purple-400');
-      default:
-        return baseClasses + (isActive ? 'bg-slate-600 text-white' : 'text-slate-500 hover:text-slate-300');
-    }
+    return this.activeProtocolFilter === proto ? 'protocol-filter protocol-filter--active' : 'protocol-filter';
   }
 
   getProtocolBadgeClass(protocol: string): string {
-    switch(protocol) {
-      case 'TCP':
-        return 'bg-blue-500/20 text-blue-300 border border-blue-500/30';
-      case 'UDP':
-        return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
-      case 'ICMP':
-      case 'ICMPv6':
-        return 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
-      case 'ARP':
-        return 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
-      default:
-        return 'bg-slate-700 text-slate-400 border border-slate-600';
-    }
+    const classes: Record<string, string> = { TCP: 'protocol-tcp', UDP: 'protocol-udp', ICMP: 'protocol-icmp', ICMPv6: 'protocol-icmp', ARP: 'protocol-arp' };
+    return classes[protocol] ?? 'protocol-other';
   }
 
   togglePause() {

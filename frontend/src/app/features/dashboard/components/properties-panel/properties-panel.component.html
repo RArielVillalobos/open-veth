@@ -1,10 +1,11 @@
-<div class="h-full bg-slate-900 border-l border-slate-700 flex flex-col w-80 overflow-y-auto">
+<div class="inspector h-full bg-slate-900 border-l border-slate-700 flex flex-col overflow-y-auto" [class.inspector--wide]="expanded()" role="region" aria-label="Selection properties">
   <!-- HEADER -->
-  <div class="p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
-    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">
-      {{ selectedNode() ? 'Node Properties' : (selectedLink() ? 'Link Properties' : 'Properties') }}
+  <div class="inspector-heading sticky top-0 bg-slate-900 z-10">
+    <h2 class="text-xs font-medium text-slate-200">
+      {{ selectedNode() ? 'Node properties' : (selectedLink() ? 'Link properties' : 'Properties') }}
     </h2>
-    <button (click)="close.emit()" class="text-slate-500 hover:text-white transition-colors">
+    <button class="inspector-width-control" (click)="expanded.set(!expanded())" [attr.aria-expanded]="expanded()" [attr.aria-label]="expanded() ? 'Narrow inspector' : 'Widen inspector'">{{ expanded() ? 'Narrow' : 'Widen' }}</button>
+    <button aria-label="Close properties" (click)="close.emit()" class="text-slate-300 hover:text-white transition-colors">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
       </svg>
@@ -13,55 +14,36 @@
 
   <!-- NODE DETAILS -->
   @if (selectedNode()) {
-    <div class="p-4 flex flex-col gap-6">
+    <div class="inspector-body">
       
       <!-- Icon & Title -->
       <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden shadow-lg"
-             [ngClass]="{
-               'bg-blue-500/10 ring-1 ring-blue-500/30': selectedNode()?.type === 'router',
-               'bg-green-500/10 ring-1 ring-green-500/30': selectedNode()?.type === 'host',
-               'bg-amber-500/10 ring-1 ring-amber-500/30': selectedNode()?.type === 'switch',
-               'bg-violet-500/10 ring-1 ring-violet-500/30': selectedNode()?.type === 'hub',
-               'bg-sky-500/10 ring-1 ring-sky-500/30': selectedNode()?.type === 'cloud',
-               'bg-orange-500/10 ring-1 ring-orange-500/30': selectedNode()?.type === 'server',
-               'bg-cyan-500/10 ring-1 ring-cyan-500/30': selectedNode()?.type === 'monitor',
-               'bg-rose-500/10 ring-1 ring-rose-500/30': selectedNode()?.type === 'tester',
-               'bg-indigo-500/10 ring-1 ring-indigo-500/30': selectedNode()?.type === 'haproxy'
-             }">
+        <div class="inspector-node-icon">
           <img [src]="'assets/icons/' + selectedNode()?.type + '.svg'" 
-               class="w-8 h-8"
+               class="w-7 h-7"
                [alt]="selectedNode()?.type">
         </div>
         <div>
           <h3 class="font-bold text-slate-100 text-lg">{{ selectedNode()?.name }}</h3>
           <div class="flex items-center gap-2">
-            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium capitalize">
+            <span class="text-xs text-slate-300 capitalize">
               {{ selectedNode()?.type }}
             </span>
-            <span class="text-[10px] text-slate-600 font-mono" [title]="selectedNode()?.id">
-              ID: {{ selectedNode()?.id?.substring(0, 8) }}...
-            </span>
+            <span class="node-status" [class.node-status--running]="selectedNode()?.status === 'running' && !powering()" role="status">{{ nodeStatus() }}</span>
           </div>
         </div>
       </div>
 
       <!-- Actions -->
-      <div class="grid gap-3" [ngClass]="selectedNode()?.type === 'hub' ? 'grid-cols-1' : 'grid-cols-2'">
+      <div class="inspector-actions">
         @if (selectedNode()?.type !== 'hub') {
-          <button (click)="openTerminal.emit(selectedNode()?.name!)"
-                  class="group flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm py-2.5 px-4 rounded-lg border border-slate-700 transition-all hover:border-slate-600">
-            <span class="font-mono text-sm group-hover:text-blue-400 transition-colors">>_</span>
+          <button (click)="openTerminal.emit(selectedNode()?.id!)" [disabled]="selectedNode()?.status !== 'running' || powering()"
+                  class="inspector-action">
+            <span class="font-mono text-sm group-hover:text-signal-300 transition-colors">>_</span>
             <span>Terminal</span>
           </button>
         }
-        <button (click)="deleteNode.emit(selectedNode()?.id!)"
-                class="group flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 text-sm py-2.5 px-4 rounded-lg border border-red-900/30 transition-all hover:border-red-900/50">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-          </svg>
-          <span>Delete</span>
-        </button>
+        <button class="inspector-action" (click)="togglePower()" [disabled]="powering()">{{ powering() ? 'Please wait...' : (selectedNode()?.status === 'stopped' ? 'Power on' : 'Power off') }}</button>
       </div>
 
       <!-- Monitor Node: Grafana + Prometheus quick access -->
@@ -69,17 +51,17 @@
         <div class="space-y-2">
           @if (grafanaUrl()) {
             <a [href]="grafanaUrl()!" target="_blank"
-               class="flex items-center justify-between gap-2 w-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-sm py-2.5 px-4 rounded-lg border border-orange-500/30 transition-all">
+               class="flex items-center justify-between gap-2 w-full bg-slate-800/30 hover:bg-slate-800 text-slate-200 text-sm py-2.5 px-4 rounded-sm border border-slate-700 transition-all">
               <div class="flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20V10m6 10V4m6 16v-7"/>
                 </svg>
                 <span class="font-medium">Open Grafana</span>
               </div>
-              <span class="text-[10px] font-mono text-orange-300/70">:{{ selectedNode()?.service_ports?.['grafana'] }}</span>
+              <span class="text-xs font-mono text-slate-200">:{{ selectedNode()?.service_ports?.['grafana'] }}</span>
             </a>
           } @else {
-            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-500 text-sm py-2.5 px-4 rounded-lg border border-slate-700/50">
+            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-300 text-sm py-2.5 px-4 rounded-sm border border-slate-700/50">
               <svg class="w-4 h-4 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
@@ -88,22 +70,22 @@
           }
           @if (prometheusUrl()) {
             <a [href]="prometheusUrl()!" target="_blank"
-               class="flex items-center justify-between gap-2 w-full bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-sm py-2.5 px-4 rounded-lg border border-cyan-500/30 transition-all">
+               class="flex items-center justify-between gap-2 w-full bg-slate-800/30 hover:bg-slate-800 text-slate-200 text-sm py-2.5 px-4 rounded-sm border border-slate-700 transition-all">
               <div class="flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <polyline points="3,12 8,12 10,6 14,18 16,12 21,12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
                 </svg>
                 <span class="font-medium">Open Prometheus</span>
               </div>
-              <span class="text-[10px] font-mono text-cyan-300/70">:{{ selectedNode()?.service_ports?.['prometheus'] }}</span>
+              <span class="text-xs font-mono text-slate-200">:{{ selectedNode()?.service_ports?.['prometheus'] }}</span>
             </a>
           }
-          <div class="flex items-start gap-2 px-3 py-2 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
-            <svg class="w-3.5 h-3.5 text-cyan-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex items-start gap-2 px-3 py-2 bg-slate-800/30 rounded-sm border border-slate-700">
+            <svg class="w-3.5 h-3.5 text-slate-200 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            <p class="text-[10px] text-cyan-300/70 leading-relaxed">
-              Login: <span class="font-mono text-cyan-300">admin / admin</span>
+            <p class="text-xs text-slate-200 leading-relaxed">
+              Login: <span class="font-mono text-slate-200">admin / admin</span>
               · Connect this node to your topology, then add targets in
               <span class="font-mono">/etc/prometheus/prometheus.yml</span>
             </p>
@@ -116,7 +98,7 @@
         <div class="space-y-2">
           @if (haproxyStatsUrl()) {
             <a [href]="haproxyStatsUrl()!" target="_blank"
-               class="flex items-center justify-between gap-2 w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-sm py-2.5 px-4 rounded-lg border border-indigo-500/30 transition-all">
+               class="flex items-center justify-between gap-2 w-full bg-slate-800/30 hover:bg-slate-800 text-slate-200 text-sm py-2.5 px-4 rounded-sm border border-slate-700 transition-all">
               <div class="flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="6" cy="16" r="2" stroke-width="2"/><circle cx="18" cy="16" r="2" stroke-width="2"/><circle cx="12" cy="8" r="2" stroke-width="2"/>
@@ -124,10 +106,10 @@
                 </svg>
                 <span class="font-medium">Open Stats</span>
               </div>
-              <span class="text-[10px] font-mono text-indigo-300/70">:{{ selectedNode()?.service_ports?.['stats'] }}</span>
+              <span class="text-xs font-mono text-slate-200">:{{ selectedNode()?.service_ports?.['stats'] }}</span>
             </a>
           } @else {
-            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-500 text-sm py-2.5 px-4 rounded-lg border border-slate-700/50">
+            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-300 text-sm py-2.5 px-4 rounded-sm border border-slate-700/50">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="6" cy="16" r="2" stroke-width="2"/><circle cx="18" cy="16" r="2" stroke-width="2"/><circle cx="12" cy="8" r="2" stroke-width="2"/>
                 <path stroke-linecap="round" stroke-width="2" d="M12 10v3m0 0l-5 3m5-3l5 3"/>
@@ -143,28 +125,28 @@
         <div class="space-y-2">
           @if (zabbixUrl()) {
             <a [href]="zabbixUrl()!" target="_blank"
-               class="flex items-center justify-between gap-2 w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm py-2.5 px-4 rounded-lg border border-red-500/30 transition-all">
+               class="flex items-center justify-between gap-2 w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm py-2.5 px-4 rounded-sm border border-red-500/30 transition-all">
               <div class="flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                 </svg>
                 <span class="font-medium">Open Zabbix</span>
               </div>
-              <span class="text-[10px] font-mono text-red-300/70">:{{ selectedNode()?.service_ports?.['zabbix'] }}</span>
+              <span class="text-xs font-mono text-red-300/70">:{{ selectedNode()?.service_ports?.['zabbix'] }}</span>
             </a>
           } @else {
-            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-500 text-sm py-2.5 px-4 rounded-lg border border-slate-700/50">
+            <div class="flex items-center gap-2 w-full bg-slate-800/50 text-slate-300 text-sm py-2.5 px-4 rounded-sm border border-slate-700/50">
               <svg class="w-4 h-4 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
               <span>{{ nodeServiceMessage() || 'Zabbix — starting...' }}</span>
             </div>
           }
-          <div class="flex items-start gap-2 px-3 py-2 bg-red-500/5 rounded-lg border border-red-500/20">
+          <div class="flex items-start gap-2 px-3 py-2 bg-red-500/5 rounded-sm border border-red-500/20">
             <svg class="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            <p class="text-[10px] text-red-300/70 leading-relaxed">
+            <p class="text-xs text-red-300/70 leading-relaxed">
               Login: <span class="font-mono text-red-300">Admin / zabbix</span>
               · First boot initializes the DB (~30s). Add hosts via
               <span class="font-mono">Configuration → Hosts</span>
@@ -176,6 +158,227 @@
         </div>
       }
 
+      <!-- Network Interfaces / Ports -->
+      <div class="space-y-2">
+        <button
+          type="button"
+          (click)="showInterfaces.set(!showInterfaces())" [attr.aria-expanded]="showInterfaces()"
+          class="w-full flex items-center justify-between group cursor-pointer hover:bg-slate-800/30 rounded py-3 px-1 -mx-1 transition-colors"
+        >
+          <div class="flex items-center gap-2">
+            <span class="text-xs transition-transform duration-200" [class.rotate-90]="showInterfaces()">▶</span>
+            <label class="text-xs text-slate-300 font-bold  cursor-pointer">
+              {{ isBridgeNode() ? 'Connected Ports' : 'Network Interfaces' }}
+            </label>
+          </div>
+          @if (activeInterfaceCount() > 0) {
+            <span class="text-xs text-slate-300 bg-slate-800 px-2 py-0.5 rounded-sm">
+              {{ activeInterfaceCount() }} {{ isBridgeNode() ? 'ports' : 'interfaces' }}
+            </span>
+          }
+        </button>
+
+        @if (showInterfaces()) {
+          <div class="text-xs text-slate-300 italic">
+            Lab interfaces only. Loopback and Docker management interfaces are hidden.
+          </div>
+
+          @if (activeInterfaceCount() > 0) {
+          <div class="bg-slate-950 rounded-sm border border-slate-700 overflow-x-auto">
+            <table class="network-table w-full text-xs text-left">
+              <tbody class="divide-y divide-slate-800/50">
+                @for (iface of selectedNode()?.interfaces; track iface.ifname) {
+                  @if (iface.ifname !== 'lo' && iface.ifname !== 'docker0' && !(isBridgeNode() && iface.ifname === 'br0')) {
+                    <tr class="hover:bg-slate-900/50 transition-colors">
+                      <td class="px-2 py-1.5 font-mono text-slate-300 border-r border-slate-800/50 w-16">
+                        <span class="px-1.5 py-0.5 rounded bg-slate-800/50 text-xs">{{ iface.ifname }}</span>
+                      </td>
+                      <td class="px-2 py-1.5">
+                        @if (isBridgeNode()) {
+                          <div class="text-slate-300 text-xs">Connected</div>
+                        } @else {
+                          <div class="flex items-center gap-1 group">
+                            <div class="text-slate-200 font-medium text-[11px] cursor-pointer hover:text-signal-300 transition-colors"
+                                 (click)="copyToClipboard(getIPv4(iface.addr_info))"
+                                 title="Click to copy IP">
+                              {{ getIPv4(iface.addr_info) }}
+                            </div>
+                            <span class="text-[11px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                  (click)="copyToClipboard(getIPv4(iface.addr_info))">⎘</span>
+                          </div>
+                          @if (getNetwork(iface.addr_info); as net) {
+                            <div class="text-[11px] text-slate-300 leading-tight">{{ net }}</div>
+                          }
+
+                        }
+                      </td>
+                      <td><button class="inspector-action" (click)="openCapture.emit(iface.ifname)" [attr.aria-label]="'Capture on ' + iface.ifname" [disabled]="selectedNode()?.status !== 'running' || powering()">Capture</button></td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="p-4 bg-slate-950/50 rounded-sm border border-slate-800 border-dashed">
+            <div class="text-xs text-slate-300 text-center">
+              <svg class="w-5 h-5 mx-auto mb-1.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+              </svg>
+              {{ selectedNode()?.status !== 'running' ? 'Start the node to inspect its interfaces.' : (isBridgeNode() ? 'No connected ports' : 'No lab interfaces available') }}
+            </div>
+          </div>
+        }
+      }
+      </div>
+
+      <!-- MAC Address Table (switch only) -->
+      @if (selectedNode()?.type === 'switch') {
+        <div class="space-y-2">
+          <div class="flex items-center justify-between py-3 px-1">
+            <label class="text-xs text-slate-300 font-bold ">MAC Address Table</label>
+            <button (click)="loadMacTable()"
+                    class="flex items-center gap-1 text-[11px] text-slate-200 hover:text-signal-300 transition-colors disabled:opacity-50"
+                    [disabled]="loadingMacTable() || selectedNode()?.status !== 'running' || powering()">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              {{ loadingMacTable() ? 'Loading...' : 'Refresh' }}
+            </button>
+          </div>
+
+          @if (macTable().length > 0) {
+            <div class="bg-slate-950 rounded-sm border border-slate-700 overflow-x-auto">
+              <table class="w-full text-xs text-left">
+                <thead class="bg-slate-900/80 text-slate-300">
+                  <tr>
+                    <th class="px-3 py-2 font-medium">MAC Address</th>
+                    <th class="px-3 py-2 font-medium">Port</th>
+                    <th class="px-3 py-2 font-medium">Type</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/50">
+                  @for (entry of macTable(); track entry.mac + entry.port) {
+                    <tr class="hover:bg-slate-900/50 transition-colors">
+                      <td class="px-3 py-2 font-mono text-slate-200">{{ entry.mac }}</td>
+                      <td class="px-3 py-2 font-mono text-slate-300">{{ entry.port }}</td>
+                      <td class="px-3 py-2">
+                        <span [class]="entry.type === 'dynamic'
+                          ? 'px-1.5 py-0.5 rounded text-[11px] bg-slate-800/30 text-slate-200'
+                          : 'px-1.5 py-0.5 rounded text-[11px] bg-slate-700 text-slate-300'">
+                          {{ entry.type }}
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="p-4 bg-slate-950/50 rounded-sm border border-slate-800 border-dashed">
+              <div class="text-xs text-slate-300 text-center">
+                {{ loadingMacTable() ? 'Loading MAC table...' : (macError() || 'No MAC entries learned yet') }}
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Routing Table (L3 nodes only — not switch or hub) -->
+      @if (selectedNode()?.type !== 'switch' && selectedNode()?.type !== 'hub') {
+        <div class="space-y-2">
+          <div class="flex items-center justify-between py-3 px-1">
+            <div>
+              <label class="text-xs text-slate-300 font-bold ">Routing Table</label>
+              <div class="text-xs text-slate-300 italic">Hover over a route to highlight its path on the canvas</div>
+            </div>
+            <button class="inspector-action" (click)="traceroute.emit()" [disabled]="selectedNode()?.status !== 'running' || powering()">Traceroute</button>
+            <button (click)="loadRoutes()" 
+                    class="flex items-center gap-1 text-[11px] text-slate-200 hover:text-signal-300 transition-colors disabled:opacity-50"
+                    [disabled]="loadingRoutes() || selectedNode()?.status !== 'running' || powering()">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              {{ loadingRoutes() ? 'Loading...' : 'Refresh' }}
+            </button>
+          </div>
+
+          @if (routes().length > 0) {
+            <div class="bg-slate-950 rounded-sm border border-slate-700">
+              <table class="w-full text-xs text-left">
+                <thead class="bg-slate-900/80 text-slate-300">
+                  <tr>
+                    <th class="p-1.5 px-2 font-medium ">Destination</th>
+                    <th class="p-1.5 px-2 font-medium ">Via <span class="text-[10px] normal-case text-slate-300">(Gateway)</span></th>
+                    <th class="p-1.5 px-2 font-medium  text-center w-10">Dev</th>
+                    <th class="p-1.5 px-2 font-medium  text-center w-8"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/50">
+                  @for (r of routes(); track r.dst + r.dev) {
+                    <tr class="hover:bg-slate-900/50 transition-colors cursor-pointer"
+                        (mouseenter)="onRouteMouseEnter(r)"
+                        (mouseleave)="onRouteMouseLeave()">
+                      <td class="p-1.5 px-2 text-slate-300 font-mono" [title]="r.dst">
+                        {{ r.dst === 'default' ? '0.0.0.0/0' : r.dst }}
+                      </td>
+                      <td class="p-1.5 px-2 text-slate-300" [title]="r.gateway || 'Direct'">
+                        {{ r.gateway || 'Direct' }}
+                      </td>
+                      <td class="p-1.5 px-2 text-center">
+                        <span class="text-slate-200 font-mono">{{ r.dev }}</span>
+                      </td>
+                      <td class="p-1.5 px-2 text-center">
+                        @if (r.protocol === 'kernel') {
+                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-slate-700 text-slate-300 font-medium"
+                                title="Connected">C</span>
+                        } @else {
+                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-slate-800/30 text-slate-200 font-medium"
+                                title="Static">S</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-300 mt-1.5">
+              <span class="flex items-center gap-1">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-slate-800/30 text-slate-200 font-medium text-[10px]">S</span>
+                Static
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-slate-700 text-slate-300 font-medium text-[10px]">C</span>
+                Connected
+              </span>
+              <span class="flex items-center gap-1 ml-auto">
+                <span class="inline-block w-5 h-1.5 rounded-sm" [style.background]="routeHighlightColor"></span>
+                subnet
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="inline-block w-5 h-1.5 rounded-sm" [style.background]="routeHighlightStaticColor"></span>
+                next-hop
+              </span>
+            </div>
+          } @else if (!loadingRoutes()) {
+            <div class="p-4 bg-slate-950/50 rounded-sm border border-slate-800 border-dashed">
+              <div class="text-xs text-slate-300 text-center">
+                <svg class="w-5 h-5 mx-auto mb-1.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                </svg>
+                {{ selectedNode()?.status !== 'running' ? 'Start the node to inspect its routes.' : (routeError() || 'No routes configured') }}
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <details class="inspector-advanced">
+        <summary>Advanced</summary>
+        <dl class="node-identifiers">
+          <dt>Node ID</dt><dd>{{ selectedNode()?.id }}</dd>
+          @if (selectedNode()?.container_id) { <dt>Container ID</dt><dd>{{ selectedNode()?.container_id }}</dd> }
+        </dl>
       <!-- File Transfer (not for hub) -->
       @if (!isHubNode()) {
         <div class="border-t border-slate-800/50">
@@ -183,7 +386,7 @@
                   class="w-full flex items-center justify-between py-3 px-1 hover:bg-slate-800/30 transition-all">
             <div class="flex items-center gap-2">
               <span class="text-xs transition-transform duration-200" [class.rotate-90]="showConnect()">▶</span>
-              <span class="text-xs text-slate-500 font-bold uppercase tracking-wider">File Transfer</span>
+              <span class="text-xs text-slate-300 font-bold ">File Transfer</span>
             </div>
           </button>
 
@@ -191,13 +394,13 @@
             <div class="px-4 pb-4 space-y-2">
 
               <!-- Upload File -->
-              <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+              <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                 <div class="flex items-center justify-between px-3 py-2 border-b border-slate-800">
-                  <span class="text-[10px] text-slate-400 font-medium">Upload File</span>
-                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">→ /root</span>
+                  <span class="text-xs text-slate-300 font-medium">Upload File</span>
+                  <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">→ /root</span>
                 </div>
                 <div class="px-3 py-2">
-                  <label class="flex items-center justify-center gap-2 w-full py-2 rounded border border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-300 cursor-pointer transition-all text-[10px]"
+                  <label class="flex items-center justify-center gap-2 w-full py-2 rounded border border-dashed border-slate-700 hover:border-slate-500 text-slate-300 hover:text-slate-300 cursor-pointer transition-all text-xs"
                          [class.opacity-50]="uploading()"
                          [class.pointer-events-none]="uploading()">
                     @if (uploading()) {
@@ -208,11 +411,11 @@
                     } @else {
                       <span>Choose file to upload</span>
                     }
-                    <input type="file" class="hidden" (change)="onFileSelected($event)" [disabled]="uploading()">
+                    <input type="file" class="hidden" (change)="onFileSelected($event)" [disabled]="uploading() || selectedNode()?.status !== 'running'">
                   </label>
                   @if (uploadResult(); as result) {
-                    <div class="mt-2 flex items-center justify-center gap-1 text-[10px]"
-                         [class.text-green-400]="result.success"
+                    <div class="mt-2 flex items-center justify-center gap-1 text-xs"
+                         [class.text-slate-200]="result.success"
                          [class.text-red-400]="!result.success">
                       <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         @if (result.success) {
@@ -228,11 +431,11 @@
               </div>
 
               <!-- Persistence warning -->
-              <div class="flex items-start gap-2 px-3 py-2 bg-amber-500/5 rounded-lg border border-amber-500/20">
-                <svg class="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex items-start gap-2 px-3 py-2 bg-slate-800/30 rounded-sm border border-slate-700">
+                <svg class="w-3.5 h-3.5 text-slate-200 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                <p class="text-[10px] text-amber-300/70 leading-relaxed">
+                <p class="text-xs text-slate-200 leading-relaxed">
                   Files are lost when the node is deleted or the lab is reset. Save important files to your PC before closing.
                 </p>
               </div>
@@ -240,29 +443,29 @@
               <!-- docker cp commands hidden for now -->
               <!--
               @if (selectedNode()?.container_id) {
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="flex items-center justify-between px-3 py-2 border-b border-slate-800">
-                    <span class="text-[10px] text-slate-400 font-medium">Your PC → Node</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">docker cp</span>
+                    <span class="text-xs text-slate-300 font-medium">Your PC → Node</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">docker cp</span>
                   </div>
                   <div class="flex items-center gap-2 px-3 py-2">
-                    <code class="flex-1 text-[10px] text-slate-300 font-mono truncate">docker cp &lt;file&gt; {{ selectedNode()?.container_id?.substring(0, 12) }}:/root/</code>
+                    <code class="flex-1 text-xs text-slate-300 font-mono truncate">docker cp &lt;file&gt; {{ selectedNode()?.container_id?.substring(0, 12) }}:/root/</code>
                     <button (click)="copyToClipboard('docker cp <file> ' + selectedNode()?.container_id?.substring(0, 12) + ':/root/')"
-                            class="text-slate-500 hover:text-blue-400 transition-colors text-xs flex-shrink-0" title="Copy">
+                            class="text-slate-300 hover:text-signal-300 transition-colors text-xs flex-shrink-0" title="Copy">
                       ⎘
                     </button>
                   </div>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="flex items-center justify-between px-3 py-2 border-b border-slate-800">
-                    <span class="text-[10px] text-slate-400 font-medium">Node → Your PC</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">docker cp</span>
+                    <span class="text-xs text-slate-300 font-medium">Node → Your PC</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">docker cp</span>
                   </div>
                   <div class="flex items-center gap-2 px-3 py-2">
-                    <code class="flex-1 text-[10px] text-slate-300 font-mono truncate">docker cp {{ selectedNode()?.container_id?.substring(0, 12) }}:/root/&lt;file&gt; .</code>
+                    <code class="flex-1 text-xs text-slate-300 font-mono truncate">docker cp {{ selectedNode()?.container_id?.substring(0, 12) }}:/root/&lt;file&gt; .</code>
                     <button (click)="copyToClipboard('docker cp ' + selectedNode()?.container_id?.substring(0, 12) + ':/root/<file> .')"
-                            class="text-slate-500 hover:text-blue-400 transition-colors text-xs flex-shrink-0" title="Copy">
+                            class="text-slate-300 hover:text-signal-300 transition-colors text-xs flex-shrink-0" title="Copy">
                       ⎘
                     </button>
                   </div>
@@ -275,228 +478,15 @@
         </div>
       }
 
-      <!-- Network Interfaces / Ports -->
-      <div class="space-y-2">
-        <button
-          type="button"
-          (click)="showInterfaces.set(!showInterfaces())"
-          class="w-full flex items-center justify-between group cursor-pointer hover:bg-slate-800/30 rounded py-3 px-1 -mx-1 transition-colors"
-        >
-          <div class="flex items-center gap-2">
-            <span class="text-xs transition-transform duration-200" [class.rotate-90]="showInterfaces()">▶</span>
-            <label class="text-xs text-slate-500 font-bold uppercase tracking-wider cursor-pointer">
-              {{ isBridgeNode() ? 'Connected Ports' : 'Network Interfaces' }}
-            </label>
-          </div>
-          @if (activeInterfaceCount() > 0) {
-            <span class="text-[10px] text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">
-              {{ activeInterfaceCount() }} {{ isBridgeNode() ? 'ports' : 'active' }}
-            </span>
-          }
-        </button>
-
-        @if (showInterfaces()) {
-          <div class="text-[10px] text-slate-600 italic">
-            Docker bridge interface (docker0) is hidden. Use ifconfig inside the node to see all interfaces.
-          </div>
-
-          @if (hasInterfaces()) {
-          <div class="bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
-            <table class="w-full text-xs text-left">
-              <tbody class="divide-y divide-slate-800/50">
-                @for (iface of selectedNode()?.interfaces; track iface.ifname) {
-                  @if (iface.ifname !== 'docker0' && !(isBridgeNode() && iface.ifname === 'br0')) {
-                    <tr class="hover:bg-slate-900/50 transition-colors">
-                      <td class="px-2 py-1.5 font-mono text-slate-400 border-r border-slate-800/50 w-16">
-                        <span class="px-1.5 py-0.5 rounded bg-slate-800/50 text-[10px]">{{ iface.ifname }}</span>
-                      </td>
-                      <td class="px-2 py-1.5">
-                        @if (isBridgeNode()) {
-                          <div class="text-slate-400 text-[10px]">Connected</div>
-                        } @else {
-                          <div class="flex items-center gap-1 group">
-                            <div class="text-slate-200 font-medium text-[11px] cursor-pointer hover:text-blue-300 transition-colors"
-                                 (click)="copyToClipboard(getIPv4(iface.addr_info))"
-                                 title="Click to copy IP">
-                              {{ getIPv4(iface.addr_info) }}
-                            </div>
-                            <span class="text-[9px] text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                  (click)="copyToClipboard(getIPv4(iface.addr_info))">⎘</span>
-                          </div>
-                          @if (getNetwork(iface.addr_info); as net) {
-                            <div class="text-[9px] text-slate-500 leading-tight">{{ net }}</div>
-                          }
-
-                        }
-                      </td>
-                    </tr>
-                  }
-                }
-              </tbody>
-            </table>
-          </div>
-        } @else {
-          <div class="p-4 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed">
-            <div class="text-xs text-slate-500 text-center">
-              <svg class="w-5 h-5 mx-auto mb-1.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-              </svg>
-              {{ isBridgeNode() ? 'No connected ports' : 'No active interfaces' }}
-            </div>
-          </div>
-        }
-      }
-      </div>
-
-      <!-- MAC Address Table (switch only) -->
-      @if (selectedNode()?.type === 'switch') {
-        <div class="space-y-2">
-          <div class="flex items-center justify-between py-3 px-1">
-            <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">MAC Address Table</label>
-            <button (click)="loadMacTable()"
-                    class="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
-                    [disabled]="loadingMacTable()">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              {{ loadingMacTable() ? 'Loading...' : 'Refresh' }}
-            </button>
-          </div>
-
-          @if (macTable().length > 0) {
-            <div class="bg-slate-950 rounded-lg border border-slate-700 overflow-hidden">
-              <table class="w-full text-[10px] text-left">
-                <thead class="bg-slate-900/80 text-slate-500">
-                  <tr>
-                    <th class="px-3 py-2 font-medium">MAC Address</th>
-                    <th class="px-3 py-2 font-medium">Port</th>
-                    <th class="px-3 py-2 font-medium">Type</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-800/50">
-                  @for (entry of macTable(); track entry.mac + entry.port) {
-                    <tr class="hover:bg-slate-900/50 transition-colors">
-                      <td class="px-3 py-2 font-mono text-slate-200">{{ entry.mac }}</td>
-                      <td class="px-3 py-2 font-mono text-slate-400">{{ entry.port }}</td>
-                      <td class="px-3 py-2">
-                        <span [class]="entry.type === 'dynamic'
-                          ? 'px-1.5 py-0.5 rounded text-[9px] bg-green-500/10 text-green-400'
-                          : 'px-1.5 py-0.5 rounded text-[9px] bg-slate-700 text-slate-400'">
-                          {{ entry.type }}
-                        </span>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          } @else {
-            <div class="p-4 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed">
-              <div class="text-xs text-slate-500 text-center">
-                {{ loadingMacTable() ? 'Loading MAC table...' : 'No MAC entries learned yet' }}
-              </div>
-            </div>
-          }
-        </div>
-      }
-
-      <!-- Routing Table (L3 nodes only — not switch or hub) -->
-      @if (selectedNode()?.type !== 'switch' && selectedNode()?.type !== 'hub') {
-        <div class="space-y-2">
-          <div class="flex items-center justify-between py-3 px-1">
-            <div>
-              <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Routing Table</label>
-              <div class="text-[10px] text-slate-600 italic">Hover over a route to highlight its path on the canvas</div>
-            </div>
-            <button (click)="loadRoutes()" 
-                    class="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50" 
-                    [disabled]="loadingRoutes()">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              {{ loadingRoutes() ? 'Loading...' : 'Refresh' }}
-            </button>
-          </div>
-
-          @if (routes().length > 0) {
-            <div class="bg-slate-950 rounded-lg border border-slate-700">
-              <table class="w-full text-[10px] text-left">
-                <thead class="bg-slate-900/80 text-slate-500">
-                  <tr>
-                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider">Destination</th>
-                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider">Via <span class="text-[8px] normal-case text-slate-600">(Gateway)</span></th>
-                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider text-center w-10">Dev</th>
-                    <th class="p-1.5 px-2 font-medium uppercase tracking-wider text-center w-8"></th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-800/50">
-                  @for (r of routes(); track r.dst + r.dev) {
-                    <tr class="hover:bg-slate-900/50 transition-colors cursor-pointer"
-                        (mouseenter)="onRouteMouseEnter(r)"
-                        (mouseleave)="onRouteMouseLeave()">
-                      <td class="p-1.5 px-2 text-slate-300 font-mono" [title]="r.dst">
-                        {{ r.dst === 'default' ? '0.0.0.0/0' : (r.dst.length > 14 ? r.dst.substring(0, 12) + '..' : r.dst) }}
-                      </td>
-                      <td class="p-1.5 px-2 text-slate-400 truncate" [title]="r.gateway || 'Direct'">
-                        {{ (r.gateway || 'Direct').length > 10 ? (r.gateway || 'Direct').substring(0, 8) + '..' : (r.gateway || 'Direct') }}
-                      </td>
-                      <td class="p-1.5 px-2 text-center">
-                        <span class="text-blue-400 font-mono">{{ r.dev }}</span>
-                      </td>
-                      <td class="p-1.5 px-2 text-center">
-                        @if (r.protocol === 'kernel') {
-                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-700 text-slate-400 font-medium"
-                                title="Connected">C</span>
-                        } @else {
-                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium"
-                                title="Static">S</span>
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-500 mt-1.5">
-              <span class="flex items-center gap-1">
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 font-medium text-[8px]">S</span>
-                Static
-              </span>
-              <span class="flex items-center gap-1">
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-700 text-slate-400 font-medium text-[8px]">C</span>
-                Connected
-              </span>
-              <span class="flex items-center gap-1 ml-auto">
-                <span class="inline-block w-5 h-1.5 rounded-full" [style.background]="routeHighlightColor"></span>
-                subnet
-              </span>
-              <span class="flex items-center gap-1">
-                <span class="inline-block w-5 h-1.5 rounded-full" [style.background]="routeHighlightStaticColor"></span>
-                next-hop
-              </span>
-            </div>
-          } @else if (!loadingRoutes()) {
-            <div class="p-4 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed">
-              <div class="text-xs text-slate-500 text-center">
-                <svg class="w-5 h-5 mx-auto mb-1.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                </svg>
-                No routes configured
-              </div>
-            </div>
-          }
-        </div>
-      }
-
       <!-- LAB GUIDE (Cheat Sheet) -->
       <div class="mt-auto border-t border-slate-800/50">
         <button (click)="showHelp.set(!showHelp())" 
-                class="w-full flex items-center justify-between p-4 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-slate-800/30 transition-all">
+                class="w-full flex items-center justify-between p-4 text-xs font-semibold text-slate-200 hover:text-signal-300 hover:bg-slate-800/30 transition-all">
           <span class="flex items-center gap-2">
             <span class="font-mono text-sm">&gt;_</span>
             <span>Quick Commands</span>
           </span>
-          <span class="text-slate-500 transition-transform" [class.rotate-90]="showHelp()">▶</span>
+          <span class="text-slate-300 transition-transform" [class.rotate-90]="showHelp()">▶</span>
         </button>
 
         @if (showHelp()) {
@@ -504,82 +494,82 @@
             
             @if (selectedNode()?.type === 'router') {
               <div class="space-y-3">
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">DHCP Server</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Setup</span>
+                    <span class="text-xs text-slate-300 font-medium">DHCP Server</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Setup</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono leading-relaxed">
                   echo "interface=eth0" > /etc/dnsmasq.conf
 echo "dhcp-range=192.168.1.50,192.168.1.100,12h" >> /etc/dnsmasq.conf
 dnsmasq --no-daemon</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">NAT / Internet</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Routing</span>
+                    <span class="text-xs text-slate-300 font-medium">NAT / Internet</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Routing</span>
                   </div>
-                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">iptables -t nat -A POSTROUTING -o docker0 -j MASQUERADE</pre>
+                   <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">iptables -t nat -A POSTROUTING -o docker0 -j MASQUERADE</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">SSH Access</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">Remote</span>
+                    <span class="text-xs text-slate-300 font-medium">SSH Access</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Remote</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">ssh root@&lt;ROUTER_IP&gt;</pre>
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">ssh root@&lt;ROUTER_IP&gt;</pre>
                 </div>
               </div>
             }
 
             @if (selectedNode()?.type === 'host') {
               <div class="space-y-3">
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">DHCP Client</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Network</span>
+                    <span class="text-xs text-slate-300 font-medium">DHCP Client</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Network</span>
                   </div>
-                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">udhcpc -i eth0</pre>
+                   <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">udhcpc -i eth0</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">DNS Config</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Resolver</span>
+                    <span class="text-xs text-slate-300 font-medium">DNS Config</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Resolver</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">echo "nameserver &lt;ROUTER_IP&gt;" > /etc/resolv.conf</pre>
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">echo "nameserver &lt;ROUTER_IP&gt;" > /etc/resolv.conf</pre>
                 </div>
               </div>
             }
 
             @if (selectedNode()?.type === 'cloud') {
               <div class="space-y-3">
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Internet Gateway</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">Auto</span>
+                    <span class="text-xs text-slate-300 font-medium">Internet Gateway</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Auto</span>
                   </div>
-                  <div class="p-3 text-[10px] text-slate-400 leading-relaxed">
+                  <div class="p-3 text-xs text-slate-300 leading-relaxed">
                     NAT and IP forwarding are configured automatically. Assign an IP to the lab interface and add return routes for each subnet in your lab.
                   </div>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Assign lab interface IP</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Setup</span>
+                    <span class="text-xs text-slate-300 font-medium">Assign lab interface IP</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Setup</span>
                   </div>
-                   <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip addr add &lt;IP&gt;/&lt;PREFIX&gt; dev eth0
+                   <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono leading-relaxed">ip addr add &lt;IP&gt;/&lt;PREFIX&gt; dev eth0
 ip link set eth0 up</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Return route (per subnet)</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Routing</span>
+                    <span class="text-xs text-slate-300 font-medium">Return route (per subnet)</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">Routing</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">ip route add &lt;LAB_SUBNET&gt; via &lt;NEXT_HOP&gt;</pre>
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono leading-relaxed">ip route add &lt;LAB_SUBNET&gt; via &lt;NEXT_HOP&gt;</pre>
                 </div>
               </div>
             }
@@ -587,63 +577,73 @@ ip link set eth0 up</pre>
 
             @if (selectedNode()?.type === 'monitor') {
               <div class="space-y-3">
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Add node to Prometheus</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">prometheus.yml</span>
+                    <span class="text-xs text-slate-300 font-medium">Add node to Prometheus</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">prometheus.yml</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">- job_name: 'lab_nodes'
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono leading-relaxed">- job_name: 'lab_nodes'
   static_configs:
     - targets:
         - '&lt;NODE_IP&gt;:9100'</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Install node_exporter on a lab node</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">from monitor</span>
+                    <span class="text-xs text-slate-300 font-medium">Install node_exporter on a lab node</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">from monitor</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono leading-relaxed">docker cp &lt;monitor_id&gt;:/opt/exporters/node_exporter .
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono leading-relaxed">docker cp &lt;monitor_id&gt;:/opt/exporters/node_exporter .
 docker cp node_exporter &lt;node_id&gt;:/usr/local/bin/
 # then in target node:
 /usr/local/bin/node_exporter &amp;</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Reload Prometheus config</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">no restart</span>
+                    <span class="text-xs text-slate-300 font-medium">Reload Prometheus config</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">no restart</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">systemctl reload prometheus</pre>
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">systemctl reload prometheus</pre>
                 </div>
               </div>
             }
 
             @if (selectedNode()?.type === 'haproxy') {
               <div class="space-y-3">
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Reload config</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">no downtime</span>
+                    <span class="text-xs text-slate-300 font-medium">Reload config</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800/30 text-slate-200">no downtime</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)</pre>
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)</pre>
                 </div>
 
-                <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-950 rounded-sm border border-slate-800 overflow-hidden">
                   <div class="px-3 py-2 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between">
-                    <span class="text-[10px] text-slate-400 font-medium">Edit config</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">vi</span>
+                    <span class="text-xs text-slate-300 font-medium">Edit config</span>
+                    <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">vi</span>
                   </div>
-                  <pre class="p-3 text-[10px] text-slate-300 overflow-x-auto font-mono">vi /etc/haproxy/haproxy.cfg</pre>
+                  <pre role="button" tabindex="0" aria-label="Copy command" (click)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.enter)="copyToClipboard($any($event.currentTarget).innerText)" (keydown.space)="$event.preventDefault(); copyToClipboard($any($event.currentTarget).innerText)" class="p-3 text-xs text-slate-300 overflow-x-auto font-mono">vi /etc/haproxy/haproxy.cfg</pre>
                 </div>
               </div>
             }
 
-            <p class="text-[9px] text-slate-500 text-center pt-2">Click to copy • Paste in terminal</p>
+            <p class="text-[11px] text-slate-300 text-center pt-2">Click to copy • Paste in terminal</p>
           </div>
         }
       </div>
 
+      </details>
+      <div class="inspector-delete">
+        <button (click)="deleteNode.emit(selectedNode()?.id!)"
+                class="inspector-action inspector-action--danger">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          <span>Delete</span>
+        </button>
+      </div>
     </div>
   } 
   
@@ -653,7 +653,7 @@ docker cp node_exporter &lt;node_id&gt;:/usr/local/bin/
       
       <!-- Header -->
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400">
+        <div class="w-10 h-10 rounded-sm bg-slate-800 flex items-center justify-center text-slate-300">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="8" cy="12" r="3" stroke-width="2"/><circle cx="16" cy="12" r="3" stroke-width="2"/>
             <path stroke-linecap="round" stroke-width="2" d="M11 12h2"/>
@@ -661,35 +661,37 @@ docker cp node_exporter &lt;node_id&gt;:/usr/local/bin/
         </div>
         <div>
           <h3 class="font-bold text-slate-100">Virtual Link</h3>
-          <span class="text-[10px] text-slate-600 font-mono">{{ selectedLink()?.id?.substring(0, 12) }}...</span>
+          <span class="text-xs text-slate-300 font-mono">{{ selectedLink()?.id?.substring(0, 12) }}...</span>
         </div>
       </div>
 
+      <button class="btn btn--secondary justify-center" (click)="toggleLink.emit(selectedLink()!.id)">{{ selectedLink()?.enabled === false ? 'Enable link' : 'Disable link' }}</button>
+      <p class="text-sm text-slate-300">Status: {{ selectedLink()?.enabled === false ? 'Disabled' : 'Enabled' }}</p>
       <!-- Connection Details -->
       <div class="space-y-3">
-        <label class="text-xs text-slate-500 font-bold uppercase tracking-wider">Connected Interfaces</label>
+        <label class="text-xs text-slate-300 font-bold ">Connected Interfaces</label>
         
         <div class="space-y-2">
-          <div class="p-3 bg-slate-950 rounded-lg border border-slate-700/50">
+          <div class="p-3 bg-slate-950 rounded-sm border border-slate-700/50">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] text-slate-500 uppercase tracking-wider">Source</span>
-              <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px]">{{ selectedLink()?.source_int }}</span>
+              <span class="text-xs text-slate-300 ">Source</span>
+              <span class="px-2 py-0.5 rounded bg-slate-800/30 text-slate-200 font-mono text-xs">{{ selectedLink()?.source_int }}</span>
             </div>
-            <div class="text-sm text-slate-200">{{ selectedLink()?.source }}</div>
+            <div class="text-sm text-slate-200">{{ nodeName(selectedLink()?.source) }}</div>
           </div>
           
           <div class="flex justify-center">
-            <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v13m0 0l-5-5m5 5l5-5"/>
             </svg>
           </div>
           
-          <div class="p-3 bg-slate-950 rounded-lg border border-slate-700/50">
+          <div class="p-3 bg-slate-950 rounded-sm border border-slate-700/50">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] text-slate-500 uppercase tracking-wider">Target</span>
-              <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px]">{{ selectedLink()?.target_int }}</span>
+              <span class="text-xs text-slate-300 ">Target</span>
+              <span class="px-2 py-0.5 rounded bg-slate-800/30 text-slate-200 font-mono text-xs">{{ selectedLink()?.target_int }}</span>
             </div>
-            <div class="text-sm text-slate-200">{{ selectedLink()?.target }}</div>
+            <div class="text-sm text-slate-200">{{ nodeName(selectedLink()?.target) }}</div>
           </div>
         </div>
       </div>
@@ -697,7 +699,7 @@ docker cp node_exporter &lt;node_id&gt;:/usr/local/bin/
       <!-- Actions -->
       <div class="pt-4 border-t border-slate-800">
         <button (click)="deleteLink.emit(selectedLink()?.id!)"
-                class="w-full flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 py-2.5 px-4 rounded-lg border border-red-900/30 transition-all">
+                class="w-full flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 py-2.5 px-4 rounded-sm border border-red-900/30 transition-all">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
           </svg>
@@ -709,14 +711,14 @@ docker cp node_exporter &lt;node_id&gt;:/usr/local/bin/
 
   <!-- Empty State -->
   @if (!selectedNode() && !selectedLink()) {
-    <div class="flex-1 flex flex-col items-center justify-center text-slate-600 p-8 text-center">
-      <div class="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mb-4 text-slate-600">
+    <div class="flex-1 flex flex-col items-center justify-center text-slate-300 p-8 text-center">
+      <div class="w-16 h-16 rounded-sm bg-slate-800/50 flex items-center justify-center mb-4 text-slate-300">
         <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
           <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
         </svg>
       </div>
-      <p class="text-sm font-medium text-slate-500 mb-1">No selection</p>
-      <p class="text-xs text-slate-600">Click a node or link to view properties</p>
+      <p class="text-sm font-medium text-slate-300 mb-1">No selection</p>
+      <p class="text-xs text-slate-300">Click a node or link to view properties</p>
     </div>
   }
 </div>

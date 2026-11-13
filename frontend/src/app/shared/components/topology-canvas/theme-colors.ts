@@ -18,10 +18,10 @@ export const INK = '#e8efef';
 export const INK_DIM = '#8fa3a6';
 export const INK_FAINT = '#5c6d70';
 
-export const SIGNAL = '#4fb3ac';
-export const SIGNAL_HI = '#7ed6ce';
+export const SIGNAL = '#648eac';
+export const SIGNAL_HI = '#83b9df';
 
-export const UP = '#8fbb6c';
-export const UP_600 = '#6f9c4f';
+export const UP = '#8eaf9f';
+export const UP_600 = '#648775';
 export const PENDING = '#d7a153';
 export const DOWN = '#d97b68';
