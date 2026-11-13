@@ -169,6 +169,23 @@ cd open-veth
 make up
 ```
 
+On Linux, `make up` reuses local node images and downloads missing ones. If a
+download fails, it builds the missing image locally, preparing the shared base
+first when needed. Application images are built before updating running services.
+Startup requires Bash, Docker Compose v2, `curl`, and `ss` (from `iproute2`).
+
+```bash
+make up UPDATE_IMAGES=1       # Also try updating existing node images
+make up STARTUP_TIMEOUT=300   # Allow more time for startup reconciliation
+make pull-images             # Prepare/update node images without starting the app
+make test-startup             # Run isolated startup regression tests
+```
+
+Port detection preserves unrelated `.env` settings and reuses this project's
+published ports. It fails if no suitable ports are available. The ready message
+appears only after the API health endpoint, frontend, and API proxy respond;
+failed startup prints recent container logs and returns a nonzero exit code.
+
 **Windows (Docker Desktop with WSL2):**
 ```
 1. Clone the repository
@@ -177,8 +194,22 @@ make up
 
 > `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
 
+The Windows launcher uses `scripts/start-windows.ps1` with Windows PowerShell 5.1.
+It reuses local node images, downloads missing images, and builds locally if a download fails.
+Application images are built before Compose updates any running services. It selects
+available ports, preserves unrelated `.env` settings, and waits for the API, frontend,
+and API proxy to respond before printing the ready message. On failure it returns a
+nonzero exit code and shows recent container logs when startup has been attempted.
+
+```powershell
+.\start.bat -UpdateImages                        # Also try updating existing node images
+.\start.bat -NoPause                             # Return without waiting for Enter
+.\start.bat -StartupTimeoutSeconds 300           # Allow more time for startup reconciliation
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-windows.tests.ps1
+```
+
 That's it! The command will:
-- Pull node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester, HAProxy, Storage, Zabbix — Hub and Cloud reuse the Host image)
+- Prepare node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester, HAProxy, Storage, Zabbix — Hub and Cloud reuse the Host image; existing local images are reused by default)
 - Auto-detect available ports (avoids conflicts with existing services)
 - Start the application and show you the URL to open in your browser
 

@@ -6,8 +6,10 @@ DOCKER_CMD=docker
 COMPOSE_CMD=docker compose
 FRONTEND_DIR=frontend
 SCRIPTS_DIR=scripts
+UPDATE_IMAGES ?= 0
+STARTUP_TIMEOUT ?= 180
 
-.PHONY: all up down pull-images images dev-env dev-down run-api run-ui deps-go deps-ui test-go fmt clean nuke reset-ports help
+.PHONY: all up down check-docker pull-images images dev-env dev-down run-api run-ui deps-go deps-ui test-go test-startup fmt clean nuke reset-ports help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -16,20 +18,11 @@ all: help
 
 # --- Quick Start (Docker) ---
 check-docker:
-	@command -v docker >/dev/null 2>&1 || { echo "Error: Docker is not installed. https://docs.docker.com/get-docker/"; exit 1; }
-	@docker info >/dev/null 2>&1 || { echo "Error: Docker daemon is not running. Start Docker and try again."; exit 1; }
+	@DOCKER_CMD="$(DOCKER_CMD)" bash "$(SCRIPTS_DIR)/start-linux.sh" --check
 
 
-up: check-docker pull-images ## Start OpenVeth (auto-detects available ports)
-	@$(SCRIPTS_DIR)/find-ports.sh
-	@echo ""
-	@$(COMPOSE_CMD) up -d --build
-	@echo ""
-	@echo "========================================"
-	@echo "  OpenVeth is running!"
-	@echo "  Frontend: http://localhost:$$(grep FRONTEND_PORT .env | cut -d= -f2)"
-	@echo "  Backend:  http://localhost:$$(grep BACKEND_PORT .env | cut -d= -f2)"
-	@echo "========================================"
+up: ## Start OpenVeth; reuse local images (UPDATE_IMAGES=1 to refresh)
+	@DOCKER_CMD="$(DOCKER_CMD)" UPDATE_IMAGES="$(UPDATE_IMAGES)" STARTUP_TIMEOUT="$(STARTUP_TIMEOUT)" bash "$(SCRIPTS_DIR)/start-linux.sh"
 
 down: ## Stop OpenVeth
 	$(COMPOSE_CMD) down
@@ -66,15 +59,7 @@ deps-ui: ## Install frontend dependencies
 
 # --- Node Images ---
 pull-images: ## Pull node images from Docker Hub (openveth/*)
-	$(DOCKER_CMD) pull openveth/host:latest
-	$(DOCKER_CMD) pull openveth/router:latest
-	$(DOCKER_CMD) pull openveth/server:latest
-	$(DOCKER_CMD) pull openveth/monitor:latest
-	$(DOCKER_CMD) pull openveth/tester:latest
-	$(DOCKER_CMD) pull openveth/switch:latest
-	$(DOCKER_CMD) pull openveth/haproxy:latest
-	$(DOCKER_CMD) pull openveth/storage:latest
-	$(DOCKER_CMD) pull openveth/zabbix:latest
+	@DOCKER_CMD="$(DOCKER_CMD)" bash "$(SCRIPTS_DIR)/start-linux.sh" --images-only --update-images
 
 images: ## Build node images locally (Host, Router/Debian+FRR, Server, Monitor, Tester, Switch, HAProxy, Storage, Zabbix)
 	$(DOCKER_CMD) build -t openveth/base:latest ./images/base-node
@@ -114,6 +99,9 @@ zabbix-image: ## Build only the zabbix node image (Debian + Zabbix 8 + MariaDB +
 # --- Testing ---
 test-go: ## Run Go tests
 	$(GO_CMD) test ./...
+
+test-startup: ## Test Linux startup without a Docker daemon
+	bash "$(SCRIPTS_DIR)/start-linux.tests.sh"
 
 # --- Utilities ---
 fmt: ## Format Go source code

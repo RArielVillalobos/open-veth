@@ -1,0 +1,20 @@
+name: Windows startup tests
+
+on:
+  pull_request:
+    paths: ['start.bat', 'scripts/start-windows*.ps1', '.github/workflows/windows-startup-tests.yml']
+  push:
+    branches: [main]
+    paths: ['start.bat', 'scripts/start-windows*.ps1', '.github/workflows/windows-startup-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run startup regression tests with Windows PowerShell
+        shell: powershell
+        run: ./scripts/start-windows.tests.ps1

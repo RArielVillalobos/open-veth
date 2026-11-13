@@ -1,0 +1,23 @@
+name: Linux startup tests
+
+on:
+  pull_request:
+    paths: ['Makefile', 'scripts/*.sh', '.github/workflows/linux-startup-tests.yml']
+  push:
+    branches: [main]
+    paths: ['Makefile', 'scripts/*.sh', '.github/workflows/linux-startup-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Bash syntax
+        run: bash -n scripts/find-ports.sh scripts/start-linux.sh scripts/start-linux.tests.sh
+      - name: Verify native socket test tools
+        run: command -v ss && command -v python3
+      - name: Run startup regression tests without a Docker daemon
+        run: make test-startup
