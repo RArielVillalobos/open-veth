@@ -1,454 +1,157 @@
 # OpenVeth
 
-**OpenVeth** is a web-based network emulator that uses real Linux kernel networking — not simulations. Design topologies visually, access node terminals in the browser, capture packets live, and run observability labs with Grafana and Prometheus. Runs on any machine with Docker.
+OpenVeth is a network lab environment you control from your browser. Build topologies, configure Linux nodes through integrated terminals, and inspect the packets moving between them.
 
-![Backend](https://img.shields.io/badge/Backend-Go_1.23-00ADD8?logo=go)
-![Frontend](https://img.shields.io/badge/Frontend-Angular_21-DD0031?logo=angular)
-![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker)
-![License](https://img.shields.io/badge/License-AGPL%20v3-green)
+Nodes run in Docker containers. Links use Linux network namespaces, veth pairs, and bridges, so you work with real networking tools and services.
 
----
+![OpenVeth workspace with a router, switch, web server, host, monitor, and routing table](assets/openveth-workspace.png)
 
-<p align="center">
-  <img src="https://i.imgur.com/XZiNjJJ.gif" alt="OpenVeth Demo - Creating network topologies in real-time" width="800">
-</p>
+*A LAN lab connecting a router, switch, web server, client, and monitor. Inspect interface addresses and routes alongside the topology, with a node terminal open below. Screenshot uses example data; terminal commands are shown for illustration, not as executed connectivity tests.*
 
-<p align="center">
-  <i>Create network topologies visually, connect to nodes via terminal, capture packets in real-time.</i>
-</p>
+[Hands-on labs](https://rarielvillalobos.github.io/open-veth-labs/) · [Usage guide](docs/usage.md) · [Development](docs/development.md) · [License](LICENSE)
 
----
-
-## 📚 Documentation & Labs
-
-Step-by-step hands-on labs for learning networking, routing, and services:
-
-👉 **[https://rarielvillalobos.github.io/open-veth-labs/](https://rarielvillalobos.github.io/open-veth-labs/)**
-
-Covers networking fundamentals: connectivity, ARP, subnetting, routing, DHCP, DNS, firewall, NAT.
-
----
-
-## Why real containers?
-
-OpenVeth uses real Linux containers, not simulations.
-
-- **Real commands:** `iproute2`, `iptables`, `tcpdump`, `systemctl` — the same tools you use in production.
-- **Real packet capture:** `tcpdump` on every cable, seeing actual frames.
-- **Real services:** run nginx, sshd, nfs, or whatever you install.
-- **Real failures:** when something breaks, it breaks for the same reasons it breaks in production.
-
-If you want to understand why a network fails, you need to break a real one first.
-
----
-
-## Use Cases
-
-- **Networking Courses**: Hands-on labs for CCNA, Network+, Linux networking — routing, switching, VLANs, NAT
-- **Protocol Analysis**: Capture and analyze OSPF, BGP, ARP, DHCP packets with live packet capture
-- **Network Troubleshooting**: Visualize broadcast/collision domains and trace packet paths interactively
-- **System Administration**: Practice service management with systemd, configure nginx, apache2, dnsmasq, NFS, vsftpd — everything runs on real Debian with real `systemctl`
-- **Observability**: Deploy a Monitor node with Grafana + Prometheus pre-configured. Copy exporters from `/opt/exporters/` to any lab node via `scp` and build your own dashboards from scratch
-- **Load & Stress Testing**: Generate HTTP load with `wrk` or `k6`, measure throughput with `iperf3`, simulate degraded links with `tc netem` — all from a dedicated Tester node
-- **Load Balancing**: Deploy an HAProxy node to distribute traffic across multiple backends. Stats page auto-starts on a dynamic port, accessible directly from the node panel
-- **Block Storage & LFCS Prep**: Practice `fdisk`, LVM, RAID, LUKS and NFS with a Storage node — loop devices pre-allocated at startup, no VM needed. Covers ~70% of the LFCS storage domain
-- **Enterprise Monitoring**: Deploy a Zabbix node with Zabbix 8, MariaDB and Apache pre-configured. Monitor hosts via Agent 2 and routers/switches via SNMP. Web UI auto-starts on a dynamic port
-- **Security**: Practice iptables rules, NAT, port forwarding and firewall policies in an isolated environment
-
----
-
-### Observability Labs — Grafana + Prometheus + SNMP
-
-Connect a Monitor node to your topology and get Grafana + Prometheus running out of the box. All exporters are pre-installed and ready to use — no setup needed on the monitor side. Dashboards are built by the student from scratch, which is the point — exploring metrics, building queries and designing visualizations is part of the learning experience.
-
-- **Any node** → `node_exporter` (CPU, memory, network, disk)
-- **nginx / apache** → `nginx_exporter` / `apache_exporter`
-- **Router (FRRouting)** → `frr_exporter` (BGP peers, OSPF neighbors, routing table)
-- **Switch** → SNMP via `snmp_exporter` (interface counters, bridge stats)
-
-Copy any exporter from `/opt/exporters/` on the monitor to the target node via `scp`.
-
-<p align="center">
-  <img src="assets/grafana-obs.gif" alt="Observability lab - Grafana metrics in real-time while wrk generates HTTP load" width="800">
-</p>
-<p align="center"><i>wrk generating HTTP load against an nginx server — CPU, network and memory metrics live in Grafana via node_exporter. The managed switch exposes interface metrics via SNMP.</i></p>
-
----
-
-### Broadcast & Collision Domain Overlay
-
-Visualize **broadcast** and **collision** domains directly on the topology canvas with a single click.
-
-<p align="center">
-  <img src="https://i.imgur.com/fPzXKFJ.png" alt="Broadcast domains highlighted on the topology" width="800">
-</p>
-<p align="center"><i>Broadcast domains — each colored region is an independent broadcast domain separated by routers.</i></p>
-
-<p align="center">
-  <img src="https://i.imgur.com/yVI4b5O.png" alt="Collision domains highlighted on the topology" width="800">
-</p>
-<p align="center"><i>Collision domains — note how the hub merges all connected ports into a single shared collision domain, while the switch isolates each link.</i></p>
-
----
-
-### Visual Traceroute
-
-Run traceroute from any node and watch the path light up on the graph in real-time.
-
-<p align="center">
-  <img src="https://i.imgur.com/8sBFlCP.gif" alt="Visual traceroute - path highlighted on topology" width="800">
-</p>
-<p align="center"><i>Each hop is numbered on the canvas. The result table shows IP, RTT, and the resolved node name.</i></p>
-
-<p align="center">
-  <img src="https://i.imgur.com/dKg5Otm.png" alt="Traceroute result dialog" width="800">
-</p>
-
----
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Visual Topology Builder** | Drag-and-drop canvas (Cytoscape.js) to design network labs |
-| **Integrated Terminals** | Shell access to any node (bash, vtysh) via xterm.js |
-| **Live Packet Capture** | Wireshark-style traffic sniffing in real-time |
-| **Dynamic Routing** | Full FRRouting support (OSPF, BGP, IS-IS, Static) |
-| **SSH Between Nodes** | Connect from one node to another within the lab |
-| **DHCP Server** | Automatic IP assignment for realistic LAN labs |
-| **Infrastructure as Code** | Export/import topologies as YAML — includes node positions, links, IP configs, and static routes |
-| **Lab Management** | Create, save, and switch between lab projects |
-| **State Persistence** | IP/route configs auto-saved every 30s. Manual Save also snapshots the full filesystem of each node (`docker commit`) — surviving lab switches and restarts |
-| **Broadcast/Collision Domain Overlay** | Visualize broadcast and collision domains highlighted on the topology canvas |
-| **Visual Traceroute** | Run traceroute from any node and see the path highlighted on the topology graph |
-| **Cloud Gateway** | Automatic NAT gateway — IP forwarding and masquerade pre-configured, connect lab nodes to real internet |
-| **Link Toggle** | Enable or disable any link without deleting it — right-click a cable and select Disable/Enable |
-| **Node Power Control** | Power off and on any node — right-click a node and select Power Off/On. The UI updates in real-time, including when a node is shut down from within (e.g. `systemctl poweroff` on a SERVER node) |
-
----
-
-## Node Types
-
-| Type | Base Image | Use Case |
-|------|------------|----------|
-| **HOST** | Alpine Linux | End devices, servers, clients |
-| **ROUTER** | FRRouting | Dynamic routing, NAT, firewalls |
-| **SWITCH** | Linux Bridge + snmpd | Managed L2 switch — terminal access, SNMP (community `public`, port 161), live MAC address table visible in the properties panel |
-| **HUB** | Alpine Linux (no MAC learning) | L1 repeater, floods all traffic to all ports |
-| **CLOUD** | Alpine Linux | NAT gateway — automatically configures IP forwarding and masquerade for internet access |
-| **SERVER** | Debian bookworm + systemd | Sysadmin and services labs — systemd as PID 1, nginx, apache2, dnsmasq, chrony, vsftpd, nfs-kernel-server, nfs-common pre-installed. Manage services with `systemctl`, inspect logs with `journalctl`. Direct internet access |
-| **MONITOR** | Debian bookworm + systemd | Observability labs — Grafana + Prometheus + snmp_exporter pre-installed and auto-started. Loki is installed but disabled by default — enable with `systemctl enable loki --now`. Ports 3000 (Grafana) and 9090 (Prometheus) auto-mapped. Exporters available in `/opt/exporters/` to copy to any node via `scp`: `node_exporter`, `nginx_exporter`, `apache_exporter`, `promtail`, `frr_exporter` (BGP/OSPF metrics from FRRouting), and more |
-| **TESTER** | Debian bookworm | Load and stress testing — `wrk`, `k6`, `siege`, `ab`, `iperf3`, `hping3`, `vegeta`, `stress-ng`, `locust` pre-installed. Use `tc netem` to simulate network degradation |
-| **HAPROXY** | Alpine Linux + HAProxy | Load balancer — HAProxy pre-configured with stats page on port 8404 (auto-mapped). Edit `/etc/haproxy/haproxy.cfg` and reload with `haproxy -f /etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)` |
-| **STORAGE** | Debian bookworm + systemd | Block storage labs — `fdisk`, `parted`, `gdisk`, `LVM`, `mdadm`, `cryptsetup`, `nfs-common`, `smartmontools` pre-installed. Loop devices pre-allocated at startup so you can practice `mkfs`, `mount`, LVM, RAID and LUKS without attaching real disks. Ideal for LFCS preparation |
-| **ZABBIX** | Debian bookworm + systemd | Enterprise monitoring — Zabbix 8, MariaDB and Apache pre-configured. Ready on first boot (no setup wizard). Monitor hosts via Zabbix Agent 2, routers and switches via SNMP. Web UI (port 80) auto-mapped. Login: `Admin / zabbix` |
-
-All nodes include: `iproute2`, `tcpdump`, `ping`, `traceroute`, `curl`
-
----
-
-## Quick Start
+## Quick start
 
 ### Requirements
 
-| Component | Version | Notes |
-|-----------|---------|-------|
-| Docker | 20.10+ | Required |
-| Docker Compose | 2.0+ | Required |
-| Make | - | Required |
-| Linux / WSL2 | - | Netlink operations require Linux kernel |
+- **Linux**, or **Windows with Docker Desktop using its WSL2 backend**. Network namespace operations require a Linux kernel.
+- Docker running Linux containers and Docker Compose v2.
+- Git to clone the repository.
+- On Linux: Make, Bash, `curl`, and `ss` from `iproute2`.
+- On Windows: Windows PowerShell 5.1, used by the launcher.
 
-> **Windows Users**: OpenVeth requires Linux networking. Docker Desktop must be configured to use WSL2 as the backend (this is the default in recent versions). Once Docker is running, use `start.bat` as described below.
+Go and Node.js are only needed for native development. The first startup downloads node images and builds the application images, so it requires internet access and can take several minutes.
 
-### Installation
+### Linux
 
-**Linux:**
 ```bash
 git clone https://github.com/RArielVillalobos/open-veth.git
 cd open-veth
 make up
 ```
 
-On Linux, `make up` reuses local node images and downloads missing ones. If a
-download fails, it builds the missing image locally, preparing the shared base
-first when needed. Application images are built before updating running services.
-Startup requires Bash, Docker Compose v2, `curl`, and `ss` (from `iproute2`).
+### Windows
 
-```bash
-make up UPDATE_IMAGES=1       # Also try updating existing node images
-make up STARTUP_TIMEOUT=300   # Allow more time for startup reconciliation
-make pull-images             # Prepare/update node images without starting the app
-make test-startup             # Run isolated startup regression tests
-```
-
-Port detection preserves unrelated `.env` settings and reuses this project's
-published ports. It fails if no suitable ports are available. The ready message
-appears only after the API health endpoint, frontend, and API proxy respond;
-failed startup prints recent container logs and returns a nonzero exit code.
-
-**Windows (Docker Desktop with WSL2):**
-```
-1. Clone the repository
-2. Double-click start.bat
-```
-
-> `start.bat` verifies that Docker is running and that the WSL2 backend is active before starting. If either check fails, it shows a clear error message with instructions.
-
-The Windows launcher uses `scripts/start-windows.ps1` with Windows PowerShell 5.1.
-It reuses local node images, downloads missing images, and builds locally if a download fails.
-Application images are built before Compose updates any running services. It selects
-available ports, preserves unrelated `.env` settings, and waits for the API, frontend,
-and API proxy to respond before printing the ready message. On failure it returns a
-nonzero exit code and shows recent container logs when startup has been attempted.
+Start Docker Desktop and ensure its WSL2 backend is enabled. Then run:
 
 ```powershell
-.\start.bat -UpdateImages                        # Also try updating existing node images
-.\start.bat -NoPause                             # Return without waiting for Enter
-.\start.bat -StartupTimeoutSeconds 300           # Allow more time for startup reconciliation
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-windows.tests.ps1
+git clone https://github.com/RArielVillalobos/open-veth.git
+cd open-veth
+.\start.bat
 ```
 
-That's it! The command will:
-- Prepare node images from Docker Hub (Host, Router, Switch, Server, Monitor, Tester, HAProxy, Storage, Zabbix — Hub and Cloud reuse the Host image; existing local images are reused by default)
-- Auto-detect available ports (avoids conflicts with existing services)
-- Start the application and show you the URL to open in your browser
+You can also double-click `start.bat` after cloning.
 
-```
-========================================
-  OpenVeth listo!
-  Abri tu browser en:
-  http://localhost:80
-========================================
-```
+Both launchers reuse local node images, download missing ones, and attempt a local build if a download fails. They select available ports and wait for the API, frontend, and API proxy before reporting readiness.
 
-### Credentials
-
-| Access | URL / Command | User | Password |
-|--------|--------------|------|----------|
-| OpenVeth UI | `http://localhost` | — | — |
-| Node terminal (SSH) | `ssh root@<node-ip>` | `root` | `openveth` |
-| Grafana (MONITOR node) | `http://localhost:<mapped-port>` | `admin` | `admin` |
-| Zabbix (ZABBIX node) | `http://localhost:<mapped-port>` | `Admin` | `zabbix` |
-
-> Service ports (Grafana, Zabbix, HAProxy stats) are auto-assigned — find them in the node panel after the node finishes starting up.
-
-### Useful Commands
+**Open the URL printed by the launcher.** The frontend prefers port 80, but it may receive a different port when that port is occupied. Do not assume that `http://localhost` is always the assigned address.
 
 ```bash
-make help         # Show all available commands
-make up           # Start OpenVeth (auto-detects ports)
-make down         # Stop OpenVeth
-make logs         # View container logs
-make status       # Show current ports and container status
-make reset-ports  # Force port re-detection on next start
-make clean        # Free disk space: remove all OpenVeth images, snapshots and build cache
-make nuke         # NUCLEAR: remove everything including containers and database
+make status    # Container status and published ports
+make logs      # Service logs
+make down      # Stop the application stack
 ```
 
-### Development Setup
+For startup options and troubleshooting, see the [usage guide](docs/usage.md#startup-and-troubleshooting).
 
-For local development (requires Go 1.23+ and Node.js 22+):
+## Your first laboratory
+
+1. Open **New Topology** if the startup dialog is shown.
+2. Add a **Router** named `R1` and a **Host** named `PC1` from the device list.
+3. Select **Connect nodes**, then select `R1` and `PC1`. Press Escape to leave connection mode.
+4. Select a node to inspect it, then open **Terminal**. On a fresh topology, the first lab interface is `eth0`.
+
+On `R1`:
 
 ```bash
-# Start dev container (provides Linux networking tools)
-make dev-env
-
-# In another terminal, enter the container
-docker exec -it openveth-dev bash
-
-# Inside the container, run the API
-go run ./cmd/openveth-api
-
-# Run frontend natively (terminal 2, on your host)
-cd frontend && npm install && npm start
-# → UI at http://localhost:4200
-```
-
----
-
-## Architecture
-
-OpenVeth translates your visual topology into real Linux kernel networking structures.
-
-### How it works
-
-1. **Nodes** → Docker containers with isolated network namespaces (HOST, ROUTER, SWITCH, CLOUD)
-2. **Links** → `veth` pairs connecting container namespaces
-3. **SWITCH nodes** → Have a Linux bridge (`br0`) inside for L2 switching. Managed device with terminal access, SNMP daemon, and a live MAC address table visible in the properties panel
-4. **HUB nodes** → Same as SWITCH but with MAC learning disabled (floods all frames). Unmanaged — no terminal, no SNMP
-5. **CLOUD nodes** → Keep `docker0` connected to the Docker bridge. On creation, automatically enable IP forwarding and set up `iptables MASQUERADE` so connected lab nodes can reach real internet
-6. **Links** → Can be enabled/disabled at runtime (right-click → Disable/Enable) without deleting them, simulating link failures
-7. **Node power** → Nodes can be powered off and on (right-click → Power Off/On). The backend listens to Docker events so the UI updates even when a node shuts itself down from within (e.g. `systemctl poweroff`)
-8. **Startup reconciliation** → On restart, the backend rebuilds containers, links, and IP configs automatically from the database
-9. **Filesystem snapshots** → The Save button runs `docker commit` on every running node, capturing the full filesystem state (configs in `/etc`, installed packages, etc.). On next lab activation, each node boots from its snapshot instead of the base image
-
----
-
-### Cloud Gateway — Internet Access for Lab Nodes
-
-The **CLOUD** node acts as a NAT gateway. When created, it automatically enables IP forwarding and sets up masquerade rules so any connected lab node can reach real internet.
-
-**Example topology:**
-```
-HOST ── ROUTER ── CLOUD ── Internet
-```
-
-**Configuration steps:**
-
-On **CLOUD** (terminal):
-```bash
-ip addr add 10.0.2.2/30 dev eth0
+ip addr add 10.0.0.1/24 dev eth0
 ip link set eth0 up
-ip route add 10.0.1.0/30 via 10.0.2.1   # return route per lab subnet
 ```
 
-On **ROUTER** (terminal):
-```bash
-ip addr add 10.0.1.1/30 dev eth0
-ip addr add 10.0.2.1/30 dev eth1
-ip link set eth0 up && ip link set eth1 up
-ip route add default via 10.0.2.2
-sysctl -w net.ipv4.ip_forward=1
-```
+On `PC1`:
 
-On **HOST** (terminal):
 ```bash
-ip addr add 10.0.1.2/30 dev eth0
+ip addr add 10.0.0.2/24 dev eth0
 ip link set eth0 up
-ip route add default via 10.0.1.1
-ping 8.8.8.8   # should work
+ping -c 3 10.0.0.1
 ```
 
-### Topology YAML Format
+Select either node and use **Capture** beside `eth0` to inspect traffic. Run the ping again to see the packets. Use **Save** to save network settings and create filesystem snapshots of running nodes.
 
-Export and import full lab configurations, including IP addresses and static routes:
+The terminal supports multiple node tabs, output search (`Ctrl+Shift+F`), font size controls, and reconnection. `Ctrl+C` interrupts a process; `Ctrl+Shift+C` copies selected text and `Ctrl+Shift+V` pastes, subject to browser clipboard permissions. Reconnecting opens a new shell connection and keeps the previous output in the panel.
 
-```yaml
-name: My Lab
-nodes:
-  - name: R1
-    type: router
-    x: 200
-    y: 150
-    interfaces:
-      - interface: eth0
-        address: 10.0.1.1/30
-      - interface: eth1
-        address: 10.0.2.1/30
-    routes:
-      - dst: 10.0.3.0/24
-        gateway: 10.0.2.2
-        dev: eth1
-  - name: HOST-1
-    type: host
-    x: 400
-    y: 150
-    interfaces:
-      - interface: eth0
-        address: 10.0.1.2/30
-    routes:
-      - dst: 0.0.0.0/0
-        gateway: 10.0.1.1
-        dev: eth0
-links:
-  - source: R1
-    target: HOST-1
-    source_int: eth0
-    target_int: eth0
-    enabled: true
-```
+## What you can practice
 
-On import, IP addresses and routes are applied to the containers immediately and persisted to the database so they survive restarts.
+- **Networking:** addressing, ARP, subnetting, static routing, DHCP, DNS, NAT, and firewall rules.
+- **Routing and failures:** FRRouting protocols such as OSPF and BGP, link failures, node shutdowns, and convergence.
+- **Troubleshooting:** live packet capture, interface and route inspection, visual traceroute, and broadcast/collision domain overlays.
+- **Linux services:** systemd, web servers, SSH, file sharing, and service diagnostics.
+- **Monitoring:** Grafana and Prometheus, exporters, SNMP, and Zabbix.
+- **Load balancing and testing:** HAProxy, HTTP load generators, throughput tests, and `tc netem`.
+- **Storage:** filesystems, LVM, RAID, and LUKS using the Storage node's loop devices.
 
-### Link Toggle — Simulate Link Failures
+The [lab collection](https://rarielvillalobos.github.io/open-veth-labs/) provides guided exercises. Services and routing protocols may need configuration inside the nodes; adding a node does not automatically configure the rest of the topology.
 
-Right-click any cable on the canvas and select **Disable Link** to bring the interfaces down without deleting the connection. Re-enable it at any time. Useful for testing routing protocol convergence (OSPF/BGP failover), STP, and redundancy scenarios.
+## Node types
 
-### Node Power Control — Simulate Node Failures
+| Node | Included software or behavior | Typical use |
+|------|-------------------------------|-------------|
+| Host | Alpine Linux and network tools | Clients and basic connectivity |
+| Router | Debian, FRRouting, SNMP tools | Routing, NAT, and firewall labs |
+| Switch | Debian, Linux bridge, snmpd | L2 switching, MAC tables, and SNMP |
+| Hub | Bridge with MAC learning disabled; no terminal | Flooding and shared-domain exercises |
+| Cloud | Host image with forwarding and masquerade configured | Internet gateway for lab networks |
+| Server | Debian, systemd, nginx, Apache, dnsmasq, NFS, and other service packages | Linux administration |
+| Monitor | Debian, Grafana, Prometheus, snmp_exporter, and exporter binaries | Metrics and observability |
+| Tester | wrk, k6, iperf3, stress-ng, and other generators | Traffic and load testing |
+| HAProxy | Alpine Linux and HAProxy with a stats page | Load balancing |
+| Storage | Debian, systemd, loop devices, LVM, mdadm, and cryptsetup | Block storage exercises |
+| Zabbix | Debian, Zabbix server and Agent 2, MariaDB, and Apache | Monitoring and alerting |
 
-Right-click any node and select **Power Off** to stop the container without deleting it. The node turns transparent on the canvas and all its links become inactive. Select **Power On** to restart it.
+Grafana, Prometheus, HAProxy stats, and Zabbix have dynamically assigned host ports. Open them from the node properties panel once the services are ready. Exporters, monitoring targets, agents on other nodes, and SNMP checks require configuration for your lab.
 
-This is distinct from disconnecting a cable:
+### Default credentials
 
-| | Disable Link | Power Off |
-|---|---|---|
-| Node stays running | ✅ | ❌ |
-| Affects | One interface | All interfaces |
-| Services (nginx, sshd...) | Active | Stopped |
-| Routing protocols | Partial reconvergence | Full session drop |
-| Analogy | Unplug a cable | Cut the power |
+| Service | User | Password |
+|---------|------|----------|
+| Node SSH, where available | `root` | `openveth` |
+| Grafana | `admin` | `admin` |
+| Zabbix | `Admin` | `zabbix` |
 
-The UI updates in real-time even when the node shuts itself down from within — for example, running `systemctl poweroff` inside a SERVER node triggers an immediate visual update via the Docker event stream. Useful for testing OSPF/BGP reconvergence, high-availability setups, and service recovery scenarios.
+The browser terminal does not require a separate SSH login. SSH to a node IP requires network reachability, for example from another node in the lab. These credentials are lab defaults, not deployment credentials.
 
----
+## Saving and sharing
 
----
+| Action | What it preserves |
+|--------|-------------------|
+| Move a node | Its position is queued for saving; the status bar reports pending or failed saves |
+| Automatic network save | IP and route configuration, by default every 30 seconds |
+| **Save** | Network settings and local Docker filesystem snapshots of running nodes |
+| **Export** | YAML describing nodes, positions, links, saved IP configuration, and static routes |
+| **Import** | A YAML topology into a new laboratory or as a replacement for the selected laboratory |
 
-## Capabilities
+**YAML is not a backup of installed software or service databases.** It does not contain container filesystem snapshots. Export after saving network settings when you want those settings included.
 
-| Feature | |
-|---------|:---:|
-| Real Linux kernel networking (no simulation) | ✅ |
-| Web-based visual topology builder | ✅ |
-| Integrated terminals (bash, vtysh) | ✅ |
-| Live packet capture | ✅ |
-| Dynamic routing (OSPF, BGP, IS-IS, Static) | ✅ |
-| SSH between nodes | ✅ |
-| L2 switching / L1 hub | ✅ |
-| Internet connectivity via Cloud node | ✅ |
-| Broadcast & collision domain overlay | ✅ |
-| Visual traceroute | ✅ |
-| Route highlight — hover a route, see the cable | ✅ |
-| Node power off/on | ✅ |
-| Link enable/disable (simulate failures) | ✅ |
-| Grafana + Prometheus built-in (Monitor node) | ✅ |
-| Load testing built-in (wrk, k6, iperf3) | ✅ |
-| HAProxy load balancer node | ✅ |
-| Block storage labs (LVM, RAID, LUKS, loop devices) | ✅ |
-| Zabbix 8 monitoring node (Agent 2 + SNMP) | ✅ |
-| SNMP monitoring (router + switch) | ✅ |
-| MAC address table (live) | ✅ |
-| Filesystem snapshots (docker commit) | ✅ |
-| Export/import topologies as YAML | ✅ |
-| No VMs required | ✅ |
-| Free & Open Source (AGPLv3) | ✅ |
+Filesystem snapshots use `docker commit`. They preserve files in the container's writable layer, but not process memory, mounted volumes, or temporary filesystems. They are local Docker images, not portable lab archives or a guarantee of application-consistent database backups. Back up important service data with the service's own tools.
 
----
+Switching laboratories stops and rebuilds environments. Save filesystem changes you need before switching. **Reset** deletes the selected lab's nodes, links, saved settings, and snapshots. Replacing a lab during import also deletes its existing contents; the UI asks you to choose the destination first.
 
-## Contributing
+## Scope and limitations
 
-Contributions are welcome! Please follow these steps:
+OpenVeth is intended for local learning and trusted lab environments. The API controls Docker and the backend runs with privileged access, the host PID namespace, and the Docker socket mounted. Do not expose the application directly to an untrusted network; the UI does not provide a multi-user authentication boundary.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Containers share the Docker host's Linux kernel. They do not reproduce vendor hardware, physical collision behavior, independent kernels, or hardware performance characteristics. The Hub node and collision-domain overlay are teaching abstractions built with Linux bridges.
 
----
+A Cloud node can provide access to external networks: lab traffic is not necessarily isolated from the internet. Native Windows or macOS execution of the networking backend is not supported; the documented Windows launcher relies on Docker Desktop's Linux/WSL2 environment.
+
+## Documentation and development
+
+- [Usage guide](docs/usage.md): startup options, troubleshooting, Cloud gateway setup, YAML format, and observability.
+- [Development guide](docs/development.md): architecture, local development, configuration, and tests.
+- [Hands-on labs](https://rarielvillalobos.github.io/open-veth-labs/): guided networking exercises.
+
+Contributions are welcome. Describe the problem or lab scenario, include reproduction steps, and run the checks relevant to your change. See the development guide for commands and platform requirements.
 
 ## License
 
-This project is licensed under the **GNU Affero General Public License v3 (AGPLv3)**.
-
-See the [LICENSE](LICENSE) file for details.
-
----
-### Backend persistence and tests
-
-The API stops at startup if its configured database cannot be initialized.
-For explicitly temporary sessions, set `DB_DRIVER=memory`; this mode loses all
-configuration when the API exits. SQLite remains the default.
-
-Run `go test -race ./...` on Linux with CGO enabled. Docker integration tests
-skip when no daemon is available. Network namespace tests skip without the
-required capabilities. To require the namespace tests, run:
-
-```bash
-sudo env PATH="$PATH" REQUIRE_NETWORK_TESTS=1 go test ./internal/orchestrator -run '^TestNetwork' -count=1
-```
-
-Topology mutations return HTTP 409 while activation, saving, or cleanup holds
-the laboratory operation lock. Failed Docker reads preserve saved node network
-configuration. Partial activation uses the existing `lab:activation_failed` event
-with a reason describing the failure. Cleanup retains failed nodes for retry.
+OpenVeth is licensed under the [GNU Affero General Public License v3](LICENSE).
