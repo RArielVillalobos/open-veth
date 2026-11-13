@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Playwright 1.58.x supports Ubuntu 24.04; keep the runner reproducible.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
