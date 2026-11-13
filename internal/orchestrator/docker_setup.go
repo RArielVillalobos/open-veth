@@ -185,24 +185,7 @@ func (m *Manager) AttachInterfaceToBridge(ctx context.Context, containerID strin
 		}
 	}
 
-	// Step 3: Bring interface up
-	execConfig2 := container.ExecOptions{
-		Cmd:          []string{"ip", "link", "set", "dev", ifaceName, "up"},
-		AttachStdout: true,
-		AttachStderr: true,
-		Privileged:   true,
-	}
-
-	execID2, err := m.cli.ContainerExecCreate(ctx, containerID, execConfig2)
-	if err != nil {
-		return fmt.Errorf("failed to create exec for interface up: %v", err)
-	}
-	if err := m.cli.ContainerExecStart(ctx, execID2.ID, container.ExecStartOptions{}); err != nil {
-		return fmt.Errorf("failed to start exec for interface up: %v", err)
-	}
-	if inspect, err := m.cli.ContainerExecInspect(ctx, execID2.ID); err == nil && inspect.ExitCode != 0 {
-		return fmt.Errorf("bringing up %s exited with code %d", ifaceName, inspect.ExitCode)
-	}
+	// Preserve the administrative state selected by NetworkManager.CreateLink.
 
 	return nil
 }

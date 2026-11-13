@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -33,26 +34,28 @@ func (m *Manager) CommitNode(ctx context.Context, containerID, imageName string)
 }
 
 // RemoveImage removes a local Docker image. Ignores not-found errors.
-func (m *Manager) RemoveImage(ctx context.Context, imageName string) {
+func (m *Manager) RemoveImage(ctx context.Context, imageName string) error {
 	_, err := m.cli.ImageRemove(ctx, imageName, image.RemoveOptions{Force: true})
 	if err != nil && !client.IsErrNotFound(err) {
-		m.logger.Warn("failed to remove snapshot image", "image", imageName, "error", err)
+		return fmt.Errorf("remove snapshot %s: %w", imageName, err)
 	}
+	return nil
 }
 
 // RemoveAllSnapshotImages removes all local Docker images with the openveth-snapshot prefix.
-func (m *Manager) RemoveAllSnapshotImages(ctx context.Context) int {
+func (m *Manager) RemoveAllSnapshotImages(ctx context.Context) (int, error) {
 	images, err := m.cli.ImageList(ctx, image.ListOptions{})
 	if err != nil {
 		m.logger.Warn("failed to list images for snapshot cleanup", "error", err)
-		return 0
+		return 0, err
 	}
+	var failures []error
 	removed := 0
 	for _, img := range images {
 		for _, tag := range img.RepoTags {
 			if strings.HasPrefix(tag, "openveth-snapshot:") {
 				if _, err := m.cli.ImageRemove(ctx, img.ID, image.RemoveOptions{Force: true}); err != nil {
-					m.logger.Warn("failed to remove snapshot image", "image", tag, "error", err)
+					failures = append(failures, fmt.Errorf("remove snapshot %s: %w", tag, err))
 				} else {
 					removed++
 				}
@@ -60,5 +63,5 @@ func (m *Manager) RemoveAllSnapshotImages(ctx context.Context) int {
 			}
 		}
 	}
-	return removed
+	return removed, errors.Join(failures...)
 }

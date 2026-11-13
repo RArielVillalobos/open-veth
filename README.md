@@ -403,3 +403,21 @@ This project is licensed under the **GNU Affero General Public License v3 (AGPLv
 See the [LICENSE](LICENSE) file for details.
 
 ---
+### Backend persistence and tests
+
+The API stops at startup if its configured database cannot be initialized.
+For explicitly temporary sessions, set `DB_DRIVER=memory`; this mode loses all
+configuration when the API exits. SQLite remains the default.
+
+Run `go test -race ./...` on Linux with CGO enabled. Docker integration tests
+skip when no daemon is available. Network namespace tests skip without the
+required capabilities. To require the namespace tests, run:
+
+```bash
+sudo env PATH="$PATH" REQUIRE_NETWORK_TESTS=1 go test ./internal/orchestrator -run '^TestNetwork' -count=1
+```
+
+Topology mutations return HTTP 409 while activation, saving, or cleanup holds
+the laboratory operation lock. Failed Docker reads preserve saved node network
+configuration. Partial activation uses the existing `lab:activation_failed` event
+with a reason describing the failure. Cleanup retains failed nodes for retry.

@@ -54,6 +54,16 @@ func (h *Handler) IsReconciling() bool {
 	return h.reconciling.Load()
 }
 
+// LockRuntimeUpdate serializes watcher writes with topology mutations.
+func (h *Handler) LockRuntimeUpdate() {
+	h.labOpMu.Lock()
+}
+
+// UnlockRuntimeUpdate releases the lock acquired by LockRuntimeUpdate.
+func (h *Handler) UnlockRuntimeUpdate() {
+	h.labOpMu.Unlock()
+}
+
 // hydrateNode populates runtime state (ContainerID, PID, ServicePorts) from the in-memory RuntimeStore
 func (h *Handler) hydrateNode(node *models.Node) {
 	if state, ok := h.Runtime.Get(node.ID); ok {
@@ -250,4 +260,13 @@ func (h *Handler) broadcastServiceStatus(nodeID, labID, message string) {
 		Data:      map[string]string{"message": message},
 		Timestamp: time.Now().Unix(),
 	})
+}
+
+// lockLabOperation rejects mutations while a lab operation is in progress.
+func (h *Handler) lockLabOperation(c *gin.Context) bool {
+	if !h.labOpMu.TryLock() {
+		c.JSON(http.StatusConflict, gin.H{"error": "another lab operation is in progress"})
+		return false
+	}
+	return true
 }

@@ -26,6 +26,7 @@ type Repository interface {
 	DeleteLaboratory(id string) error
 
 	// Interface Configs
+	SaveLabConfigs(labID string, configs []models.InterfaceConfig, routes []models.RouteConfig) error
 	SaveInterfaceConfigs(labID string, configs []models.InterfaceConfig) error
 	GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error)
 

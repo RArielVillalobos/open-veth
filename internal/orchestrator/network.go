@@ -129,6 +129,10 @@ func renameAndBringUp(currentName, newName string) error {
 
 // CreateLink creates a veth pair and connects two namespaces (PIDs)
 func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int) error {
+	return nm.createLink(link, pidSource, pidTarget, true)
+}
+
+func (nm *NetworkManager) createLink(link models.Link, pidSource, pidTarget int, replace bool) error {
 	if err := models.ValidateLinkID(link.ID); err != nil {
 		return err
 	}
@@ -147,20 +151,55 @@ func (nm *NetworkManager) CreateLink(link models.Link, pidSource, pidTarget int)
 	}
 
 	// 2. Move and configure source endpoint
-	if err := nm.moveAndConfigure(vethSource, link.SourceInt, pidSource); err != nil {
+	if err := nm.moveAndConfigureEndpoint(vethSource, link.SourceInt, pidSource, replace); err != nil {
+		deleteIfExists(vethTarget)
 		return fmt.Errorf("failed to configure source endpoint: %v", err)
 	}
 
 	// 3. Move and configure target endpoint
-	if err := nm.moveAndConfigure(vethTarget, link.TargetInt, pidTarget); err != nil {
+	if err := nm.moveAndConfigureEndpoint(vethTarget, link.TargetInt, pidTarget, replace); err != nil {
+		_ = nm.RemoveInterface(pidSource, link.SourceInt)
 		return fmt.Errorf("failed to configure target endpoint: %v", err)
+	}
+	if !link.Enabled {
+		if err := nm.SetLinkEnabled(pidSource, link.SourceInt, false); err != nil {
+			return err
+		}
+		if err := nm.SetLinkEnabled(pidTarget, link.TargetInt, false); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
+// CreateNewLink refuses to replace interfaces already present in either namespace.
+// Callers serialize topology mutations; CreateLink is reserved for restoration.
+func (nm *NetworkManager) CreateNewLink(link models.Link, pidSource, pidTarget int) error {
+	for _, endpoint := range []struct {
+		pid  int
+		name string
+	}{{pidSource, link.SourceInt}, {pidTarget, link.TargetInt}} {
+		if err := nm.runInNs(endpoint.pid, func() error {
+			if _, err := netlink.LinkByName(endpoint.name); err == nil {
+				return fmt.Errorf("interface %s already exists", endpoint.name)
+			} else if _, missing := err.(netlink.LinkNotFoundError); !missing {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nm.createLink(link, pidSource, pidTarget, false)
+}
+
 // moveAndConfigure moves an interface to a namespace and renames it
 func (nm *NetworkManager) moveAndConfigure(hostIface, containerIface string, pid int) error {
+	return nm.moveAndConfigureEndpoint(hostIface, containerIface, pid, true)
+}
+
+func (nm *NetworkManager) moveAndConfigureEndpoint(hostIface, containerIface string, pid int, replace bool) error {
 	// Move interface from host to container namespace
 	if err := moveToNamespace(hostIface, pid); err != nil {
 		return err
@@ -169,7 +208,9 @@ func (nm *NetworkManager) moveAndConfigure(hostIface, containerIface string, pid
 	// Configure inside namespace
 	return nm.runInNs(pid, func() error {
 		// Cleanup: delete zombie interface if it exists with target name
-		deleteIfExists(containerIface)
+		if replace {
+			deleteIfExists(containerIface)
+		}
 
 		// Rename and bring up
 		return renameAndBringUp(hostIface, containerIface)

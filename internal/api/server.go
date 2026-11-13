@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -27,7 +28,7 @@ type Server struct {
 }
 
 // NewServer creates and configures the API server instance
-func NewServer(mgr *orchestrator.Manager, cfg *config.Config, logger *slog.Logger) *Server {
+func NewServer(mgr *orchestrator.Manager, cfg *config.Config, logger *slog.Logger) (*Server, error) {
 	r := gin.Default()
 
 	// CORS configuration
@@ -39,12 +40,14 @@ func NewServer(mgr *orchestrator.Manager, cfg *config.Config, logger *slog.Logge
 
 	// Initialize Repository using config
 	var repo storage.Repository
-	dbRepo, err := storage.NewGormRepository(cfg.Database.Driver, cfg.Database.DSN)
-	if err != nil {
-		logger.Warn("failed to initialize database, falling back to memory",
-			"driver", cfg.Database.Driver, "error", err)
+	if cfg.Database.Driver == "memory" {
 		repo = storage.NewMemoryRepository()
+		logger.Warn("using explicitly selected volatile memory storage")
 	} else {
+		dbRepo, err := storage.NewGormRepository(cfg.Database.Driver, cfg.Database.DSN)
+		if err != nil {
+			return nil, fmt.Errorf("initialize database: %w", err)
+		}
 		repo = dbRepo
 		logger.Info("database initialized", "driver", cfg.Database.Driver)
 	}
@@ -60,7 +63,7 @@ func NewServer(mgr *orchestrator.Manager, cfg *config.Config, logger *slog.Logge
 	}
 
 	s.setupRoutes()
-	return s
+	return s, nil
 }
 
 // setupRoutes defines API endpoints
@@ -186,6 +189,8 @@ func (s *Server) StartDockerWatcher(ctx context.Context) {
 		debouncers := make(map[string]*time.Timer)
 
 		processEvent := func(ev orchestrator.ContainerEvent) {
+			s.handler.LockRuntimeUpdate()
+			defer s.handler.UnlockRuntimeUpdate()
 			if s.handler.IsReconciling() {
 				return
 			}

@@ -200,6 +200,17 @@ func (r *GormRepository) SaveInterfaceConfigs(labID string, configs []models.Int
 	})
 }
 
+// SaveLabConfigs atomically replaces the IP and route configuration of a lab.
+func (r *GormRepository) SaveLabConfigs(labID string, configs []models.InterfaceConfig, routes []models.RouteConfig) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		repo := &GormRepository{db: tx}
+		if err := repo.SaveInterfaceConfigs(labID, configs); err != nil {
+			return err
+		}
+		return repo.SaveRouteConfigs(labID, routes)
+	})
+}
+
 func (r *GormRepository) GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error) {
 	var configs []models.InterfaceConfig
 	err := r.db.Where("lab_id = ?", labID).Find(&configs).Error

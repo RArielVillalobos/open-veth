@@ -231,6 +231,15 @@ func (m *MemoryRepository) SaveInterfaceConfigs(labID string, configs []models.I
 	return nil
 }
 
+// SaveLabConfigs atomically replaces the IP and route configuration of a lab.
+func (m *MemoryRepository) SaveLabConfigs(labID string, configs []models.InterfaceConfig, routes []models.RouteConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.interfaceConfs[labID] = append([]models.InterfaceConfig(nil), configs...)
+	m.routeConfs[labID] = append([]models.RouteConfig(nil), routes...)
+	return nil
+}
+
 func (m *MemoryRepository) GetInterfaceConfigsByLab(labID string) ([]models.InterfaceConfig, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

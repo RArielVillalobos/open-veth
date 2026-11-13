@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"open-veth/internal/models"
 
@@ -44,6 +46,10 @@ func (h *Handler) ListNodes(c *gin.Context) {
 
 // CreateNode creates a new node and its container
 func (h *Handler) CreateNode(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	var node models.Node
 	if err := c.ShouldBindJSON(&node); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -54,9 +60,37 @@ func (h *Handler) CreateNode(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "lab_id is required"})
 		return
 	}
+	if node.ID == "" || node.Name == "" || !models.IsValidNodeType(node.Type) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node id, name, and a valid type are required"})
+		return
+	}
+	if _, ok := h.Repo.GetLaboratory(node.LabID); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "laboratory not found"})
+		return
+	}
+	if _, ok := h.Repo.GetNode(node.ID); ok {
+		c.JSON(http.StatusConflict, gin.H{"error": "node id already exists"})
+		return
+	}
+	existing, err := h.Repo.ListNodes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate node name"})
+		return
+	}
+	for _, other := range existing {
+		if other.Name == node.Name {
+			c.JSON(http.StatusConflict, gin.H{"error": "node name already exists"})
+			return
+		}
+	}
+	if h.Manager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "server not fully initialized"})
+		return
+	}
 
 	// SECURITY: Override user-provided image with official image
 	node.Image = models.GetImageForType(node.Type)
+	node.SnapshotImage = ""
 
 	h.Logger.Info("creating node", "name", node.Name, "type", node.Type, "lab", node.LabID)
 
@@ -70,6 +104,13 @@ func (h *Handler) CreateNode(c *gin.Context) {
 	pid, err := h.Manager.GetNodePID(c.Request.Context(), containerID)
 	if err != nil {
 		h.Logger.Error("failed to get node PID", "name", node.Name, "error", err)
+		cleanupTimeout := h.Config.Docker.CleanupTimeout
+		if cleanupTimeout <= 0 {
+			cleanupTimeout = 5 * time.Second
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+		defer cancel()
+		_ = h.Manager.DeleteNode(cleanupCtx, containerID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -101,6 +142,10 @@ func (h *Handler) CreateNode(c *gin.Context) {
 
 // UpdateNodePosition updates the canvas position of a node
 func (h *Handler) UpdateNodePosition(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	id := c.Param("id")
 	var pos struct {
 		X float64 `json:"x"`
@@ -131,6 +176,10 @@ func (h *Handler) UpdateNodePosition(c *gin.Context) {
 
 // DeleteNode removes a node and its container
 func (h *Handler) DeleteNode(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	id := c.Param("id")
 	node, found := h.Repo.GetNode(id)
 	if !found {
@@ -141,6 +190,16 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 
 	h.Logger.Info("deleting node", "name", node.Name, "id", id)
 	ctx := c.Request.Context()
+
+	if h.Manager != nil {
+		if err := removeNodeResources(ctx, h.Manager, node); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else if node.ContainerID != "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "server not fully initialized"})
+		return
+	}
 
 	// 1. Clean up link interfaces on PEER nodes before cascade delete
 	links, err := h.Repo.ListLinksByNode(id)
@@ -176,16 +235,6 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 		}
 	}
 
-	// 2. Delete the container and its volumes
-	if node.ContainerID != "" {
-		if err := h.Manager.DeleteNode(ctx, node.Name); err != nil {
-			h.Logger.Warn("failed to delete container", "name", node.Name, "error", err)
-		}
-	}
-	if h.Manager != nil && node.SnapshotImage != "" {
-		h.Manager.RemoveImage(ctx, node.SnapshotImage)
-	}
-
 	// 3. Delete from DB (cascade removes links + interface configs)
 	if err := h.Repo.DeleteNode(id); err != nil {
 		h.Logger.Error("failed to delete node from DB", "id", id, "error", err)
@@ -201,6 +250,10 @@ func (h *Handler) DeleteNode(c *gin.Context) {
 
 // StopNode stops a running node container without deleting it
 func (h *Handler) StopNode(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	id := c.Param("id")
 	node, ok := h.getRunningNode(c, id)
 	if !ok {
@@ -226,6 +279,10 @@ func (h *Handler) StopNode(c *gin.Context) {
 
 // StartNode starts a stopped node container
 func (h *Handler) StartNode(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	id := c.Param("id")
 	node, ok := h.getRunningNode(c, id)
 	if !ok {

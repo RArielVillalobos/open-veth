@@ -153,10 +153,13 @@ func TestDeleteLaboratory_WithSnapshots_CallsDockerRemove(t *testing.T) {
 	})
 
 	r := setupSnapshotRouter(h)
-	// Manager is nil — reaching RemoveImage panics, confirming the snapshot path is exercised
-	assert.Panics(t, func() {
-		doRequest(r, "DELETE", "/api/v1/laboratories/lab-1", nil)
-	})
+	// Cleanup cannot silently discard a snapshot when Docker is unavailable.
+	rec := doRequest(r, "DELETE", "/api/v1/laboratories/lab-1", nil)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	_, found := repo.GetNode("node-snap")
+	assert.True(t, found)
+	_, found = repo.GetLaboratory("lab-1")
+	assert.True(t, found)
 }
 
 // =============================================================================

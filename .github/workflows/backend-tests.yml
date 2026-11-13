@@ -1,0 +1,28 @@
+name: Backend tests
+
+on:
+  pull_request:
+    paths: ['**/*.go', 'go.mod', 'go.sum', '.github/workflows/backend-tests.yml']
+  push:
+    branches: [main]
+    paths: ['**/*.go', 'go.mod', 'go.sum', '.github/workflows/backend-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run tests and race detector without a Docker daemon
+        env:
+          DOCKER_HOST: unix:///tmp/openveth-no-docker.sock
+          CGO_ENABLED: '1'
+        run: go test -race ./...
+      - name: Run privileged network namespace tests
+        run: sudo env PATH="$PATH" REQUIRE_NETWORK_TESTS=1 go test ./internal/orchestrator -run '^TestNetwork' -count=1

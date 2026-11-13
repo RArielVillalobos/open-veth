@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -86,10 +87,15 @@ func (h *Handler) checkDatabase() ComponentHealth {
 
 // HandleCleanup eliminates all containers with label openveth=true
 func (h *Handler) HandleCleanup(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	ctx := c.Request.Context()
 
 	h.Logger.Info("starting system cleanup")
 
+	var cleanupErrors []error
 	cleaned := 0
 	volumesRemoved := 0
 	snapshotsRemoved := 0
@@ -103,16 +109,33 @@ func (h *Handler) HandleCleanup(c *gin.Context) {
 		}
 		for _, ct := range containers {
 			if err := h.Manager.DeleteNode(ctx, ct.ID); err != nil {
-				h.Logger.Warn("failed to remove container during cleanup", "container", ct.ID[:12], "error", err)
+				cleanupErrors = append(cleanupErrors, err)
 			} else {
 				cleaned++
 			}
 		}
-		volumesRemoved = h.Manager.RemoveAllOpenVethVolumes(ctx)
-		snapshotsRemoved = h.Manager.RemoveAllSnapshotImages(ctx)
+		if err := errors.Join(cleanupErrors...); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "containers_removed": cleaned})
+			return
+		}
+		volumesRemoved, err = h.Manager.RemoveAllOpenVethVolumes(ctx)
+		if err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+		snapshotsRemoved, err = h.Manager.RemoveAllSnapshotImages(ctx)
+		if err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+		if err := errors.Join(cleanupErrors...); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "containers_removed": cleaned, "volumes_removed": volumesRemoved, "snapshots_removed": snapshotsRemoved})
+			return
+		}
 	}
 
-	h.Repo.ClearAll()
+	if err := h.Repo.ClearAll(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.Runtime.Clear()
 
 	h.Logger.Info("cleanup completed", "containers_removed", cleaned, "volumes_removed", volumesRemoved, "snapshots_removed", snapshotsRemoved)
@@ -212,6 +235,11 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 			h.storeServicePorts(ctx, &node, ctr.ID)
 			node.ContainerID = ctr.ID
 			node.PID = pid
+			node.Status = models.NodeStatusRunning
+			if err := h.Repo.SaveNode(node); err != nil {
+				failed++
+				continue
+			}
 			nodeMap[node.ID] = node
 			skipped++
 			continue
@@ -221,13 +249,14 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 		// - stopped container: detects name conflict, restarts it, runs WaitForReady +
 		//   renameMgmtInterface + deleteDefaultRoute + setupBridge + setupInternetGateway
 		// - missing container: creates fresh; use snapshot image if available
+		creationNode := node
 		if _, exists := containerByName[node.Name]; !exists {
 			if node.SnapshotImage != "" && h.Manager.ImageExists(ctx, node.SnapshotImage) {
-				node.Image = node.SnapshotImage
+				creationNode.Image = node.SnapshotImage
 			}
 		}
 
-		cid, err := h.Manager.CreateNode(ctx, node)
+		cid, err := h.Manager.CreateNode(ctx, creationNode)
 		if err != nil {
 			h.Logger.Warn("failed to revive node", "node", node.Name, "error", err)
 			failed++
@@ -242,6 +271,11 @@ func (h *Handler) reconcileNodes(ctx context.Context, nodes []models.Node, conta
 		h.storeServicePorts(ctx, &node, cid)
 		node.ContainerID = cid
 		node.PID = pid
+		node.Status = models.NodeStatusRunning
+		if err := h.Repo.SaveNode(node); err != nil {
+			failed++
+			continue
+		}
 		nodeMap[node.ID] = node
 		revived++
 	}
@@ -343,32 +377,33 @@ func (h *Handler) saveAllLabsStateLocked(ctx context.Context) error {
 		return fmt.Errorf("failed to list laboratories: %w", err)
 	}
 
+	var saveErrors []error
 	totalIPs, totalRoutes := 0, 0
 	for _, lab := range labs {
 		nodes, err := h.Repo.ListNodesByLab(lab.ID)
 		if err != nil {
-			h.Logger.Warn("failed to list nodes for save state", "lab", lab.ID, "error", err)
+			saveErrors = append(saveErrors, fmt.Errorf("list nodes for lab %s: %w", lab.ID, err))
 			continue
 		}
 		h.hydrateNodes(nodes)
 
-		configs, routeConfigs, hasRunning := h.captureLabState(ctx, lab.ID, nodes)
+		configs, routeConfigs, hasRunning, captureErr := captureLabState(ctx, h.Manager, h.Repo, lab.ID, nodes)
+		if captureErr != nil {
+			saveErrors = append(saveErrors, captureErr)
+		}
 		if !hasRunning {
 			continue
 		}
 
-		if err := h.Repo.SaveInterfaceConfigs(lab.ID, configs); err != nil {
-			h.Logger.Warn("failed to save interface configs", "lab", lab.ID, "error", err)
+		if err := h.Repo.SaveLabConfigs(lab.ID, configs, routeConfigs); err != nil {
+			saveErrors = append(saveErrors, fmt.Errorf("save lab %s: %w", lab.ID, err))
 			continue
 		}
-		if err := h.Repo.SaveRouteConfigs(lab.ID, routeConfigs); err != nil {
-			h.Logger.Warn("failed to save route configs", "lab", lab.ID, "error", err)
-			continue
-		}
+
 		totalIPs += len(configs)
 		totalRoutes += len(routeConfigs)
 	}
 
 	h.Logger.Info("all labs state saved", "labs", len(labs), "ips_saved", totalIPs, "routes_saved", totalRoutes)
-	return nil
+	return errors.Join(saveErrors...)
 }

@@ -39,7 +39,6 @@ func IsValidNodeType(t NodeType) bool {
 	return false
 }
 
-
 // SnapshotImageName returns the local Docker image name used to snapshot a node's filesystem.
 func SnapshotImageName(nodeID string) string {
 	return "openveth-snapshot:" + nodeID
@@ -97,8 +96,8 @@ type Node struct {
 	Image      string   `json:"image"`
 	CPURequest string   `json:"cpu_request"`
 	RAMLimit   string   `json:"ram_limit"`
-	X          float64  `json:"x"` // Canvas position
-	Y          float64  `json:"y"` // Canvas position
+	X          float64  `json:"x"`                             // Canvas position
+	Y          float64  `json:"y"`                             // Canvas position
 	Status     string   `json:"status" gorm:"default:running"` // NodeStatusRunning | NodeStatusStopped
 
 	// Snapshot: local image created by "Save State" — used on next lab activation instead of base image
@@ -126,9 +125,9 @@ type IPAddress struct {
 
 // MacEntry represents a single entry in a bridge MAC address table (bridge fdb show)
 type MacEntry struct {
-	MAC    string `json:"mac"`
-	Port   string `json:"port"`
-	Type   string `json:"type"` // "static" | "dynamic"
+	MAC  string `json:"mac"`
+	Port string `json:"port"`
+	Type string `json:"type"` // "static" | "dynamic"
 }
 
 // RouteInfo maps the output of 'ip -j route'
@@ -150,7 +149,7 @@ type Link struct {
 	TargetID  string `json:"target" gorm:"index"`
 	SourceInt string `json:"source_int"`
 	TargetInt string `json:"target_int"`
-	Enabled   bool   `json:"enabled" gorm:"default:true"`
+	Enabled   bool   `json:"enabled"`
 }
 
 // Laboratory represents a saved network project
@@ -219,8 +218,8 @@ type RouteExport struct {
 }
 
 type LinkExport struct {
-	Source    string `yaml:"source"`     // node name
-	Target    string `yaml:"target"`     // node name
+	Source    string `yaml:"source"` // node name
+	Target    string `yaml:"target"` // node name
 	SourceInt string `yaml:"source_int"`
 	TargetInt string `yaml:"target_int"`
 	Enabled   bool   `yaml:"enabled"`

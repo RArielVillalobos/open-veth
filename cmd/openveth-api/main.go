@@ -32,7 +32,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := api.NewServer(mgr, cfg, logger)
+	srv, err := api.NewServer(mgr, cfg, logger)
+	if err != nil {
+		logger.Error("failed to initialize API server", "error", err)
+		os.Exit(1)
+	}
 	srv.StartEventHub()
 
 	if err := srv.Reconcile(ctx); err != nil {

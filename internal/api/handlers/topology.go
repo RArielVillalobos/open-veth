@@ -132,14 +132,15 @@ func (h *Handler) HandleImport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 
 	if _, ok := h.Repo.GetLaboratory(labID); !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("laboratory %q not found", labID)})
 		return
 	}
-
-	h.labOpMu.Lock()
-	defer h.labOpMu.Unlock()
 
 	h.Logger.Info("importing topology", "name", imported.Name, "nodes", len(imported.Nodes), "links", len(imported.Links))
 
@@ -196,9 +197,29 @@ func (h *Handler) validateImport(imported models.LabExport) error {
 		if !models.IsValidNodeType(n.Type) {
 			return fmt.Errorf("unknown node type: %q", n.Type)
 		}
+		if n.Name == "" || nodeNames[n.Name] {
+			return fmt.Errorf("node names must be nonempty and unique: %q", n.Name)
+		}
 		nodeNames[n.Name] = true
 	}
+	usedInterfaces := make(map[string]bool)
 	for _, l := range imported.Links {
+		if l.Source == l.Target {
+			return fmt.Errorf("link endpoints must be different nodes")
+		}
+		for _, endpoint := range []struct{ node, iface string }{{l.Source, l.SourceInt}, {l.Target, l.TargetInt}} {
+			if err := models.ValidateInterfaceName(endpoint.iface); err != nil {
+				return err
+			}
+			if endpoint.iface == "docker0" || endpoint.iface == "lo" {
+				return fmt.Errorf("reserved interface: %s", endpoint.iface)
+			}
+			key := endpoint.node + "\x00" + endpoint.iface
+			if usedInterfaces[key] {
+				return fmt.Errorf("interface %s on %s is used more than once", endpoint.iface, endpoint.node)
+			}
+			usedInterfaces[key] = true
+		}
 		if !nodeNames[l.Source] {
 			return fmt.Errorf("link references unknown node: %q", l.Source)
 		}
@@ -212,17 +233,13 @@ func (h *Handler) validateImport(imported models.LabExport) error {
 
 // cleanupImportState removes existing containers and recreates the lab record.
 func (h *Handler) cleanupImportState(ctx context.Context, labID string, newName string) error {
-	existingNodes, _ := h.Repo.ListNodesByLab(labID)
-	for _, n := range existingNodes {
-		if err := h.Manager.DeleteNode(ctx, n.Name); err != nil {
-			h.Logger.Warn("failed to delete node during import cleanup", "node", n.Name, "error", err)
-		}
-		h.Runtime.Delete(n.ID)
+	if _, err := h.cleanupLabResources(ctx, labID); err != nil {
+		return err
 	}
 
 	existingLab, _ := h.Repo.GetLaboratory(labID)
 	if err := h.Repo.DeleteLaboratory(labID); err != nil {
-		h.Logger.Warn("failed to delete old lab during import", "lab", labID, "error", err)
+		return fmt.Errorf("failed to delete old laboratory: %w", err)
 	}
 	if err := h.Repo.SaveLaboratory(models.Laboratory{ID: labID, Name: newName}); err != nil {
 		h.Logger.Error("failed to create lab during import", "lab", labID, "error", err)
@@ -314,7 +331,7 @@ func (h *Handler) importLinks(ctx context.Context, labID string, links []models.
 			continue
 		}
 
-		if err := h.Network.CreateLink(linkModel, source.PID, target.PID); err != nil {
+		if err := h.Network.CreateNewLink(linkModel, source.PID, target.PID); err != nil {
 			h.Logger.Warn("import link failed", "source", l.Source, "target", l.Target, "error", err)
 			errors = append(errors, fmt.Sprintf("Failed to create link %s→%s: %v", l.Source, l.Target, err))
 			continue

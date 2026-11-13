@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -96,23 +97,24 @@ func (m *Manager) ListNodes(ctx context.Context) error {
 }
 
 // RemoveAllOpenVethVolumes removes any legacy openveth-frr-* volumes left from older versions.
-func (m *Manager) RemoveAllOpenVethVolumes(ctx context.Context) int {
+func (m *Manager) RemoveAllOpenVethVolumes(ctx context.Context) (int, error) {
 	f := filters.NewArgs()
 	f.Add("name", "openveth-frr-")
 	listResp, err := m.cli.VolumeList(ctx, volume.ListOptions{Filters: f})
 	if err != nil {
 		m.logger.Warn("failed to list volumes for cleanup", "error", err)
-		return 0
+		return 0, err
 	}
+	var failures []error
 	removed := 0
 	for _, v := range listResp.Volumes {
 		if err := m.cli.VolumeRemove(ctx, v.Name, true); err != nil {
-			m.logger.Warn("failed to remove volume", "volume", v.Name, "error", err)
+			failures = append(failures, fmt.Errorf("remove volume %s: %w", v.Name, err))
 		} else {
 			removed++
 		}
 	}
-	return removed
+	return removed, errors.Join(failures...)
 }
 
 // ExecCommand runs a command inside a container and returns its stdout.

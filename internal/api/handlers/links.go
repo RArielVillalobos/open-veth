@@ -30,6 +30,10 @@ func (h *Handler) ListLinks(c *gin.Context) {
 
 // CreateLink creates a veth pair between two nodes
 func (h *Handler) CreateLink(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	var link models.Link
 	if err := c.ShouldBindJSON(&link); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -67,12 +71,35 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "source or target node not found"})
 		return
 	}
+	if source.LabID != link.LabID || target.LabID != link.LabID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "both nodes must belong to the specified laboratory"})
+		return
+	}
+	if link.SourceID == link.TargetID || link.SourceInt == "docker0" || link.TargetInt == "docker0" || link.SourceInt == "lo" || link.TargetInt == "lo" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid link endpoints"})
+		return
+	}
+	if _, found := h.Repo.GetLink(link.ID); found {
+		c.JSON(http.StatusConflict, gin.H{"error": "link id already exists"})
+		return
+	}
 	h.hydrateNode(&source)
 	h.hydrateNode(&target)
 
 	// Validation: Check for existing link between these nodes
-	existingLinks, _ := h.Repo.ListLinksByLab(link.LabID)
+	existingLinks, err := h.Repo.ListLinksByLab(link.LabID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to inspect existing links"})
+		return
+	}
 	for _, l := range existingLinks {
+		if (l.SourceID == link.SourceID && l.SourceInt == link.SourceInt) ||
+			(l.TargetID == link.SourceID && l.TargetInt == link.SourceInt) ||
+			(l.SourceID == link.TargetID && l.SourceInt == link.TargetInt) ||
+			(l.TargetID == link.TargetID && l.TargetInt == link.TargetInt) {
+			c.JSON(http.StatusConflict, gin.H{"error": "interface already used by another link"})
+			return
+		}
 		// Check both directions
 		if (l.SourceID == link.SourceID && l.TargetID == link.TargetID) ||
 			(l.SourceID == link.TargetID && l.TargetID == link.SourceID) {
@@ -81,6 +108,14 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		}
 	}
 
+	if _, found := h.Repo.GetLaboratory(link.LabID); !found {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "laboratory not found"})
+		return
+	}
+	if h.Manager == nil || h.Network == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "server not fully initialized"})
+		return
+	}
 	// Fetch FRESH PIDs
 	ctx := c.Request.Context()
 	srcPID, errS := h.Manager.GetNodePID(ctx, source.ContainerID)
@@ -95,7 +130,7 @@ func (h *Handler) CreateLink(c *gin.Context) {
 		"source", source.Name, "source_int", link.SourceInt,
 		"target", target.Name, "target_int", link.TargetInt)
 
-	if err := h.Network.CreateLink(link, srcPID, tgtPID); err != nil {
+	if err := h.Network.CreateNewLink(link, srcPID, tgtPID); err != nil {
 		h.Logger.Error("failed to create link", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -132,6 +167,10 @@ func (h *Handler) CreateLink(c *gin.Context) {
 
 // ToggleLink enables or disables a link by bringing its interfaces up or down
 func (h *Handler) ToggleLink(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	id := c.Param("id")
 
 	var req struct {
@@ -197,6 +236,10 @@ func (h *Handler) ToggleLink(c *gin.Context) {
 
 // DeleteLink removes a veth pair
 func (h *Handler) DeleteLink(c *gin.Context) {
+	if !h.lockLabOperation(c) {
+		return
+	}
+	defer h.labOpMu.Unlock()
 	id := c.Param("id")
 
 	// 1. Get Link details before deleting
