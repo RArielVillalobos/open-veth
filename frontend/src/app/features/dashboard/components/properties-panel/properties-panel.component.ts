@@ -26,6 +26,15 @@ export class PropertiesPanelComponent {
   traceroute = output<void>();
   toggleLink = output<string>();
   expanded = signal(false);
+  readonly directGatewayExample = [
+    { title: 'Internet Gateway', commands: 'ip addr add 10.20.0.1/24 dev eth0\nip link set eth0 up' },
+    { title: 'Host', commands: 'ip addr add 10.20.0.2/24 dev eth0\nip link set eth0 up\nip route replace default via 10.20.0.1' },
+  ];
+  readonly gatewayExample = [
+    { title: 'Internet Gateway', commands: 'ip addr add 10.0.2.2/30 dev eth0\nip link set eth0 up\nip route replace 10.0.1.0/24 via 10.0.2.1' },
+    { title: 'Router', commands: 'ip addr add 10.0.1.1/24 dev eth0\nip addr add 10.0.2.1/30 dev eth1\nip link set eth0 up\nip link set eth1 up\nsysctl -w net.ipv4.ip_forward=1\nip route replace default via 10.0.2.2' },
+    { title: 'Host', commands: 'ip addr add 10.0.1.10/24 dev eth0\nip link set eth0 up\nip route replace default via 10.0.1.1' },
+  ];
   routeHover = output<{ subnet: string | null; gateway: string | null } | null>();
 
   readonly routeHighlightColor = ROUTE_HIGHLIGHT_COLOR;

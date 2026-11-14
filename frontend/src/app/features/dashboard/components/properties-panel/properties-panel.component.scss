@@ -26,3 +26,17 @@
 .node-identifiers dd { margin: 4px 0 12px; overflow-wrap: anywhere; font-family: monospace; }
 .inspector-delete { border-top: 1px solid #28353a; padding-top: 12px; }
 .inspector-delete .inspector-action { margin-left: 0; }
+
+.gateway-guide, .management-route { color: #8fa3a6; font-size: 12px; line-height: 1.5; }
+.gateway-guide h4 { color: #b4c4c6; font-weight: 500; }
+.gateway-guide p, .management-route p { margin: 6px 0; }
+.gateway-path { color: #b4c4c6; font-size: 11px; }
+.gateway-guide summary, .management-route summary { padding: 5px 0; cursor: pointer; color: #b4c4c6; }
+.gateway-guide pre { padding: 8px; overflow-x: auto; background: #0d1416; color: #b4c4c6; font-size: 11px; white-space: pre; }
+.gateway-step { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; color: #b4c4c6; }
+.gateway-step button { padding: 2px 6px; font-size: 11px; }
+.gateway-steps { margin: 8px 0; padding-left: 18px; list-style: decimal; }
+.gateway-steps li { margin: 3px 0; }
+.gateway-state-note { font-size: 11px; }
+.management-label { display: block; font-size: 10px; color: #8fa3a6; font-family: inherit; }
+.gateway-guide pre { cursor: text; }

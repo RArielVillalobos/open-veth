@@ -59,7 +59,7 @@ For startup options and troubleshooting, see the [usage guide](docs/usage.md#sta
 1. Open **New Topology** if the startup dialog is shown.
 2. Add a **Router** named `R1` and a **Host** named `PC1` from the device list.
 3. Select **Connect nodes**, then select `R1` and `PC1`. Press Escape to leave connection mode.
-4. Select a node to inspect it, then open **Terminal**. On a fresh topology, the first lab interface is `eth0`.
+4. Newly created nodes appear near the visible center and open their properties automatically. Select any node to inspect it, then open **Terminal**. On a fresh topology, the first lab interface is `eth0`.
 
 On `R1`:
 
@@ -77,6 +77,8 @@ ping -c 3 10.0.0.1
 ```
 
 Select either node and use **Capture** beside `eth0` to inspect traffic. Run the ping again to see the packets. Use **Save** to save network settings and create filesystem snapshots of running nodes.
+
+Use **Labels** to switch between **Interfaces** and **Interfaces + IP**. At distant zoom levels, the canvas reduces label detail; selecting a node or link restores its IP labels. Creating a node preserves the zoom and reveals it without fitting the whole topology again.
 
 The terminal supports multiple node tabs, output search (`Ctrl+Shift+F`), font size controls, and reconnection. `Ctrl+C` interrupts a process; `Ctrl+Shift+C` copies selected text and `Ctrl+Shift+V` pastes, subject to browser clipboard permissions. Reconnecting opens a new shell connection and keeps the previous output in the panel.
 
@@ -100,7 +102,7 @@ The [lab collection](https://rarielvillalobos.github.io/open-veth-labs/) provide
 | Router | Debian, FRRouting, SNMP tools | Routing, NAT, and firewall labs |
 | Switch | Debian, Linux bridge, snmpd | L2 switching, MAC tables, and SNMP |
 | Hub | Bridge with MAC learning disabled; no terminal | Flooding and shared-domain exercises |
-| Cloud | Host image with forwarding and masquerade configured | Internet gateway for lab networks |
+| Internet Gateway | Host image with forwarding and masquerade configured | Internet gateway for lab networks |
 | Server | Debian, systemd, nginx, Apache, dnsmasq, NFS, and other service packages | Linux administration |
 | Monitor | Debian, Grafana, Prometheus, snmp_exporter, and exporter binaries | Metrics and observability |
 | Tester | wrk, k6, iperf3, stress-ng, and other generators | Traffic and load testing |
@@ -109,6 +111,8 @@ The [lab collection](https://rarielvillalobos.github.io/open-veth-labs/) provide
 | Zabbix | Debian, Zabbix server and Agent 2, MariaDB, and Apache | Monitoring and alerting |
 
 Grafana, Prometheus, HAProxy stats, and Zabbix have dynamically assigned host ports. Open them from the node properties panel once the services are ready. Exporters, monitoring targets, agents on other nodes, and SNMP checks require configuration for your lab.
+
+The Internet Gateway node keeps `cloud` as its YAML type; existing laboratory files remain compatible.
 
 ### Default credentials
 
@@ -142,11 +146,13 @@ OpenVeth is intended for local learning and trusted lab environments. The API co
 
 Containers share the Docker host's Linux kernel. They do not reproduce vendor hardware, physical collision behavior, independent kernels, or hardware performance characteristics. The Hub node and collision-domain overlay are teaching abstractions built with Linux bridges.
 
-A Cloud node can provide access to external networks: lab traffic is not necessarily isolated from the internet. Native Windows or macOS execution of the networking backend is not supported; the documented Windows launcher relies on Docker Desktop's Linux/WSL2 environment.
+The **Broadcast** and **Collision** views label link groups as `BD1`, `CD1`, etc. They describe the designed topology, including disabled links and stopped nodes, rather than measured reachability. Disabled links remain labeled with their domain and an explicit **Disabled** marker. These views do not inspect VLANs or custom bridges configured inside nodes. See the [domain overlay guide](docs/usage.md#broadcast-and-collision-views) for the teaching model.
+
+An Internet Gateway node can provide access to external networks: lab traffic is not necessarily isolated from the internet. Native Windows or macOS execution of the networking backend is not supported; the documented Windows launcher relies on Docker Desktop's Linux/WSL2 environment.
 
 ## Documentation and development
 
-- [Usage guide](docs/usage.md): startup options, troubleshooting, Cloud gateway setup, YAML format, and observability.
+- [Usage guide](docs/usage.md): startup options, troubleshooting, internet gateway setup, domain overlays, YAML format, and observability.
 - [Development guide](docs/development.md): architecture, local development, configuration, and tests.
 - [Hands-on labs](https://rarielvillalobos.github.io/open-veth-labs/): guided networking exercises.
 

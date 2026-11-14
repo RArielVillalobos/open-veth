@@ -27,7 +27,7 @@
           <h3 class="font-bold text-slate-100 text-lg">{{ selectedNode()?.name }}</h3>
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-300 capitalize">
-              {{ selectedNode()?.type }}
+              {{ selectedNode()?.type === 'cloud' ? 'Internet Gateway' : selectedNode()?.type }}
             </span>
             <span class="node-status" [class.node-status--running]="selectedNode()?.status === 'running' && !powering()" role="status">{{ nodeStatus() }}</span>
           </div>
@@ -45,6 +45,35 @@
         }
         <button class="inspector-action" (click)="togglePower()" [disabled]="powering()">{{ powering() ? 'Please wait...' : (selectedNode()?.status === 'stopped' ? 'Power on' : 'Power off') }}</button>
       </div>
+
+      @if (selectedNode()?.type === 'cloud') {
+        <section class="gateway-guide" aria-label="Internet gateway guide">
+          <p>Connect your lab to the internet. Configure the lab addresses and gateway; Internet Gateway provides the external connection.</p>
+          <p class="gateway-path">Host → Internet Gateway → Internet</p>
+          <ol class="gateway-steps"><li>Connect a Host to Internet Gateway.</li><li>Assign an IP address to each connected interface.</li><li>Set Internet Gateway's lab IP as the Host's default gateway.</li></ol>
+          <details>
+            <summary>Setup example</summary>
+            <p>Example addresses for a fresh lab. Both nodes use eth0; adapt the interface names to your connections.</p>
+            @for (step of directGatewayExample; track step.title) {
+              <div class="gateway-step"><h5>{{ step.title }}</h5><button (click)="copyToClipboard(step.commands)" [attr.aria-label]="'Copy ' + step.title + ' setup commands'">Copy</button></div>
+              <pre>{{ step.commands }}</pre>
+            }
+          </details>
+          <details>
+            <summary>Check the connection</summary>
+            <p>On Host, run <code>ip route get 1.1.1.1</code>. The next hop should be Internet Gateway's lab IP through eth0. Then test an external IP and capture traffic on the lab link.</p>
+            <p>A route lookup shows the chosen path, not whether the destination is reachable. If IP access works but names fail, check DNS settings.</p>
+            <p>Some server nodes have an auxiliary connection for package downloads. Their internet access alone does not prove the lab gateway is correct.</p>
+          </details>
+          <p class="gateway-state-note">Running means the node is powered on; internet access has not been verified.</p>
+        </section>
+      }
+      @if (selectedNode()?.type === 'server' || selectedNode()?.type === 'storage' || selectedNode()?.type === 'zabbix') {
+        <details class="management-route">
+          <summary>Internet access and lab routing</summary>
+          <p>This node has an auxiliary connection for package downloads. Internet may work even if its lab gateway is incorrect. Use <code>ip route get 1.1.1.1</code> to inspect the chosen path and capture lab traffic when testing Internet Gateway.</p>
+        </details>
+      }
 
       <!-- Monitor Node: Grafana + Prometheus quick access -->
       @if (isMonitorNode()) {
@@ -180,7 +209,7 @@
 
         @if (showInterfaces()) {
           <div class="text-xs text-slate-300 italic">
-            Lab interfaces only. Loopback and Docker management interfaces are hidden.
+            Only lab interfaces are shown.
           </div>
 
           @if (activeInterfaceCount() > 0) {
@@ -327,6 +356,7 @@
                       </td>
                       <td class="p-1.5 px-2 text-center">
                         <span class="text-slate-200 font-mono">{{ r.dev }}</span>
+                        @if (r.dev === 'docker0') { <span class="management-label" title="Auxiliary connection used for management and package downloads">Management</span> }
                       </td>
                       <td class="p-1.5 px-2 text-center">
                         @if (r.protocol === 'kernel') {
@@ -375,6 +405,20 @@
 
       <details class="inspector-advanced">
         <summary>Advanced</summary>
+        <details class="management-route">
+          <summary>Management interface</summary>
+          <p>The real interface name docker0 identifies the Docker management connection. It remains visible in route output so you can diagnose the actual path.</p>
+        </details>
+        @if (selectedNode()?.type === 'cloud') {
+          <details class="gateway-guide">
+            <summary>Gateway example with a Router</summary>
+            <p>Host → Router → Internet Gateway → Internet. Internet Gateway needs a return route to the Host network. In this example Router eth0 faces Host and eth1 faces Internet Gateway; the other nodes use eth0. Adapt these addresses and interface names to your lab.</p>
+            @for (step of gatewayExample; track step.title) {
+              <div class="gateway-step"><h5>{{ step.title }}</h5><button (click)="copyToClipboard(step.commands)" [attr.aria-label]="'Copy advanced ' + step.title + ' commands'">Copy</button></div>
+              <pre>{{ step.commands }}</pre>
+            }
+          </details>
+        }
         <dl class="node-identifiers">
           <dt>Node ID</dt><dd>{{ selectedNode()?.id }}</dd>
           @if (selectedNode()?.container_id) { <dt>Container ID</dt><dd>{{ selectedNode()?.container_id }}</dd> }

@@ -25,7 +25,7 @@ test.describe('Node CRUD', () => {
     await expect(page.getByRole('button', { name: 'Add Switch', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Hub', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Host', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add Cloud', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Internet Gateway', exact: true })).toBeVisible();
   });
 
   test('create a router node via palette', async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe('Node CRUD', () => {
       req.url().includes('/api/v1/nodes') && req.method() === 'POST'
     );
 
-    await page.getByRole('button', { name: 'Add Cloud', exact: true }).click();
+    await page.getByRole('button', { name: 'Add Internet Gateway', exact: true }).click();
     const nameInput = page.locator('input[placeholder*="INET"]');
     await expect(nameInput).toBeVisible();
     await nameInput.fill('INTERNET');
@@ -95,6 +95,15 @@ test.describe('Node CRUD', () => {
     const body = postReq.postDataJSON();
     expect(body.name).toBe('INTERNET');
     expect(body.type).toBe('cloud');
+    const inspector = page.getByRole('region', { name: 'Selection properties' });
+    await expect(inspector.getByRole('heading', { name: 'INTERNET', exact: true })).toBeVisible();
+    const guide = inspector.getByRole('region', { name: 'Internet gateway guide' });
+    await expect(guide).toContainText('Host → Internet Gateway → Internet');
+    await expect(guide).toContainText('internet access has not been verified');
+    await guide.getByText('Setup example', { exact: true }).click();
+    await expect(guide.getByRole('button', { name: 'Copy Internet Gateway setup commands' })).toBeVisible();
+    await guide.getByText('Check the connection', { exact: true }).click();
+    await expect(guide).toContainText('auxiliary connection');
   });
 
   test('create a hub node via palette', async ({ page }) => {

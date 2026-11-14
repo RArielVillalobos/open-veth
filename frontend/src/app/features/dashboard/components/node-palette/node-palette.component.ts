@@ -89,15 +89,15 @@ export class NodePaletteComponent {
     },
     {
       id: 'cloud',
-      label: 'Cloud',
-      subtitle: 'Internet',
+      label: 'Internet Gateway',
+      subtitle: 'Outbound internet access',
       icon: 'cloud.svg',
       placeholder: 'e.g. INET',
       accentBorder: 'border-sky-500',
       hoverBorder: 'hover:border-sky-500/50',
       category: 'network',
       shortcut: 'I',
-      description: 'NAT gateway with automatic IP forwarding and masquerade. Connect your lab nodes to reach real internet.'
+      description: 'Connect a lab network to the internet. Assign lab IPs and use Internet Gateway as the default gateway. A router between them also needs a return route.'
     },
     {
       id: 'server',
