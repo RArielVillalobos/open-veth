@@ -57,6 +57,17 @@ describe('LayoutService', () => {
     });
   });
 
+  it('places a node at the center of a distant visible viewport', () => {
+    expect(service.getNextNodePosition([], [], { x1: 1000, y1: -600, x2: 1600, y2: -200, zoom: 1 })).toEqual({ x: 1300, y: -400 });
+  });
+
+  it('finds free visible space instead of placing a node over a cable', () => {
+    const nodes = [createMockNode({ id: 'a', x: 1000, y: 200 }), createMockNode({ id: 'b', x: 1600, y: 200 })];
+    const pos = service.getNextNodePosition(nodes, [createMockLink({ source: 'a', target: 'b' })], { x1: 1050, y1: 50, x2: 1550, y2: 350, zoom: 1 });
+    expect(pos.x).toBeGreaterThanOrEqual(1050); expect(pos.x).toBeLessThanOrEqual(1550);
+    expect(Math.abs(pos.y - 200)).toBeGreaterThanOrEqual(55);
+  });
+
   describe('getNextInterface', () => {
     it('should return eth0 when no links exist for node', () => {
       expect(service.getNextInterface('node-1', [])).toBe('eth0');

@@ -203,18 +203,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  onAddNode(event: { type: NodeType; name: string }) {
+  async onAddNode(event: { type: NodeType; name: string }) {
     if (this.busy()) return;
     this.ui.markInteraction();
     const { nodes, links } = this.store.topology();
-    const { x, y } = this.layoutService.getNextNodePosition(nodes, links);
-    this.store.addNode({
-      id: 'node-' + crypto.randomUUID().substring(0, 8),
+    const { x, y } = this.layoutService.getNextNodePosition(nodes, links, this.canvasComponent?.creationViewport());
+    const id = 'node-' + crypto.randomUUID().substring(0, 8);
+    this.canvasComponent?.prepareNodeReveal(id);
+    const labId = this.store.currentLabId();
+    const created = await this.store.addNode({
+      id,
       name: event.name,
       type: event.type,
       x,
       y
     });
+    if (created && labId === this.store.currentLabId()) {
+      this.ui.selectNode(created.id);
+      this.canvasComponent?.revealCreatedNode(created.id);
+    } else {
+      this.canvasComponent?.cancelNodeReveal(id);
+    }
   }
 
   async onDeleteNode(id: string) {

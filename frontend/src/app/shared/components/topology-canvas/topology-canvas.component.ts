@@ -50,6 +50,8 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private cy!: cytoscape.Core;
   private hasActiveHighlight = false;
   private canvasReady = false;
+  private pendingRevealNodeId: string | null = null;
+  private revealFrame: number | null = null;
   private destroyed = false;
   private viewportSize = { width: 0, height: 0 };
   private resizingViewport = false;
@@ -204,6 +206,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.revealFrame !== null) cancelAnimationFrame(this.revealFrame);
     if (this.labelFrame !== null) cancelAnimationFrame(this.labelFrame);
     this.destroyed = true;
     this.resizeObserver?.disconnect();
@@ -284,6 +287,37 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     this.tracerouteRequest.emit({
       nodeId: this.tracerouteNodeId,
       destination: this.tracerouteDestIP
+    });
+  }
+
+  creationViewport() {
+    if (!this.cy) return undefined;
+    const extent = this.cy.extent(), zoom = this.cy.zoom();
+    const padding = 75 / zoom;
+    const insetX = Math.min(padding, extent.w / 4), insetY = Math.min(padding, extent.h / 4);
+    return { x1: extent.x1 + insetX, y1: extent.y1 + insetY, x2: extent.x2 - insetX, y2: extent.y2 - insetY, zoom };
+  }
+
+  prepareNodeReveal(id: string) { this.pendingRevealNodeId = id; }
+  cancelNodeReveal(id: string) { if (this.pendingRevealNodeId === id) this.pendingRevealNodeId = null; }
+
+  revealCreatedNode(id: string) {
+    if (this.destroyed || this.pendingRevealNodeId !== id || this.revealFrame !== null) return;
+    this.revealFrame = requestAnimationFrame(() => {
+      this.revealFrame = null;
+      if (this.destroyed || !this.cy || this.pendingRevealNodeId !== id) return;
+      const node = this.cy.getElementById(id);
+      if (node.empty()) return;
+      // The inspector may have opened since creation; use its final available canvas size.
+      this.cy.resize();
+      const box = node.renderedBoundingBox();
+      const width = this.container.nativeElement.clientWidth, height = this.container.nativeElement.clientHeight;
+      const left = Math.min(50, width / 4), right = width - left;
+      const top = Math.min(80, height / 3), bottom = height - Math.min(40, height / 4);
+      const dx = box.x1 < left ? left - box.x1 : box.x2 > right ? right - box.x2 : 0;
+      const dy = box.y1 < top ? top - box.y1 : box.y2 > bottom ? bottom - box.y2 : 0;
+      if (dx || dy) this.cy.panBy({ x: dx, y: dy });
+      this.pendingRevealNodeId = null;
     });
   }
 
@@ -913,9 +947,11 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       this.scheduleLabels();
     });
 
+    if (this.pendingRevealNodeId) this.revealCreatedNode(this.pendingRevealNodeId);
+
     if (!this.canvasReady) {
       this.canvasReady = this.cy.nodes().length > 0;
-      if (this.cy.nodes().length > 0) {
+      if (this.cy.nodes().length > 0 && !this.pendingRevealNodeId) {
         this.cy.fit(undefined, 50);
       }
       return;

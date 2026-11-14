@@ -214,7 +214,7 @@ export const TopologyStore = signalStore(
 
       // --- Nodes ---
       async addNode(node: Node) {
-        if (activationBusy() || !(await positions.flush())) return;
+        if (activationBusy() || !(await positions.flush())) return null;
         patchState(store, { isLoading: true, error: null });
         try {
           // Inject current Lab ID
@@ -229,10 +229,12 @@ export const TopologyStore = signalStore(
           }));
           toast.success(`Node ${node.name} created`);
           this.loadDomains();
+          return createdNode;
         } catch (err: any) {
           const msg = err.error?.error || err.message || 'Error creating node';
           patchState(store, { isLoading: false, error: msg });
           toast.error(msg);
+          return null;
         }
       },
 

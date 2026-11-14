@@ -136,3 +136,32 @@ test.describe('Node CRUD', () => {
     await cleanupPromise;
   });
 });
+
+
+for (const empty of [true, false]) {
+  test('new node stays visible and selected after panning' + (empty ? ' an empty canvas' : ' with a terminal open'), async ({ page }) => {
+    await setupApiMocks(page, { empty });
+    await page.goto('/');
+    await page.waitForFunction(() => !!(document.querySelector('.cy-container') as any)?.__cy);
+    if (empty) await page.getByRole('button', { name: /^New Topology/ }).click();
+    else {
+      await page.waitForFunction(() => (document.querySelector('.cy-container') as any).__cy.nodes().length > 0);
+      await page.evaluate(() => { const cy = (document.querySelector('.cy-container') as any).__cy; const n = cy.getElementById('node-r1'); n.emit({ type: 'cxttap', renderedPosition: n.renderedPosition() }); });
+      await page.locator('.context-menu__item:has-text("Open Terminal")').click();
+      await expect(page.locator('app-terminal-panel')).toBeVisible();
+    }
+    await page.evaluate(() => { const cy = (document.querySelector('.cy-container') as any).__cy; cy.zoom(1.2); cy.pan({ x: -2000, y: 1300 }); });
+    await page.getByRole('button', { name: 'Add Router', exact: true }).click();
+    const input = page.locator('input[placeholder*="R1"]');
+    await input.fill('VisibleRouter');
+    await input.press('Enter');
+    await expect(page.getByRole('region', { name: 'Selection properties' }).getByRole('heading', { name: 'VisibleRouter', exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.querySelector('.cy-container') as HTMLElement;
+      const cy = (el as any).__cy;
+      const n = cy.nodes().filter((node: any) => node.data('name') === 'VisibleRouter').first();
+      const b = n.renderedBoundingBox();
+      return Math.abs(cy.zoom() - 1.2) < 0.001 && b.x1 >= 0 && b.y1 >= 40 && b.x2 <= el.clientWidth && b.y2 <= el.clientHeight;
+    })).toBe(true);
+  });
+}

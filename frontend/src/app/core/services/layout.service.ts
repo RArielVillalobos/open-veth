@@ -9,7 +9,23 @@ export class LayoutService {
   /**
    * Calculates the next available position for a node to avoid overlapping
    */
-  getNextNodePosition(nodes: Node[], links: Link[]): { x: number; y: number } {
+  getNextNodePosition(nodes: Node[], links: Link[], viewport?: { x1: number; y1: number; x2: number; y2: number; zoom: number }): { x: number; y: number } {
+    if (viewport) {
+      const center = { x: (viewport.x1 + viewport.x2) / 2, y: (viewport.y1 + viewport.y2) / 2 };
+      const stepX = 150 / viewport.zoom, stepY = 120 / viewport.zoom;
+      const candidates: { x: number; y: number }[] = [];
+      for (let ring = 0; ring <= 12; ring++) {
+        for (let row = -ring; row <= ring; row++) for (let col = -ring; col <= ring; col++) {
+          if (Math.max(Math.abs(row), Math.abs(col)) === ring) candidates.push({ x: center.x + col * stepX, y: center.y + row * stepY });
+        }
+      }
+      candidates.sort((a, b) => Math.hypot(a.x - center.x, a.y - center.y) - Math.hypot(b.x - center.x, b.y - center.y));
+      const free = (pos: { x: number; y: number }) => !nodes.some(n => Math.abs((n.x ?? 0) - pos.x) < 90 && Math.abs((n.y ?? 0) - pos.y) < 90)
+        && !links.some(l => { const a = nodes.find(n => n.id === l.source), b = nodes.find(n => n.id === l.target);
+          return a && b && this.pointToSegmentDist(pos.x, pos.y, a.x ?? 0, a.y ?? 0, b.x ?? 0, b.y ?? 0) < 55; });
+      const visible = (pos: { x: number; y: number }) => pos.x >= viewport.x1 && pos.x <= viewport.x2 && pos.y >= viewport.y1 && pos.y <= viewport.y2;
+      return candidates.find(pos => visible(pos) && free(pos)) ?? candidates.find(free) ?? { x: Math.max(...nodes.map(n => n.x ?? 0), center.x) + 180, y: center.y };
+    }
     const cols = 5;
     const spacingX = 150;
     const spacingY = 120;
