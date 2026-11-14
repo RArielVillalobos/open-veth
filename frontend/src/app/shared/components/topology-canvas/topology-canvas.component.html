@@ -185,3 +185,21 @@
     </div>
   }
 </div>
+@if (activeDomainOverlay()) {
+  <aside class="domain-legend" role="region" aria-label="Domain legend">
+    <h3>{{ activeDomainOverlay() === 'broadcast' ? 'Broadcast domains' : 'Collision domains · teaching model' }}</h3>
+    <p>{{ activeDomainOverlay() === 'broadcast' ? 'Links with the same label share an L2 broadcast domain in this model.' : 'Hubs share a segment; other links are separate. Full-duplex links do not collide.' }}</p>
+    <div class="domain-legend__items">
+      @for (domain of domainLegend(); track domain.name) {
+        <span><i [style.background]="domain.color" aria-hidden="true"></i><strong>{{ domain.name }}</strong> · {{ domain.links }} {{ domain.links === 1 ? 'link' : 'links' }}</span>
+      } @empty {
+        <span>{{ domains() ? 'No links in this topology.' : 'Domain model unavailable.' }}</span>
+      }
+    </div>
+    <p>Structural view · includes inactive connections.</p>
+    <details>
+      <summary>Model scope</summary>
+      <p>Structural topology, including disabled links and stopped nodes. Only Switch and Hub bridge ports. VLANs, custom bridges and interface configuration inside nodes are not inspected. Physical Ethernet collisions are not simulated.</p>
+    </details>
+  </aside>
+}

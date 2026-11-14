@@ -161,3 +161,39 @@ test('short diagonal cables keep endpoint labels clear of node icons', async ({ 
   })).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('short-diagonal-labels.png'), fullPage: true });
 });
+
+
+test('domain overlays identify links without merging the server visually', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1500, height: 850 });
+  const state = await setupApiMocks(page);
+  const ids = ['pc-a', 'sw-a', 'server', 'sw-b', 'pc-b'];
+  const types = ['host', 'switch', 'server', 'switch', 'host'];
+  state.nodes = ids.map((id, i) => ({ id, name: ['PC-A', 'SW-A', 'SERVER', 'SW-B', 'PC-B'][i], type: types[i], x: 120 + i * 240, y: 280, status: 'running', lab_id: state.labs[0].id }));
+  state.links = ids.slice(1).map((id, i) => ({ id: 'l' + (i + 1), source: ids[i], target: id, source_int: 'eth1', target_int: 'eth0', enabled: i !== 3, lab_id: state.labs[0].id }));
+  await page.route('**/api/v1/laboratories/*/domains', route => route.fulfill({ json: {
+    broadcast_domains: [{ id: 0, node_ids: ids.slice(0, 3), link_ids: ['l1', 'l2'] }, { id: 1, node_ids: ids.slice(2), link_ids: ['l3', 'l4'] }],
+    collision_domains: state.links.map((l, i) => ({ id: i, node_ids: [l.source, l.target], link_ids: [l.id] })),
+  } }));
+  await page.goto('/');
+  await page.waitForFunction(() => (document.querySelector('.cy-container') as any)?.__cy?.edges().length === 4);
+  await page.getByRole('button', { name: 'Broadcast 2', exact: true }).click();
+  const legend = page.getByRole('region', { name: 'Domain legend' });
+  await expect(legend.getByText('BD1', { exact: true })).toBeVisible();
+  await expect(legend.getByText('BD2', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => {
+    const cy = (document.querySelector('.cy-container') as any).__cy;
+    return cy.nodes().every((n: any) => !n.classes().some((c: string) => c.startsWith('domain-'))) && cy.getElementById('l1').data('domain_label') === 'BD1' && cy.getElementById('l4').data('domain_label') === 'BD2' && cy.getElementById('l4').style('label') === 'Disabled · BD2';
+  })).toBe(true);
+  await legend.getByText('Model scope', { exact: true }).click();
+  await expect(legend).toContainText('including disabled links and stopped nodes');
+  await page.screenshot({ path: testInfo.outputPath('broadcast-domains.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Collision 4', exact: true }).click();
+  await expect(legend).toContainText('Full-duplex links do not collide');
+  await expect(legend.getByText('CD4', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (document.querySelector('.cy-container') as any).__cy.getElementById('l4').style('label'))).toBe('Disabled · CD4');
+  await page.screenshot({ path: testInfo.outputPath('collision-domains.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Collision 4', exact: true }).click();
+  await expect(legend).not.toBeVisible();
+  expect(await page.evaluate(() => (document.querySelector('.cy-container') as any).__cy.getElementById('l4').style('label'))).toBe('Disabled');
+  expect(await page.evaluate(() => (document.querySelector('.cy-container') as any).__cy.edges().every((e: any) => !e.data('domain_label') && !e.classes().some((c: string) => c.startsWith('domain-'))))).toBe(true);
+});

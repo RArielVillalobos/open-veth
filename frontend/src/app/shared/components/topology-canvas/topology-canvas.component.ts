@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, input, output, effect, OnDestroy, signal, HostListener } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, input, output, effect, OnDestroy, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -33,6 +33,11 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   terminalNode = input<string | null>(null);
   domains = input<DomainsResponse | null>(null);
   activeDomainOverlay = input<'broadcast' | 'collision' | null>(null);
+  domainLegend = computed(() => {
+    const mode = this.activeDomainOverlay(), domains = this.domains();
+    const list = mode === 'broadcast' ? domains?.broadcast_domains : mode === 'collision' ? domains?.collision_domains : [];
+    return (list ?? []).map(domain => ({ name: (mode === 'broadcast' ? 'BD' : 'CD') + (domain.id + 1), color: DOMAIN_COLORS[domain.id % DOMAIN_COLORS.length], links: domain.link_ids.length }));
+  });
   traceroutePath = input<TracerouteResponse | null>(null);
   linkRequest = output<{source: string, target: string}>();
   openTerminalRequest = output<string>();
@@ -536,52 +541,31 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         classPattern.lastIndex = 0;
       });
     });
+    this.cy.edges().removeData('domain_label');
     this.clearDomainCanvas();
+    this.scheduleLabels();
   }
 
   private applyDomainOverlay(domains: DomainsResponse, mode: 'broadcast' | 'collision'): void {
     const prefix = mode === 'broadcast' ? 'bd' : 'cd';
     const domainList = mode === 'broadcast' ? domains.broadcast_domains : domains.collision_domains;
 
-    domainList.forEach((domain, index) => {
-      const colorIndex = index % DOMAIN_COLORS.length;
-      const className = `domain-${prefix}-${colorIndex}`;
-
-      // Color links in both modes
+    domainList.forEach(domain => {
+      const colorIndex = domain.id % DOMAIN_COLORS.length;
       domain.link_ids.forEach(linkId => {
-        const el = this.cy.getElementById(linkId);
-        if (!el.empty()) el.addClass(className);
-      });
-
-      // In CD mode, only color links
-      if (mode === 'collision') return;
-
-      // In BD mode, also color nodes
-      domain.node_ids.forEach(nodeId => {
-        const el = this.cy.getElementById(nodeId);
-        if (!el.empty()) el.addClass(className);
+        const edge = this.cy.getElementById(linkId);
+        if (!edge.empty()) {
+          edge.addClass(`domain-${prefix}-${colorIndex}`);
+          edge.data('domain_label', (mode === 'broadcast' ? 'BD' : 'CD') + (domain.id + 1));
+        }
       });
     });
-
-    // Draw polygons for broadcast domains
-    if (mode === 'broadcast') {
-      this.drawDomainPolygons(domainList);
-    }
+    this.scheduleLabels();
   }
 
   private redrawOverlayCanvas(): void {
-    this.redrawDomainPolygons();
+    this.clearDomainCanvas();
     this.drawTracerouteHopBadges();
-  }
-
-  private redrawDomainPolygons(): void {
-    const domains = this.domains();
-    const overlay = this.activeDomainOverlay();
-    if (overlay === 'broadcast' && domains) {
-      this.drawDomainPolygons(domains.broadcast_domains);
-    } else {
-      this.clearDomainCanvas();
-    }
   }
 
   private clearDomainCanvas(): void {
@@ -647,90 +631,6 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawDomainPolygons(domainList: DomainsResponse['broadcast_domains']): void {
-    if (!this.cy) return;
-    const ctx = this.setupOverlayCanvas();
-    if (!ctx) return;
-
-    domainList.forEach((domain, index) => {
-      const color = DOMAIN_COLORS[index % DOMAIN_COLORS.length];
-
-      // Gather rendered positions of domain nodes
-      const points: { x: number; y: number }[] = [];
-      domain.node_ids.forEach(nodeId => {
-        const el = this.cy.getElementById(nodeId);
-        if (!el.empty()) {
-          const pos = el.renderedPosition();
-          points.push({ x: pos.x, y: pos.y });
-        }
-      });
-
-      if (points.length < 2) return; // Need at least 2 nodes for a polygon
-
-      const hull = this.convexHull(points);
-      const padding = 40;
-
-      ctx.beginPath();
-      if (hull.length === 2) {
-        // Draw a rounded rectangle between 2 points
-        this.drawRoundedSegment(ctx, hull[0], hull[1], padding);
-      } else {
-        // Draw expanded convex hull with rounded corners
-        this.drawExpandedHull(ctx, hull, padding);
-      }
-
-      // Fill
-      ctx.fillStyle = color + '15'; // ~8% opacity
-      ctx.fill();
-
-      // Stroke
-      ctx.strokeStyle = color + '40'; // ~25% opacity
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    });
-  }
-
-  private convexHull(points: { x: number; y: number }[]): { x: number; y: number }[] {
-    if (points.length <= 2) return [...points];
-
-    // Andrew's monotone chain algorithm
-    const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
-    const cross = (O: any, A: any, B: any) =>
-      (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
-
-    const lower: any[] = [];
-    for (const p of sorted) {
-      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
-        lower.pop();
-      lower.push(p);
-    }
-    const upper: any[] = [];
-    for (const p of [...sorted].reverse()) {
-      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
-        upper.pop();
-      upper.push(p);
-    }
-    upper.pop();
-    lower.pop();
-    return lower.concat(upper);
-  }
-
-  private drawRoundedSegment(ctx: CanvasRenderingContext2D, a: { x: number; y: number }, b: { x: number; y: number }, padding: number): void {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const nx = -dy / len * padding;
-    const ny = dx / len * padding;
-
-    // Draw a stadium shape (rectangle with semicircle caps)
-    const angle = Math.atan2(dy, dx);
-    ctx.arc(a.x, a.y, padding, angle + Math.PI / 2, angle - Math.PI / 2);
-    ctx.arc(b.x, b.y, padding, angle - Math.PI / 2, angle + Math.PI / 2);
-    ctx.closePath();
-  }
-
   private scheduleLabels() {
     if (!this.cy || this.destroyed || this.labelFrame !== null) return;
     this.labelFrame = requestAnimationFrame(() => { this.labelFrame = null; this.updateEndpointLabels(); });
@@ -740,6 +640,14 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     if (!this.cy || this.destroyed) return;
     const labels: { id: string; x: number; y: number; iface: string; ip: string; focused: boolean }[] = [];
     const occupied = this.cy.nodes().map(node => node.renderedBoundingBox());
+    for (const edge of this.cy.edges()) {
+      const text = edge.style('label');
+      if (!text) continue;
+      const p = edge.renderedMidpoint();
+      const w = Math.max(42, text.length * 6.6 + 8);
+      occupied.push({ x1: p.x - w / 2, x2: p.x + w / 2, y1: p.y - 10, y2: p.y + 18, w, h: 28 });
+    }
+
     const width = this.container.nativeElement.clientWidth, height = this.container.nativeElement.clientHeight;
     const zoom = this.cy.zoom();
     const edges = this.cy.edges().toArray().sort((a, b) => Number(this.labelFocused(b)) - Number(this.labelFocused(a)));
@@ -782,49 +690,6 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
 
   private labelFocused(edge: cytoscape.EdgeSingular) {
     return edge.id() === this.selectedLinkId() || edge.source().id() === this.selectedNodeId() || edge.target().id() === this.selectedNodeId();
-  }
-
-  private drawExpandedHull(ctx: CanvasRenderingContext2D, hull: { x: number; y: number }[], padding: number): void {
-    // Expand hull outward and draw with rounded corners
-    const n = hull.length;
-    const expanded: { x: number; y: number }[] = [];
-
-    for (let i = 0; i < n; i++) {
-      const curr = hull[i];
-      const prev = hull[(i - 1 + n) % n];
-      const next = hull[(i + 1) % n];
-
-      // Outward direction at this vertex (average of two edge normals)
-      const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
-      const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
-      const nx1 = -dy1, ny1 = dx1;
-      const nx2 = -dy2, ny2 = dx2;
-      const len1 = Math.sqrt(nx1 * nx1 + ny1 * ny1) || 1;
-      const len2 = Math.sqrt(nx2 * nx2 + ny2 * ny2) || 1;
-      const ox = (nx1 / len1 + nx2 / len2) / 2;
-      const oy = (ny1 / len1 + ny2 / len2) / 2;
-      const olen = Math.sqrt(ox * ox + oy * oy) || 1;
-
-      expanded.push({
-        x: curr.x + (ox / olen) * padding,
-        y: curr.y + (oy / olen) * padding
-      });
-    }
-
-    // Draw with quadratic curves for rounded corners
-    ctx.moveTo(
-      (expanded[n - 1].x + expanded[0].x) / 2,
-      (expanded[n - 1].y + expanded[0].y) / 2
-    );
-    for (let i = 0; i < n; i++) {
-      const next = (i + 1) % n;
-      ctx.quadraticCurveTo(
-        expanded[i].x, expanded[i].y,
-        (expanded[i].x + expanded[next].x) / 2,
-        (expanded[i].y + expanded[next].y) / 2
-      );
-    }
-    ctx.closePath();
   }
 
   private updateCanvas(): void {

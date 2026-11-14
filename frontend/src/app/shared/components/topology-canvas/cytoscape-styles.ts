@@ -3,45 +3,10 @@ import { DOMAIN_COLORS, ROUTE_HIGHLIGHT_COLOR, ROUTE_HIGHLIGHT_STATIC_COLOR } fr
 import { GROUND, SURFACE, INK, INK_FAINT, UP } from './theme-colors';
 
 function generateDomainStyles(): cytoscape.StylesheetStyle[] {
-  const styles: cytoscape.StylesheetStyle[] = [];
-  for (let i = 0; i < DOMAIN_COLORS.length; i++) {
-    const color = DOMAIN_COLORS[i];
-    styles.push({
-      selector: `node.domain-bd-${i}`,
-      style: {
-        'border-width': 3,
-        'border-color': color,
-        'border-opacity': 1,
-        'background-color': color,
-        'background-opacity': 0.15,
-      }
-    });
-    styles.push({
-      selector: `edge.domain-bd-${i}`,
-      style: {
-        'line-color': color,
-        'width': 4,
-      }
-    });
-    styles.push({
-      selector: `node.domain-cd-${i}`,
-      style: {
-        'border-width': 3,
-        'border-color': color,
-        'border-opacity': 1,
-        'border-style': 'dashed',
-      }
-    });
-    styles.push({
-      selector: `edge.domain-cd-${i}`,
-      style: {
-        'line-color': color,
-        'line-style': 'dashed',
-        'width': 4,
-      }
-    });
-  }
-  return styles;
+  return DOMAIN_COLORS.flatMap((color, index) => [
+    { selector: `edge.domain-bd-${index}`, style: { 'line-color': color, 'width': 4 } },
+    { selector: `edge.domain-cd-${index}`, style: { 'line-color': color, 'line-style': 'dashed', 'width': 4 } },
+  ] as cytoscape.StylesheetStyle[]);
 }
 
 function nodeImageStyle(url: string): cytoscape.StylesheetStyle['style'] {
@@ -122,7 +87,10 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'width': 4,
         'line-color': INK_FAINT,
         'curve-style': 'bezier',
-        'label': '',
+        'label': (edge: cytoscape.EdgeSingular) => {
+          const domain = edge.data('domain_label') || '';
+          return edge.hasClass('link-disabled') ? (domain ? 'Disabled · ' + domain : 'Disabled') : domain;
+        },
         'text-rotation': 'autorotate',
         'source-label': '',
         'target-label': '',
@@ -131,13 +99,13 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'source-text-margin-y': -24,
         'target-text-margin-y': 24,
         'text-margin-y': 4,
-        'font-size': '13px',
+        'font-size': '11px',
         'font-family': '"IBM Plex Mono", monospace',
         'color': INK,
         'text-wrap': 'wrap',
         'text-background-opacity': 0.9,
         'text-background-color': SURFACE,
-        'text-background-padding': '5px',
+        'text-background-padding': '3px',
         'text-background-shape': 'roundrectangle'
       }
     },
@@ -146,7 +114,8 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       style: {
         'line-color': INK_FAINT,
         'line-style': 'dashed',
-        'opacity': 0.4,
+        'line-opacity': 0.4,
+        'text-opacity': 1,
       }
     },
     {
