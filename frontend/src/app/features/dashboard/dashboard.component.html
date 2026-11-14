@@ -169,7 +169,7 @@
             @if (activationBusy() || isImporting()) {
               <div class="canvas-progress" role="status"><strong>{{ isImporting() ? 'Importing topology' : 'Activating ' + pendingLabName() }}</strong><span>The current view stays visible until the result is confirmed.</span></div>
             }
-            <app-topology-canvas
+            <app-topology-canvas [selectedNodeId]="ui.selectedNodeId()" [selectedLinkId]="ui.selectedLinkId()"
                 [nodes]="store.topology().nodes"
                 [links]="store.topology().links"
                 [togglingNodes]="store.togglingNodes()"

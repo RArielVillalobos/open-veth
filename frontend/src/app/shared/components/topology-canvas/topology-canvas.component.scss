@@ -339,3 +339,11 @@
 .canvas-mode-button { padding: 5px 8px; background: #131b1e; color: #dbe4e5; border: 1px solid #425256; border-radius: 2px; font-size: 12px; white-space: nowrap; }
 .canvas-mode-button[aria-pressed="true"] { border-color: #83b9df; color: #83b9df; }
 .canvas-hint { padding: 6px; color: #b4c4c6; background: transparent; font-size: 11px; border-radius: 0; }
+.canvas-label-control { display: inline-flex; align-items: center; gap: 6px; color: #8fa3a6; font-size: 11px; }
+.canvas-label-control select { padding: 4px 6px; border: 1px solid #425256; border-radius: 2px; background: #131b1e; color: #b4c4c6; font-size: 11px; }
+.endpoint-labels { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.endpoint-label { position: absolute; display: flex; flex-direction: column; align-items: center; padding: 3px 6px; border-radius: 2px; background: #0d1416e8; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; line-height: 14px; }
+.endpoint-interface { color: #8fa3a6; font-size: 11px; }
+.endpoint-ip { color: #c8d5dc; font-size: 12px; }
+.endpoint-label--focused .endpoint-interface { color: #a3bbcc; }
+@media (max-width: 700px) { .canvas-hint { display: none; } }

@@ -7,7 +7,6 @@ import { Node as TopologyNode, Link, DomainsResponse, TracerouteResponse, NODE_T
 import { DOMAIN_COLORS } from './domain-colors';
 import { SIGNAL, PENDING, UP_600 } from './theme-colors';
 import { parseNetworkAddress } from '../../utils/network-utils';
-import { resolveSubnetColors } from '../../utils/subnet-colors.utils';
 import { edgeMatchesSubnet, edgeMatchesGateway } from '../../utils/route-highlight.utils';
 import { getCytoscapeStyles } from './cytoscape-styles';
 
@@ -24,6 +23,12 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   
   nodes = input.required<TopologyNode[]>();
   links = input.required<Link[]>();
+  selectedNodeId = input<string | null>(null);
+  selectedLinkId = input<string | null>(null);
+  showIPs = signal(true);
+  endpointLabels = signal<{ id: string; x: number; y: number; iface: string; ip: string; focused: boolean }[]>([]);
+  private labelFrame: number | null = null;
+  setLabelMode(value: string) { this.showIPs.set(value === 'ip'); }
   togglingNodes = input<string[]>([]);
   terminalNode = input<string | null>(null);
   domains = input<DomainsResponse | null>(null);
@@ -87,6 +92,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   private tracerouteHopMap = new Map<string, string>(); // nodeId -> label ("S", "1", "2"...)
 
   constructor() {
+    effect(() => { this.showIPs(); this.selectedNodeId(); this.selectedLinkId(); this.scheduleLabels(); });
     effect(() => {
       this.nodes();
       this.links();
@@ -198,6 +204,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.labelFrame !== null) cancelAnimationFrame(this.labelFrame);
     this.destroyed = true;
     this.resizeObserver?.disconnect();
     if (this.pulseInterval) clearInterval(this.pulseInterval);
@@ -462,6 +469,8 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
       }
     });
 
+    this.cy.on('zoom pan resize position add remove', () => this.scheduleLabels());
+
     this.cy.on('zoom pan', () => {
       if (!this.resizingViewport) this.closeContextMenu();
       this.redrawOverlayCanvas();
@@ -688,20 +697,57 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
     ctx.closePath();
   }
 
-  private applySubnetColors(nodeIfaceIPs: Map<string, Map<string, string>>): void {
-    this.cy.edges().forEach(edge => {
-      [...edge.classes()].filter(c => c.startsWith('subnet-')).forEach(c => edge.removeClass(c));
-      edge.removeData('subnet');
-    });
+  private scheduleLabels() {
+    if (!this.cy || this.destroyed || this.labelFrame !== null) return;
+    this.labelFrame = requestAnimationFrame(() => { this.labelFrame = null; this.updateEndpointLabels(); });
+  }
 
-    const colorMap = resolveSubnetColors(this.links(), nodeIfaceIPs);
-    colorMap.forEach((info, linkId) => {
-      const edge = this.cy.getElementById(linkId);
-      if (!edge.empty()) {
-        edge.addClass(`subnet-${info.colorIndex}`);
-        edge.data('subnet', info.subnet);
+  private updateEndpointLabels() {
+    if (!this.cy || this.destroyed) return;
+    const labels: { id: string; x: number; y: number; iface: string; ip: string; focused: boolean }[] = [];
+    const occupied = this.cy.nodes().map(node => node.renderedBoundingBox());
+    const width = this.container.nativeElement.clientWidth, height = this.container.nativeElement.clientHeight;
+    const zoom = this.cy.zoom();
+    const edges = this.cy.edges().toArray().sort((a, b) => Number(this.labelFocused(b)) - Number(this.labelFocused(a)));
+    for (const edge of edges) {
+      const focused = this.labelFocused(edge);
+      if (zoom < 0.45 && !focused) continue;
+      for (const end of ['source', 'target'] as const) {
+        const node = end === 'source' ? edge.source() : edge.target();
+        const other = end === 'source' ? edge.target() : edge.source();
+        const start = node.renderedPosition(), finish = other.renderedPosition();
+        const dx = finish.x - start.x, dy = finish.y - start.y;
+        const length = Math.hypot(dx, dy) || 1, ux = dx / length, uy = dy / length;
+        const [iface, address = ''] = String(edge.data(end + '_int')).split('\n');
+        const ip = (focused || (this.showIPs() && zoom >= 0.75)) ? address : '';
+        const w = Math.max(iface.length * 6.6, ip.length * 7.2) + 12, h = ip ? 34 : 20;
+        const box = node.renderedBoundingBox();
+        const distance = Math.min(length * 0.4, Math.max(box.w, box.h) / 2 + Math.abs(ux) * w / 2 + Math.abs(uy) * h / 2 + 10);
+        let best: { x: number; y: number; score: number } | undefined;
+        for (const along of [distance, length * 0.3, length * 0.45]) {
+          for (const offset of [0, 24, -24, 44, -44, 68, -68]) {
+            const x = start.x + ux * along - uy * offset - w / 2;
+            const y = start.y + uy * along + ux * offset - h / 2;
+            let score = Math.abs(offset) + Math.abs(along - distance) * 0.2;
+            if (x < 4 || y < 48 || x + w > width - 4 || y + h > height - 4) score += 100000;
+            for (const rect of occupied) {
+              const overlapX = Math.min(x + w + 4, rect.x2) - Math.max(x - 4, rect.x1);
+              const overlapY = Math.min(y + h + 4, rect.y2) - Math.max(y - 4, rect.y1);
+              if (overlapX > 0 && overlapY > 0) score += overlapX * overlapY * 100;
+            }
+            if (!best || score < best.score) best = { x, y, score };
+          }
+        }
+        if (!best || (best.score >= 100000 && !focused)) continue;
+        labels.push({ id: edge.id() + '-' + end, x: best.x, y: best.y, iface, ip, focused });
+        occupied.push({ x1: best.x, y1: best.y, x2: best.x + w, y2: best.y + h, w, h });
       }
-    });
+    }
+    this.endpointLabels.set(labels);
+  }
+
+  private labelFocused(edge: cytoscape.EdgeSingular) {
+    return edge.id() === this.selectedLinkId() || edge.source().id() === this.selectedNodeId() || edge.target().id() === this.selectedNodeId();
   }
 
   private drawExpandedHull(ctx: CanvasRenderingContext2D, hull: { x: number; y: number }[], padding: number): void {
@@ -864,7 +910,7 @@ export class TopologyCanvasComponent implements AfterViewInit, OnDestroy {
         }
       });
 
-      this.applySubnetColors(nodeIfaceIPs);
+      this.scheduleLabels();
     });
 
     if (!this.canvasReady) {

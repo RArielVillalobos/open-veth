@@ -122,10 +122,10 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
         'width': 4,
         'line-color': INK_FAINT,
         'curve-style': 'bezier',
-        'label': 'data(subnet)',
+        'label': '',
         'text-rotation': 'autorotate',
-        'source-label': 'data(source_int)',
-        'target-label': 'data(target_int)',
+        'source-label': '',
+        'target-label': '',
         'source-text-offset': 55,
         'target-text-offset': 55,
         'source-text-margin-y': -24,
@@ -173,7 +173,7 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       }
     },
     ...generateDomainStyles(),
-  ...generateSubnetStyles(),
+
     {
       selector: 'edge.route-highlight',
       style: {
@@ -191,14 +191,4 @@ export function getCytoscapeStyles(bg: Record<string, string>): cytoscape.Styles
       }
     },
   ];
-}
-
-function generateSubnetStyles(): cytoscape.StylesheetStyle[] {
-  return DOMAIN_COLORS.map((color, i) => ({
-    selector: `edge.subnet-${i}`,
-    style: {
-      'line-color': color,
-      'width': 4,
-    }
-  }));
 }

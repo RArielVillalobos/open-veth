@@ -1,5 +1,11 @@
 <div class="canvas-overlay">
   <button class="canvas-mode-button" [attr.aria-pressed]="linkMode()" (click)="toggleLinkMode()">{{ linkMode() ? 'Exit connection mode' : 'Connect nodes' }}</button>
+  <label class="canvas-label-control">Labels
+    <select aria-label="Cable labels" [value]="showIPs() ? 'ip' : 'interfaces'" (change)="setLabelMode($any($event.target).value)">
+      <option value="ip">Interfaces + IP</option>
+      <option value="interfaces">Interfaces</option>
+    </select>
+  </label>
   <span class="canvas-hint">{{ linkMode() ? 'Choose two nodes to connect. Escape cancels.' : 'Select a node to inspect it.' }}</span>
   <div *ngIf="sourceNodeId" class="linking-indicator">
     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,3 +176,12 @@
 
 <canvas #domainCanvas class="domain-canvas"></canvas>
 <div #cyContainer class="cy-container"></div>
+
+<div class="endpoint-labels" aria-hidden="true">
+  @for (label of endpointLabels(); track label.id) {
+    <div class="endpoint-label" [class.endpoint-label--focused]="label.focused" [attr.data-endpoint]="label.id" [style.left.px]="label.x" [style.top.px]="label.y">
+      <span class="endpoint-interface">{{ label.iface }}</span>
+      @if (label.ip) { <span class="endpoint-ip">{{ label.ip }}</span> }
+    </div>
+  }
+</div>
